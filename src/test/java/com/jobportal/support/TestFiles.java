@@ -35,6 +35,14 @@ public final class TestFiles {
         return "This is plain text, not a real PDF, DOC or DOCX file.".getBytes(StandardCharsets.UTF_8);
     }
 
+    // An EXE renamed to .pdf (S-F2, G-8): its bytes start with the MZ header, not %PDF,
+    // so FileStorageService's magic-byte check rejects it with "The file content doesn't
+    // match its extension." even though the name and declared content type look fine.
+    public static byte[] exeBytes() {
+        byte[] mzHeader = {0x4D, 0x5A, (byte) 0x90, 0x00};
+        return withSignature(mzHeader);
+    }
+
     // A valid PDF padded to at least sizeBytes, for the "too large" cases.
     public static byte[] pdfBytesOfSize(int sizeBytes) {
         byte[] content = new byte[Math.max(sizeBytes, PDF_SIGNATURE.length)];

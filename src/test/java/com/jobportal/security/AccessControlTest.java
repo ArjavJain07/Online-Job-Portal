@@ -1,8 +1,10 @@
 package com.jobportal.security;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -107,6 +109,19 @@ class AccessControlTest extends IntegrationTestBase {
         mockMvc.perform(get("/employer/jobs/{id}", acmeJobId).with(user(globex)))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/employer/applications/{id}", acmeApplicationId).with(user(globex)))
+                .andExpect(status().isNotFound());
+
+        // AC-P6-2 (M5, Section 6.4): a seeker can only reach their own applications -
+        // Priya opening Rohan's A2 (Java Developer) gets 404, the same rule
+        // ApplicationTrackingTest#listShowsOnlyOwnActiveApplications also proves.
+        UserDetails priya = userDetailsService.loadUserByUsername("priya@demo.local");
+        Long rohansApplicationId = data.applicationId("rohan@demo.local", "Java Developer");
+
+        mockMvc.perform(get("/seeker/applications/{id}", rohansApplicationId).with(user(priya)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/seeker/applications/{id}/resume", rohansApplicationId).with(user(priya)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/seeker/applications/{id}/withdraw", rohansApplicationId).with(user(priya)).with(csrf()))
                 .andExpect(status().isNotFound());
     }
 

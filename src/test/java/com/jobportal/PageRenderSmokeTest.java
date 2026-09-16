@@ -71,7 +71,17 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/employer/jobs/history", "hr@acme.local", "Job posting history"),
                 new Page("/employer/applications", "hr@acme.local", "Applications"),
                 new Page("/employer/applications/1", "hr@acme.local", "APP-00001"), // A1 Priya/Java Developer
-                new Page("/employer/profile", "hr@acme.local", "Company profile"));
+                new Page("/employer/profile", "hr@acme.local", "Company profile"),
+                // Job seeker module (M5, Section 6.4). J2 Spring Boot Intern is Live and
+                // Priya has never applied to it (Section 13.5), so its apply form renders
+                // instead of redirecting; A1 (Priya/Java Developer) is a seed code, equal
+                // to its id on a fresh database (Section 13.1).
+                new Page("/seeker/jobs", "priya@demo.local", "Find jobs"),
+                new Page("/seeker/jobs/2/apply", "priya@demo.local", "Spring Boot Intern"), // J2
+                new Page("/seeker/applications", "priya@demo.local", "My applications"),
+                new Page("/seeker/applications/history", "priya@demo.local", "Application history"),
+                new Page("/seeker/applications/1", "priya@demo.local", "APP-00001"), // A1 Priya/Java Developer
+                new Page("/seeker/profile", "priya@demo.local", "My profile"));
     }
 
     @ParameterizedTest(name = "GET {0} renders for {1}")

@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jobportal.domain.User;
@@ -128,6 +129,25 @@ class AuthFlowTest extends IntegrationTestBase {
         login("hr@acme.local", "Employer@123", session)
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/employer/dashboard"));
+    }
+
+    // AC-P2-2 (M5 half, Section 6.1 P-2 / 4.4): logging in as the JOB_SEEKER whose saved
+    // request this was returns the seeker to the apply form itself, not just their
+    // dashboard - the saved-request URL carries Spring Security 6's own "?continue" query
+    // marker, so the assertion matches the path with a wildcard tail rather than the exact
+    // string.
+    @Test
+    void loginToApplyReturnsToApplyForm() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        Long jobId = data.jobId("Spring Boot Intern");
+
+        mockMvc.perform(get("/seeker/jobs/{id}/apply", jobId).session(session))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("http://localhost/login"));
+
+        login("priya@demo.local", "Seeker@123", session)
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/seeker/jobs/*/apply*"));
     }
 
     private ResultActions login(String email, String password, MockHttpSession session) throws Exception {
