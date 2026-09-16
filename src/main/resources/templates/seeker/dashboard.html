@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${siteName} + ' - Job Seeker Dashboard'">Job Seeker Dashboard</title>
+</head>
+<body>
+<!--
+  M1 placeholder only (Section 11.2): just needs to exist so a seeded job seeker account has
+  somewhere to land after login. M7 replaces this with the real seeker dashboard
+  (application summary, recommended jobs), built on the shared layout and fragments/* once
+  those are in place, rather than kept self-contained like this page.
+-->
+<h1>Job Seeker Dashboard</h1>
+<p>Signed in as <span th:text="${currentUser != null ? currentUser.fullName : ''}">Job Seeker</span>.</p>
+</body>
+</html>

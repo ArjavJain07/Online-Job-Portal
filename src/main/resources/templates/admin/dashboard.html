@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${siteName} + ' - Admin Dashboard'">Admin Dashboard</title>
+</head>
+<body>
+<!--
+  M1 placeholder only (Section 11.2): just needs to exist so the seeded admin account has
+  somewhere to land after login. M3 replaces this with the real admin dashboard (KPI cards,
+  pending-approvals table, live activity widget, latest-applications panel), and M7 adds its
+  chart. Both should build on the shared layout and fragments/* once those are in place,
+  rather than keep this page self-contained.
+-->
+<h1>Admin Dashboard</h1>
+<p>Signed in as <span th:text="${currentUser != null ? currentUser.fullName : ''}">Admin</span>.</p>
+</body>
+</html>

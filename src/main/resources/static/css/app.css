@@ -1,0 +1,688 @@
+/* ============================================================================
+   Job Portal - Application Stylesheet
+   Extends Bootstrap 5.3 with project-specific styles.
+   ============================================================================ */
+
+:root {
+  --color-success: #198754;
+  --color-danger: #dc3545;
+  --color-warning: #ffc107;
+  --color-info: #0dcaf0;
+  --color-primary: #0d6efd;
+  --color-dark: #212529;
+  --color-secondary: #6c757d;
+  --color-light: #f8f9fa;
+
+  --sidebar-width: 180px;
+}
+
+/* ============================================================================
+   Text & Typography
+   ============================================================================ */
+
+/* Preserve line breaks in pre-formatted text (used in job descriptions) */
+.pre-line {
+  white-space: pre-line;
+}
+
+/* ============================================================================
+   Sidebar
+   ============================================================================ */
+
+aside {
+  min-width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
+}
+
+aside .nav-link {
+  padding: 0.75rem 1rem;
+  color: #495057;
+  text-decoration: none;
+  border-left: 4px solid transparent;
+}
+
+aside .nav-link:hover {
+  background-color: var(--color-light);
+  color: var(--color-primary);
+}
+
+aside .nav-link.active {
+  border-left-color: var(--color-primary);
+  background-color: #f0f6ff;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* Responsive: sidebar becomes offcanvas below lg breakpoint */
+@media (max-width: 991.98px) {
+  aside {
+    min-width: auto;
+    max-width: none;
+  }
+}
+
+/* ============================================================================
+   KPI Cards
+   ============================================================================ */
+
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.kpi-card .icon {
+  font-size: 2rem;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.kpi-card .content {
+  flex: 1;
+}
+
+.kpi-card .value {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-dark);
+}
+
+.kpi-card .label {
+  display: block;
+  font-size: 0.875rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+/* ============================================================================
+   Status Badges
+   ============================================================================ */
+
+.badge {
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.25rem;
+}
+
+/* Job status colors (from JobDisplayStatus) */
+.badge.job-live {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.badge.job-expired,
+.badge.job-hidden {
+  background-color: var(--color-secondary);
+  color: white;
+}
+
+.badge.job-pending {
+  background-color: var(--color-warning);
+  color: #000;
+}
+
+.badge.job-rejected {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+.badge.job-closed {
+  background-color: var(--color-dark);
+  color: white;
+}
+
+/* Application status colors (from ApplicationStatus) */
+.badge.app-applied {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.badge.app-under-review {
+  background-color: var(--color-info);
+  color: #000;
+}
+
+.badge.app-shortlisted {
+  background-color: var(--color-warning);
+  color: #000;
+}
+
+.badge.app-interview {
+  background-color: var(--color-dark);
+  color: white;
+}
+
+.badge.app-hired {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.badge.app-rejected {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+.badge.app-withdrawn {
+  background-color: var(--color-secondary);
+  color: white;
+}
+
+/* ============================================================================
+   Tables
+   ============================================================================ */
+
+.table {
+  margin-bottom: 0;
+  font-size: 0.95rem;
+}
+
+.table th {
+  font-weight: 600;
+  background-color: #f8f9fa;
+  border-top-width: 1px;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.3px;
+  color: #495057;
+  padding: 0.75rem;
+}
+
+.table td {
+  padding: 0.75rem;
+  vertical-align: middle;
+}
+
+.table-responsive {
+  border-radius: 0.25rem;
+  border: 1px solid #dee2e6;
+}
+
+/* Small action buttons in tables */
+.table .btn-sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+/* ============================================================================
+   Empty States
+   ============================================================================ */
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #6c757d;
+}
+
+.empty-state .icon {
+  font-size: 3rem;
+  color: #dee2e6;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.empty-state .message {
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  color: #495057;
+}
+
+.empty-state .action {
+  margin-top: 1.5rem;
+}
+
+/* ============================================================================
+   Timeline
+   ============================================================================ */
+
+.timeline {
+  list-style: none;
+  padding-left: 0;
+}
+
+.timeline-item {
+  display: flex;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 0.35rem;
+  top: 2rem;
+  height: calc(100% + 0.5rem);
+  width: 2px;
+  background-color: #dee2e6;
+}
+
+.timeline-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px #dee2e6;
+}
+
+.timeline-item.timeline-success::after {
+  background-color: var(--color-success);
+}
+
+.timeline-item.timeline-danger::after {
+  background-color: var(--color-danger);
+}
+
+.timeline-item.timeline-warning::after {
+  background-color: var(--color-warning);
+}
+
+.timeline-item.timeline-info::after {
+  background-color: var(--color-info);
+}
+
+.timeline-item .date {
+  font-size: 0.8rem;
+  color: #6c757d;
+  min-width: 80px;
+  font-weight: 500;
+}
+
+.timeline-item .content {
+  flex: 1;
+}
+
+.timeline-item .status {
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.timeline-item .note {
+  font-size: 0.9rem;
+  color: #495057;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+/* ============================================================================
+   Messages / Chat Bubbles
+   ============================================================================ */
+
+.message-thread {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0;
+}
+
+.message-item {
+  margin-bottom: 1rem;
+  display: flex;
+}
+
+.message-item.msg-own {
+  justify-content: flex-end;
+}
+
+.message-item.msg-other {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 70%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  word-wrap: break-word;
+  white-space: pre-line;
+}
+
+.msg-own .message-bubble {
+  background-color: var(--color-primary);
+  color: white;
+  border-bottom-right-radius: 0.1rem;
+}
+
+.msg-other .message-bubble {
+  background-color: #f8f9fa;
+  color: #212529;
+  border-bottom-left-radius: 0.1rem;
+  border: 1px solid #dee2e6;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+/* ============================================================================
+   Feed / Activity List
+   ============================================================================ */
+
+#activity-feed,
+#latest-applications {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.feed-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.feed-item:last-child {
+  border-bottom: none;
+}
+
+.feed-item a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.feed-item a:hover {
+  text-decoration: underline;
+}
+
+/* Highlight animation for newly added feed items */
+.feed-item.feed-new {
+  animation: feed-highlight 1s ease-out forwards;
+}
+
+@keyframes feed-highlight {
+  0% {
+    background-color: #fff3cd;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+#feed-status {
+  display: block;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  font-style: italic;
+  color: #dc3545;
+}
+
+/* ============================================================================
+   Flash Messages / Alerts
+   ============================================================================ */
+
+.alert {
+  border-radius: 0.25rem;
+  border: none;
+  font-size: 0.95rem;
+}
+
+.alert.alert-success {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+
+.alert.alert-danger {
+  background-color: #f8d7da;
+  color: #842029;
+}
+
+.alert.alert-warning {
+  background-color: #fff3cd;
+  color: #664d03;
+}
+
+.alert.alert-info {
+  background-color: #cfe2ff;
+  color: #084298;
+}
+
+.alert-dismissible .btn-close {
+  padding: 0.5rem;
+}
+
+/* Auto-dismiss timer (dismissal is handled by JS) */
+.alert[data-auto-dismiss="true"] {
+  animation: auto-dismiss 0s ease-out forwards;
+  animation-delay: 5s;
+}
+
+@keyframes auto-dismiss {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* ============================================================================
+   Forms
+   ============================================================================ */
+
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #212529;
+}
+
+.form-label.required::after {
+  content: ' *';
+  color: var(--color-danger);
+}
+
+.form-control,
+.form-select {
+  border-radius: 0.25rem;
+  border: 1px solid #dee2e6;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.form-control.is-invalid {
+  border-color: var(--color-danger);
+}
+
+.form-control.is-invalid:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.invalid-feedback {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--color-danger);
+}
+
+.form-text {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+/* Character counter */
+.char-counter {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+.char-counter.warning {
+  color: #ff9800;
+  font-weight: 500;
+}
+
+/* File size hint */
+.file-size-hint {
+  display: block;
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 0.5rem;
+}
+
+/* ============================================================================
+   Cards & Panels
+   ============================================================================ */
+
+.card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  font-weight: 600;
+  padding: 1rem;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-footer {
+  background-color: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  padding: 1rem;
+}
+
+/* ============================================================================
+   Charts
+   ============================================================================ */
+
+.chart-container {
+  position: relative;
+  height: 300px;
+  margin-bottom: 1.5rem;
+}
+
+.chart-data-table {
+  width: 100%;
+  font-size: 0.85rem;
+  margin-top: 1rem;
+}
+
+.chart-data-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.chart-data-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
+  text-align: right;
+}
+
+.chart-data-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   Print Styles
+   ============================================================================ */
+
+@media print {
+  body {
+    font-size: 11pt;
+    color: #000;
+    background: white;
+  }
+
+  .navbar,
+  aside,
+  .btn,
+  .form-control,
+  .alert-dismissible,
+  [data-no-print],
+  .no-print {
+    display: none !important;
+  }
+
+  .card {
+    border: 1px solid #000;
+    page-break-inside: avoid;
+  }
+
+  .table {
+    border-collapse: collapse;
+  }
+
+  .table th,
+  .table td {
+    border: 1px solid #000;
+    padding: 4pt;
+  }
+
+  .timeline-item::before,
+  .timeline-item::after {
+    display: none;
+  }
+
+  a {
+    color: #000;
+    text-decoration: underline;
+  }
+}
+
+/* ============================================================================
+   Utilities & Helpers
+   ============================================================================ */
+
+.text-muted {
+  color: #6c757d !important;
+}
+
+.mt-4 {
+  margin-top: 1.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 1.5rem;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.shadow-sm {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Responsive spacing */
+@media (max-width: 576px) {
+  .kpi-card {
+    padding: 1rem;
+  }
+
+  .timeline-item {
+    font-size: 0.85rem;
+  }
+
+  .message-bubble {
+    max-width: 90%;
+  }
+}

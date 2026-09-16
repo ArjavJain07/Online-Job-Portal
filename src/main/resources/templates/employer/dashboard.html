@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${siteName} + ' - Employer Dashboard'">Employer Dashboard</title>
+</head>
+<body>
+<!--
+  M1 placeholder only (Section 11.2): just needs to exist so a seeded employer account has
+  somewhere to land after login. M7 replaces this with the real employer dashboard (KPIs,
+  recent applications, recommendations link), built on the shared layout and fragments/*
+  once those are in place, rather than kept self-contained like this page.
+-->
+<h1>Employer Dashboard</h1>
+<p>Signed in as <span th:text="${currentUser != null ? currentUser.fullName : ''}">Employer</span>.</p>
+</body>
+</html>
