@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<!--
+  Admin user management table (Section 6.2 A-F1/A-D1). AdminUserController#list puts the
+  Spring Data Page under "page" (read by fragments/pagination) and the three raw filter
+  values under "q"/"role"/"status" so the filter bar keeps whatever was typed, even an
+  unrecognised value UserService quietly fell back to "Any" for (Section 7.9). "roles" is
+  Role.values(), passed in from Java because Thymeleaf 3.1 cannot reference an application
+  enum with T(...) in restricted mode (see the note in fragments/job-filters.html).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Users', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <div>
+            <h1 class="h3 mb-1">Users</h1>
+            <p class="text-muted mb-0">Create, edit, deactivate or delete accounts of any role.</p>
+        </div>
+        <a th:href="@{/admin/users/new}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Create user</a>
+    </div>
+
+    <form method="get" th:action="@{/admin/users}" class="card shadow-sm mt-3 mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="filter-q">Search</label>
+                    <input type="text" class="form-control" id="filter-q" name="q" maxlength="100"
+                           placeholder="Name, email or company" th:value="${q}">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="filter-role">Role</label>
+                    <select class="form-select" id="filter-role" name="role">
+                        <option value="" th:selected="${role == null or role == ''}">Any role</option>
+                        <option th:each="r : ${roles}" th:value="${r}" th:text="${r.label}"
+                                th:selected="${role == r.name()}">Role</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="filter-status">Status</label>
+                    <select class="form-select" id="filter-status" name="status">
+                        <option value="" th:selected="${status == null or status == ''}">Any status</option>
+                        <option value="ACTIVE" th:selected="${status == 'ACTIVE'}">Active</option>
+                        <option value="INACTIVE" th:selected="${status == 'INACTIVE'}">Inactive</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i> Search</button>
+                    <a th:href="@{/admin/users}" class="btn btn-outline-secondary" title="Clear filters">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div th:if="${page.empty}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-people icon"></i>
+            <p class="message">No users match these filters.</p>
+        </div>
+    </div>
+
+    <div th:unless="${page.empty}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                    <th>Registered</th>
+                    <th>Last login</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="u : ${page.content}" th:with="isSelf=${currentUser != null and u.id == currentUser.id}">
+                    <td th:text="${u.fullName}">Full name</td>
+                    <td th:text="${u.email}">email@example.com</td>
+                    <td><span class="badge text-bg-secondary" th:text="${u.role.label}">Role</span></td>
+                    <td th:text="${u.companyName != null ? u.companyName : '-'}">Company</td>
+                    <td>
+                        <span class="badge" th:classappend="${u.enabled} ? 'text-bg-success' : 'text-bg-secondary'"
+                              th:text="${u.enabled} ? 'Active' : 'Inactive'">Active</span>
+                    </td>
+                    <td th:text="${#temporals.format(u.createdAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td th:text="${u.lastLoginAt != null ? #temporals.format(u.lastLoginAt, 'dd MMM yyyy') : 'Never'}">Never</td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a th:href="@{/admin/users/{id}/edit(id=${u.id})}" class="btn btn-sm btn-outline-secondary">Edit</a>
+
+                            <form th:unless="${isSelf}" th:action="@{/admin/users/{id}/toggle-status(id=${u.id})}"
+                                  method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-warning"
+                                        th:if="${u.enabled}"
+                                        data-confirm="Deactivate this account? They will be logged out and won't be able to log in until reactivated.">
+                                    Deactivate
+                                </button>
+                                <button type="submit" class="btn btn-sm btn-outline-success" th:unless="${u.enabled}">
+                                    Activate
+                                </button>
+                            </form>
+
+                            <a th:unless="${isSelf}" th:href="@{/admin/users/{id}/delete(id=${u.id})}"
+                               class="btn btn-sm btn-outline-danger">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>

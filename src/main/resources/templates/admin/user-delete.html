@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+  Delete confirmation page (Section 6.2 A-F1, Section 5.8). AdminUserController#confirmDelete
+  hands over the target user, the Jobs/Applications/Messages dependency counts, and two
+  booleans that pick which button shows: "canDelete" (all three counts are zero) gets the
+  red "Delete permanently" button; otherwise the blocking message replaces it with a
+  "Deactivate instead" button (only offered when the account is still active - deactivating
+  an already-inactive one would be a no-op). "isSelf" is defensive: the users table never
+  links here for the admin's own row, but UserService.delete would still refuse it.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Delete User', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Delete user</h1>
+    <p class="text-muted mb-4">This cannot be undone once the account has no related records left.</p>
+
+    <div class="row">
+        <div class="col-md-9 col-lg-7">
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Name</dt>
+                        <dd class="col-sm-9" th:text="${targetUser.fullName}">Full name</dd>
+
+                        <dt class="col-sm-3">Email</dt>
+                        <dd class="col-sm-9" th:text="${targetUser.email}">email@example.com</dd>
+
+                        <dt class="col-sm-3">Role</dt>
+                        <dd class="col-sm-9" th:text="${targetUser.role.label}">Role</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <p class="mb-3">
+                        <strong>Jobs:</strong> <span th:text="${counts.jobs}">0</span>
+                        &middot; <strong>Applications:</strong> <span th:text="${counts.applications}">0</span>
+                        &middot; <strong>Messages:</strong> <span th:text="${counts.messages}">0</span>
+                    </p>
+
+                    <div class="alert alert-warning" th:if="${isSelf}">
+                        You can't delete your own account.
+                    </div>
+
+                    <div th:unless="${isSelf}">
+                        <form th:if="${canDelete}" th:action="@{/admin/users/{id}/delete(id=${targetUser.id})}" method="post">
+                            <button type="submit" class="btn btn-danger"
+                                    th:attr="data-confirm=${'Permanently delete ' + targetUser.fullName + '? This cannot be undone.'}">
+                                <i class="bi bi-trash me-1"></i>Delete permanently
+                            </button>
+                        </form>
+
+                        <div th:unless="${canDelete}">
+                            <div class="alert alert-danger" th:text="${blockedMessage}">Blocking message.</div>
+                            <form th:if="${targetUser.enabled}" th:action="@{/admin/users/{id}/toggle-status(id=${targetUser.id})}"
+                                  method="post">
+                                <button type="submit" class="btn btn-warning">Deactivate instead</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <a th:href="@{/admin/users}" class="btn btn-outline-secondary mt-3">Back to users</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

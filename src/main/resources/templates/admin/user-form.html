@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!--
+  Admin create/edit user (Section 6.2 A-F1). One template for both GET /admin/users/new
+  and GET /admin/users/{id}/edit - "userId" (present only on edit) picks the form action
+  and the page title. "editingSelf" (Section 6.2 A-F1 rule 3) hides the role/status
+  controls for the admin's own row: UserService still refuses a role/status change on that
+  row even if this were bypassed, but there is nothing useful to submit for them here since
+  name and email stay editable. "roles" is Role.values() (see the note in admin/users.html
+  for why an enum can't be looped with T(...) in the template itself).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${pageTitle}, content=~{::main}, scripts=~{::scripts})}">
+<body>
+<main>
+    <h1 class="h3 mb-1" th:text="${pageTitle}">Create user</h1>
+    <p class="text-muted mb-4" th:if="${userId == null}">Set up a new account and a temporary password.</p>
+    <p class="text-muted mb-4" th:if="${userId != null}">Update this account's details, role or password.</p>
+
+    <div class="row">
+        <div class="col-md-9 col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <form th:action="@{${formAction}}" th:object="${userForm}" method="post" novalidate>
+
+                        <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}">
+                            <span th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error message.</span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fullName" class="form-label required">Full name</label>
+                            <input type="text" class="form-control" id="fullName" th:field="*{fullName}"
+                                   th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'" maxlength="100">
+                            <div class="invalid-feedback" th:errors="*{fullName}">Name error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label required">Email</label>
+                            <input type="email" class="form-control" id="email" th:field="*{email}"
+                                   th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'" maxlength="254">
+                            <div class="invalid-feedback" th:errors="*{email}">Email error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="role" class="form-label required">Role</label>
+                            <select id="role" class="form-select" th:field="*{role}" th:disabled="${editingSelf}"
+                                    th:classappend="${#fields.hasErrors('role')} ? 'is-invalid'">
+                                <option th:each="r : ${roles}" th:value="${r}" th:text="${r.label}">Role</option>
+                            </select>
+                            <input type="hidden" th:if="${editingSelf}" name="role" th:value="*{role}">
+                            <div class="form-text" th:if="${editingSelf}">You can't change your own role.</div>
+                            <div class="invalid-feedback" th:errors="*{role}">Role error.</div>
+                        </div>
+
+                        <div class="mb-3" id="companyNameGroup">
+                            <label for="companyName" class="form-label">Company name</label>
+                            <input type="text" class="form-control" id="companyName" th:field="*{companyName}"
+                                   th:classappend="${#fields.hasErrors('companyName') or #fields.hasErrors('companyNameValid')} ? 'is-invalid'"
+                                   maxlength="120" placeholder="Required for employer accounts">
+                            <div class="invalid-feedback" th:errors="*{companyNameValid}">Company name error.</div>
+                        </div>
+
+                        <div class="mb-3 form-check" th:unless="${editingSelf}">
+                            <input type="checkbox" class="form-check-input" id="enabled" th:field="*{enabled}">
+                            <label class="form-check-label" for="enabled">Account active</label>
+                        </div>
+                        <div class="mb-3" th:if="${editingSelf}">
+                            <label class="form-label">Account status</label>
+                            <p class="form-control-plaintext py-0">Active - you can't deactivate your own account here.</p>
+                            <input type="hidden" name="enabled" value="true">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label" th:classappend="${userId == null} ? 'required'">
+                                <span th:text="${userId == null} ? 'Temporary password' : 'New password'">Password</span>
+                            </label>
+                            <input type="password" class="form-control" id="newPassword" th:field="*{newPassword}"
+                                   th:classappend="${#fields.hasErrors('newPassword')} ? 'is-invalid'" autocomplete="new-password">
+                            <div class="form-text" th:if="${userId == null}">8-64 characters, at least one letter and one digit, no spaces.</div>
+                            <div class="form-text" th:if="${userId != null}">Leave blank to keep the current password.</div>
+                            <div class="invalid-feedback" th:errors="*{newPassword}">Password error.</div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" th:text="${userId == null} ? 'Create user' : 'Save changes'">Save</button>
+                            <a th:href="@{/admin/users}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<th:block th:fragment="scripts">
+    <script>
+        // Shows the company name field only for employer accounts (progressive
+        // enhancement; the server-side rule is UserForm.isCompanyNameValid regardless of
+        // what this script does).
+        (function () {
+            var roleSelect = document.getElementById('role');
+            var companyGroup = document.getElementById('companyNameGroup');
+            function sync() {
+                if (!roleSelect || !companyGroup) return;
+                companyGroup.style.display = roleSelect.value === 'EMPLOYER' ? 'block' : 'none';
+            }
+            if (roleSelect) {
+                roleSelect.addEventListener('change', sync);
+                sync();
+            }
+        })();
+    </script>
+</th:block>
+</body>
+</html>
