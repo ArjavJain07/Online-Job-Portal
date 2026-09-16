@@ -61,6 +61,8 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/admin/jobs/8", "admin@jobportal.local", "Sales Intern"), // J8
                 new Page("/admin/settings", "admin@jobportal.local", "Settings"),
                 new Page("/admin/activity", "admin@jobportal.local", "Live Activity"),
+                // Statistics (M7, Section 6.2 A-D4).
+                new Page("/admin/statistics", "admin@jobportal.local", "Statistics"),
                 // Employer module (M4, Section 6.3). J1 Java Developer and A1 (Priya's
                 // application to it) are seed codes, which equal ids on a fresh database
                 // (Section 13.1), the same rule used above for the admin rows.
@@ -72,6 +74,12 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/employer/applications", "hr@acme.local", "Applications"),
                 new Page("/employer/applications/1", "hr@acme.local", "APP-00001"), // A1 Priya/Java Developer
                 new Page("/employer/profile", "hr@acme.local", "Company profile"),
+                // Messaging and statistics (M6/M7, Section 6.5.1, 6.3 E-D5). A1 (Priya's
+                // Java Developer application) already has a message thread (Section 13.6).
+                new Page("/employer/messages", "hr@acme.local", "Messages"),
+                new Page("/employer/messages/new", "hr@acme.local", "New message"),
+                new Page("/employer/messages/1", "hr@acme.local", "Messages"),
+                new Page("/employer/statistics", "hr@acme.local", "Statistics"),
                 // Job seeker module (M5, Section 6.4). J2 Spring Boot Intern is Live and
                 // Priya has never applied to it (Section 13.5), so its apply form renders
                 // instead of redirecting; A1 (Priya/Java Developer) is a seed code, equal
@@ -81,7 +89,13 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/seeker/applications", "priya@demo.local", "My applications"),
                 new Page("/seeker/applications/history", "priya@demo.local", "Application history"),
                 new Page("/seeker/applications/1", "priya@demo.local", "APP-00001"), // A1 Priya/Java Developer
-                new Page("/seeker/profile", "priya@demo.local", "My profile"));
+                new Page("/seeker/profile", "priya@demo.local", "My profile"),
+                // Messaging and recommendations (M6/M7, Section 6.5.1, 6.4 S-D5). A1 is
+                // Priya's own thread (Section 13.6); she has skills, so recommendations
+                // are personalised rather than the "Latest jobs" fallback (Section 13.3).
+                new Page("/seeker/messages", "priya@demo.local", "Messages"),
+                new Page("/seeker/messages/1", "priya@demo.local", "Messages"),
+                new Page("/seeker/recommendations", "priya@demo.local", "Recommended for you"));
     }
 
     @ParameterizedTest(name = "GET {0} renders for {1}")

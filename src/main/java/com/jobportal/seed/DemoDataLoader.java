@@ -71,9 +71,24 @@ public class DemoDataLoader {
     private static final int CREATED_HOUR = 10;
     private static final int LOGIN_HOUR = 9;
     private static final int JOB_POSTED_HOUR = 10;
-    private static final int JOB_DECISION_HOUR = 11;
+    // MUST equal JOB_POSTED_HOUR: every seeded decision is exactly one calendar day after
+    // its job's "Posted" row (Section 13.4's "submitted"/"decision" day counts always
+    // differ by exactly 1), so the two hours must match too, or the gap is not the clean
+    // 24 hours Section 7.6's "Approval turnaround" engagement metric states
+    // ("24.0 hours (all 8 seeded decisions in the last 30 days were made 24 hours after
+    // submission)", checked by AC-A-D4-3). A different hour here (11 was tried) still
+    // reads fine on the job-history screen but silently turns every seeded decision into
+    // 25 hours after submission instead.
+    private static final int JOB_DECISION_HOUR = JOB_POSTED_HOUR;
     private static final int APPLY_HOUR = 10;
-    private static final int STATUS_HOUR = 11;
+    // MUST equal APPLY_HOUR, for the same reason JOB_DECISION_HOUR must equal
+    // JOB_POSTED_HOUR above: Section 7.6's "Average first response" engagement metric
+    // (E-D5, "2.8 days" in the seeded 30-day range) is the mean number of days from
+    // appliedAt to the first EMPLOYER-made status change, and every seeded gap between
+    // those two events is a whole number of days (Section 13.5). A different hour here
+    // (11 was tried) adds one extra hour to every one of those six gaps, nudging the true
+    // mean from 17/6 = 2.8333... days up past the 2.85 rounding boundary to "2.9 days".
+    private static final int STATUS_HOUR = APPLY_HOUR;
     private static final int VIEWED_HOUR = 15;
 
     private final UserRepository userRepository;

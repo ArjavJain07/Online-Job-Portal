@@ -61,6 +61,27 @@ class AccessControlTest extends IntegrationTestBase {
                 .andExpect(status().isForbidden());
     }
 
+    // M6/M7 zones (Section 6.5.1, 6.3 E-D5): a job seeker must not reach the employer's
+    // messaging or statistics pages, and an employer must not reach the seeker's own
+    // messages - the same "/employer/**"/"/seeker/**" role matchers reject these before
+    // dispatch ever finds a handler (Section 4.2), exactly like every other cross-zone case
+    // above.
+    @Test
+    void seekerAndEmployerCannotCrossMessagingOrStatisticsZones() throws Exception {
+        UserDetails seeker = userDetailsService.loadUserByUsername("priya@demo.local");
+        UserDetails employer = userDetailsService.loadUserByUsername("hr@acme.local");
+
+        mockMvc.perform(get("/employer/messages").with(user(seeker)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/employer/messages/new").with(user(seeker)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/employer/statistics").with(user(seeker)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/seeker/messages").with(user(employer)))
+                .andExpect(status().isForbidden());
+    }
+
     // AC-P6-1 (third clause): a logged-in user gets 404, not a redirect to /login, for an
     // unknown URL (MockMvc sees only the status here, Section 12.1).
     @Test
@@ -122,6 +143,14 @@ class AccessControlTest extends IntegrationTestBase {
         mockMvc.perform(get("/seeker/applications/{id}/resume", rohansApplicationId).with(user(priya)))
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/seeker/applications/{id}/withdraw", rohansApplicationId).with(user(priya)).with(csrf()))
+                .andExpect(status().isNotFound());
+
+        // Messaging threads follow the same application-ownership rule (Section 6.5.1
+        // "Ownership": "the same application ownership queries; otherwise 404"): Globex
+        // can't open Acme's thread, and Priya can't open Rohan's.
+        mockMvc.perform(get("/employer/messages/{id}", acmeApplicationId).with(user(globex)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/seeker/messages/{id}", rohansApplicationId).with(user(priya)))
                 .andExpect(status().isNotFound());
     }
 
