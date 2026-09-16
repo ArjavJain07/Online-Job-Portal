@@ -1,34 +1,119 @@
 <!DOCTYPE html>
 <!--
-  M1 placeholder only (Section 11.2): just needs to exist, on the shared dashboard layout
-  with the admin sidebar, so the seeded admin account has somewhere to land after login.
-  Milestone M3 replaces this with the real admin dashboard (KPI cards, pending-approvals
-  table, live activity widget, latest-applications panel); M7 adds its chart.
+  The real admin dashboard (Section 6.2 DASH-A, 11.2 M3): KPI cards, the pending-approvals
+  mini table, the live activity widget and the latest-applications panel. This replaces the
+  M1 placeholder. The "Applications, last 30 days" chart is deliberately NOT here yet - see
+  the placeholder card near the bottom - M7 adds it together with the "Full statistics" link
+  (11.2: "everything on this page except the chart" ships in M3).
 
-  AdminDashboardController passes no model attributes of its own, only the global ones
-  from GlobalModelAttributes (currentUser, siteName, announcement, currentPath,
-  unreadMessageCount), so this page uses only those.
+  The scripts block is a SIBLING of <main> (Section 7.1), never inside it, so it runs after
+  the layout's own chart.umd.js/charts.js/forms.js. admin/dashboard.html and
+  admin/activity.html are the only two pages that load activity-feed.js (Section 7.7).
 -->
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{layout/dashboard :: layout(title='Admin Dashboard', content=~{::main}, scripts=~{})}">
+      th:replace="~{layout/dashboard :: layout(title='Admin Dashboard', content=~{::main}, scripts=~{::scripts})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Admin Dashboard</h1>
-    <p class="text-muted mb-4">
-        Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'Admin'}">Admin</span>.
-        <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Admin</span>
-    </p>
+    <h1 class="h3 mb-1">Admin dashboard</h1>
+    <p class="text-muted mb-4">Overview of users, jobs and activity across the site.</p>
 
+    <!-- KPI cards (AC-DA-1): Total users, Live jobs, Pending approvals, Applications
+         today, Active users (7 days). fragments/kpi-card only takes icon/value/label/link,
+         so the "1 admin - 3 employers - 6 seekers" breakdown is a small caption under that
+         card rather than a fifth parameter. -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 mb-4">
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-people', ${totalUsers}, 'Total users', @{/admin/users})}"></div>
+            <p class="text-muted small text-center mt-1 mb-0" th:text="${totalUsersBreakdown}">1 admin &middot; 3 employers &middot; 6 seekers</p>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-briefcase', ${liveJobs}, 'Live jobs', @{/admin/jobs(status='APPROVED')})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-hourglass-split', ${pendingApprovals}, 'Pending approvals', @{/admin/jobs})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-file-earmark-text', ${applicationsToday}, 'Applications today', @{/admin/activity(type='APPLICATION_SUBMITTED')})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-person-check', ${activeUsers7d}, 'Active users (7 days)', @{/admin/users(status='ACTIVE')})}"></div>
+        </div>
+    </div>
+
+    <!-- Pending approvals mini table: 5 oldest PENDING_APPROVAL jobs, oldest first. -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Pending approvals</span>
+            <a th:href="@{/admin/jobs}" class="btn btn-sm btn-outline-secondary">View all</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Company</th>
+                    <th scope="col">Submitted</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="job : ${pendingJobs}">
+                    <td th:text="${job.title}">Job title</td>
+                    <td th:text="${job.employer.companyName}">Company</td>
+                    <td th:text="${#temporals.format(job.createdAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td class="text-end">
+                        <a th:href="@{/admin/jobs/{id}(id=${job.id})}" class="btn btn-sm btn-primary">Review</a>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(pendingJobs)}">
+                    <td colspan="4" class="text-center text-muted py-3">No jobs are waiting for approval.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Live activity widget (last 10 events) and the latest-applications panel, both fed
+         by the same polling script as /admin/activity (Section 7.7). -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-broadcast text-success me-1"></i>Live activity</span>
+                    <a th:href="@{/admin/activity}">Open activity monitor</a>
+                </div>
+                <div class="card-body p-0" style="max-height: 360px; overflow-y: auto;">
+                    <div th:replace="~{fragments/activity-feed :: feed(${liveEvents}, ${liveEventsLastId}, ${feedIntervalMs})}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">Latest applications</div>
+                <div class="card-body p-0">
+                    <div th:replace="~{fragments/activity-feed :: applications(${latestApplications})}"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--
+      M7 placeholder (Section 11.2 M3 note): the "Applications, last 30 days" line chart
+      (fragments/chart-card :: card(...), fed by JobApplicationRepository.findAppliedAtSince
+      through DateBuckets, Section 7.6) and its "Full statistics" link to /admin/statistics
+      both arrive in Milestone M7. Do not build the chart here - AdminStatisticsController
+      and /admin/statistics do not exist yet in M3.
+    -->
     <div class="card shadow-sm">
         <div class="card-body empty-state">
-            <i class="bi bi-cone-striped icon"></i>
-            <p class="message">
-                This is a placeholder page (Section 11.2). The full admin dashboard - KPI cards,
-                the pending-approvals table, the live activity widget and the applications chart -
-                is built in <strong>Milestone M3</strong> (its chart is added in M7).
-            </p>
+            <i class="bi bi-graph-up icon"></i>
+            <p class="message">The "Applications, last 30 days" chart and full statistics arrive in Milestone M7.</p>
         </div>
     </div>
 </main>
+
+<th:block th:fragment="scripts">
+    <script th:src="@{/js/activity-feed.js}"></script>
+</th:block>
 </body>
 </html>

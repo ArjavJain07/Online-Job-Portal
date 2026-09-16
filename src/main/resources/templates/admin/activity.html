@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<!--
+  Live activity monitor (Section 6.2 A-D5, 7.7). The live panel, the "Latest applications"
+  panel and the new-event counter only appear on the unfiltered first page (liveView, set
+  by AdminActivityController) - a filtered or paged view is a plain history query and shows
+  only the table below. The scripts block is a SIBLING of <main> (Section 7.1) so it runs
+  after the layout's chart.umd.js/charts.js/forms.js, and is one of only two pages that
+  load activity-feed.js (the other is admin/dashboard.html).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Live Activity', content=~{::main}, scripts=~{::scripts})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Live activity</h1>
+    <p class="text-muted mb-4">Every recorded action across the site (Section 5.7).</p>
+
+    <div th:if="${liveView}" class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>
+                        <i class="bi bi-broadcast text-success me-1"></i>
+                        Live &middot; updates every <span th:text="${feedIntervalMs / 1000}">5</span> seconds
+                    </span>
+                    <span class="text-muted small"><span id="new-event-count">0</span> new events since you opened this page</span>
+                </div>
+                <div class="card-body p-0" style="max-height: 480px; overflow-y: auto;">
+                    <div th:replace="~{fragments/activity-feed :: feed(${liveEvents}, ${liveEventsLastId}, ${feedIntervalMs})}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">Latest applications</div>
+                <div class="card-body p-0">
+                    <div th:replace="~{fragments/activity-feed :: applications(${latestApplications})}"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <form method="get" th:action="@{/admin/activity}" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label for="typeFilter" class="form-label mb-0 small">Filter by type</label>
+                    <select id="typeFilter" name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="" th:selected="${selectedType == null}">All types</option>
+                        <option th:each="t : ${types}" th:value="${t.name()}" th:text="${t.label}"
+                                th:selected="${selectedType != null and selectedType == t}">Type</option>
+                    </select>
+                </div>
+                <noscript><div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button></div></noscript>
+            </form>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Time</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Link</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="event : ${historyPage}">
+                    <td th:text="${event.timeLabel}">16 Sep, 10:42</td>
+                    <td><span class="badge bg-secondary" th:text="${event.typeLabel}">Type</span></td>
+                    <td>
+                        <span th:text="${event.actorName != null ? event.actorName : '-'}">Actor</span>
+                        <span class="text-muted small" th:if="${event.actorRole != null}" th:switch="${event.actorRole}">
+                            <span th:case="'ADMIN'">(Admin)</span>
+                            <span th:case="'EMPLOYER'">(Employer)</span>
+                            <span th:case="'JOB_SEEKER'">(Job Seeker)</span>
+                        </span>
+                    </td>
+                    <td th:text="${event.description}">Description</td>
+                    <td>
+                        <a th:if="${event.link != null}" th:href="${event.link}">View</a>
+                        <span th:if="${event.link == null}" class="text-muted">-</span>
+                    </td>
+                </tr>
+                <tr th:if="${historyPage.empty}">
+                    <td colspan="5" class="text-center text-muted py-4">No activity recorded yet.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-body" th:if="${!historyPage.empty}">
+            <div th:replace="~{fragments/pagination :: pagination(${historyPage})}"></div>
+        </div>
+    </div>
+</main>
+
+<th:block th:fragment="scripts">
+    <script th:src="@{/js/activity-feed.js}"></script>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<!--
+  Live activity list (Section 7.7, A-D5). "feed(events, lastId, intervalMs)" renders the
+  polling list itself, #activity-feed; "applications(events)" renders the sibling
+  "Latest applications" panel, #latest-applications, that both admin/dashboard.html and
+  admin/activity.html show next to it. Both fragments are pure display - static/js/activity-feed.js
+  finds these elements by id and does the actual polling and prepending (Section 7.7 client
+  script); nothing here runs JavaScript.
+
+  Each row is written the same way the client script writes one it receives from the feed
+  (timeLabel, then a middle dot, then description - see activity-feed.js), so a row looks
+  identical whether it was rendered here on first load or appended later by the script.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="feed(events, lastId, intervalMs)">
+    <ul id="activity-feed" aria-live="polite"
+        th:attr="data-feed-url=@{/admin/activity/feed}"
+        th:data-last-id="${lastId}"
+        th:data-interval-ms="${intervalMs}">
+        <li class="feed-item" th:each="event : ${events}"
+            th:text="${event.timeLabel} + ' · ' + ${event.description}">16 Sep, 10:42 · Event description.</li>
+        <li class="feed-item text-muted" th:if="${#lists.isEmpty(events)}">No activity recorded yet.</li>
+    </ul>
+    <p id="feed-status" class="small text-muted"></p>
+</div>
+
+<ul th:fragment="applications(events)" id="latest-applications">
+    <li class="feed-item" th:each="event : ${events}"
+        th:text="${event.timeLabel} + ' · ' + ${event.description}">16 Sep, 10:42 · Application submitted.</li>
+    <li class="feed-item text-muted" th:if="${#lists.isEmpty(events)}">No applications yet.</li>
+</ul>
+
+</body>
+</html>
