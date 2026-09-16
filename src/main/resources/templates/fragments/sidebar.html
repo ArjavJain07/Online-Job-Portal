@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!--
+  Left sidebar menu (Section 7.1): one block of links per role, picked with sec:authorize
+  so the markup for the other two roles is never even sent to the browser. The active
+  link is highlighted by comparing the model attribute currentPath (the request URI, set
+  by GlobalModelAttributes) against each link's own URL.
+
+  This <aside> is a Bootstrap "responsive offcanvas": at the lg breakpoint and above the
+  offcanvas-lg class makes it behave like an ordinary static sidebar; below lg it is
+  hidden until the "Menu" button in layout/dashboard.html opens it.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<aside th:fragment="sidebar" class="offcanvas-lg offcanvas-start bg-white border-end"
+       tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel">
+
+    <div class="offcanvas-header d-lg-none">
+        <h5 class="offcanvas-title" id="sidebarMenuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"
+                data-bs-target="#sidebarMenu" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body d-block p-0">
+        <nav class="nav flex-column py-2">
+
+            <!-- Admin menu -->
+            <th:block sec:authorize="hasRole('ADMIN')">
+                <a class="nav-link" th:classappend="${currentPath == '/admin/dashboard'} ? 'active'"
+                   th:href="@{/admin/dashboard}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                <a class="nav-link" th:classappend="${currentPath == '/admin/users'} ? 'active'"
+                   th:href="@{/admin/users}"><i class="bi bi-people me-2"></i>Users</a>
+                <a class="nav-link d-flex justify-content-between align-items-center"
+                   th:classappend="${currentPath == '/admin/jobs'} ? 'active'" th:href="@{/admin/jobs}">
+                    <span><i class="bi bi-briefcase me-2"></i>Job approvals</span>
+                    <span class="badge bg-warning text-dark" th:if="${pendingApprovalCount != null and pendingApprovalCount > 0}"
+                          th:text="${pendingApprovalCount}">0</span>
+                </a>
+                <a class="nav-link" th:classappend="${currentPath == '/admin/statistics'} ? 'active'"
+                   th:href="@{/admin/statistics}"><i class="bi bi-graph-up me-2"></i>Statistics</a>
+                <a class="nav-link" th:classappend="${currentPath == '/admin/activity'} ? 'active'"
+                   th:href="@{/admin/activity}"><i class="bi bi-activity me-2"></i>Live activity</a>
+                <a class="nav-link" th:classappend="${currentPath == '/admin/settings'} ? 'active'"
+                   th:href="@{/admin/settings}"><i class="bi bi-gear me-2"></i>Settings</a>
+            </th:block>
+
+            <!-- Employer menu -->
+            <th:block sec:authorize="hasRole('EMPLOYER')">
+                <a class="nav-link" th:classappend="${currentPath == '/employer/dashboard'} ? 'active'"
+                   th:href="@{/employer/dashboard}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                <a class="nav-link" th:classappend="${currentPath == '/employer/jobs'} ? 'active'"
+                   th:href="@{/employer/jobs}"><i class="bi bi-briefcase me-2"></i>My jobs</a>
+                <a class="nav-link" th:classappend="${currentPath == '/employer/jobs/new'} ? 'active'"
+                   th:href="@{/employer/jobs/new}"><i class="bi bi-plus-circle me-2"></i>Post a job</a>
+                <a class="nav-link" th:classappend="${currentPath == '/employer/jobs/history'} ? 'active'"
+                   th:href="@{/employer/jobs/history}"><i class="bi bi-clock-history me-2"></i>Posting history</a>
+                <a class="nav-link" th:classappend="${currentPath == '/employer/applications'} ? 'active'"
+                   th:href="@{/employer/applications}"><i class="bi bi-file-earmark-person me-2"></i>Applications</a>
+                <a class="nav-link d-flex justify-content-between align-items-center"
+                   th:classappend="${currentPath == '/employer/messages'} ? 'active'" th:href="@{/employer/messages}">
+                    <span><i class="bi bi-envelope me-2"></i>Messages</span>
+                    <span class="badge bg-danger" th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
+                          th:text="${unreadMessageCount}">0</span>
+                </a>
+                <a class="nav-link" th:classappend="${currentPath == '/employer/statistics'} ? 'active'"
+                   th:href="@{/employer/statistics}"><i class="bi bi-graph-up me-2"></i>Statistics</a>
+                <a class="nav-link" th:classappend="${currentPath == '/employer/profile'} ? 'active'"
+                   th:href="@{/employer/profile}"><i class="bi bi-building me-2"></i>Company profile</a>
+            </th:block>
+
+            <!-- Job seeker menu -->
+            <th:block sec:authorize="hasRole('JOB_SEEKER')">
+                <a class="nav-link" th:classappend="${currentPath == '/seeker/dashboard'} ? 'active'"
+                   th:href="@{/seeker/dashboard}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                <a class="nav-link" th:classappend="${currentPath == '/seeker/jobs'} ? 'active'"
+                   th:href="@{/seeker/jobs}"><i class="bi bi-search me-2"></i>Find jobs</a>
+                <a class="nav-link" th:classappend="${currentPath == '/seeker/recommendations'} ? 'active'"
+                   th:href="@{/seeker/recommendations}"><i class="bi bi-stars me-2"></i>Recommended for you</a>
+                <a class="nav-link" th:classappend="${currentPath == '/seeker/applications'} ? 'active'"
+                   th:href="@{/seeker/applications}"><i class="bi bi-send me-2"></i>My applications</a>
+                <a class="nav-link" th:classappend="${currentPath == '/seeker/applications/history'} ? 'active'"
+                   th:href="@{/seeker/applications/history}"><i class="bi bi-clock-history me-2"></i>Application history</a>
+                <a class="nav-link d-flex justify-content-between align-items-center"
+                   th:classappend="${currentPath == '/seeker/messages'} ? 'active'" th:href="@{/seeker/messages}">
+                    <span><i class="bi bi-envelope me-2"></i>Messages</span>
+                    <span class="badge bg-danger" th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
+                          th:text="${unreadMessageCount}">0</span>
+                </a>
+                <a class="nav-link" th:classappend="${currentPath == '/seeker/profile'} ? 'active'"
+                   th:href="@{/seeker/profile}"><i class="bi bi-person me-2"></i>My profile</a>
+            </th:block>
+
+        </nav>
+    </div>
+</aside>
+</body>
+</html>

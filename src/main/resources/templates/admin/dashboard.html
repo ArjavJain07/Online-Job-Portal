@@ -1,18 +1,34 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title th:text="${siteName} + ' - Admin Dashboard'">Admin Dashboard</title>
-</head>
-<body>
 <!--
-  M1 placeholder only (Section 11.2): just needs to exist so the seeded admin account has
-  somewhere to land after login. M3 replaces this with the real admin dashboard (KPI cards,
-  pending-approvals table, live activity widget, latest-applications panel), and M7 adds its
-  chart. Both should build on the shared layout and fragments/* once those are in place,
-  rather than keep this page self-contained.
+  M1 placeholder only (Section 11.2): just needs to exist, on the shared dashboard layout
+  with the admin sidebar, so the seeded admin account has somewhere to land after login.
+  Milestone M3 replaces this with the real admin dashboard (KPI cards, pending-approvals
+  table, live activity widget, latest-applications panel); M7 adds its chart.
+
+  AdminDashboardController passes no model attributes of its own, only the global ones
+  from GlobalModelAttributes (currentUser, siteName, announcement, currentPath,
+  unreadMessageCount), so this page uses only those.
 -->
-<h1>Admin Dashboard</h1>
-<p>Signed in as <span th:text="${currentUser != null ? currentUser.fullName : ''}">Admin</span>.</p>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Admin Dashboard', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Admin Dashboard</h1>
+    <p class="text-muted mb-4">
+        Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'Admin'}">Admin</span>.
+        <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Admin</span>
+    </p>
+
+    <div class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-cone-striped icon"></i>
+            <p class="message">
+                This is a placeholder page (Section 11.2). The full admin dashboard - KPI cards,
+                the pending-approvals table, the live activity widget and the applications chart -
+                is built in <strong>Milestone M3</strong> (its chart is added in M7).
+            </p>
+        </div>
+    </div>
+</main>
 </body>
 </html>

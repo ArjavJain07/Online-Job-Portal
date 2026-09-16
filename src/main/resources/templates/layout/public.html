@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<!--
+  Public layout (Section 7.1): used by the landing page, job search/detail, login and
+  registration. A page hands this layout its own <main> content (and, optionally, a
+  scripts block) as fragment parameters instead of extending a base template, which is
+  how Thymeleaf 3 does "layout inheritance" without a separate layout dialect:
+
+    <html th:replace="~{layout/public :: layout(title='Find jobs', content=~{::main}, scripts=~{})}">
+
+  Structure: navbar, announcement banner, flash messages, page content in a centred
+  container, footer.
+-->
+<html th:fragment="layout(title, content, scripts)" lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' | ' + ${siteName}">Page | JobPortal</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="d-flex flex-column min-vh-100">
+
+<nav th:replace="~{fragments/navbar :: navbar}"></nav>
+
+<div th:replace="~{fragments/flash :: announcement}"></div>
+
+<main class="container py-4 flex-grow-1">
+    <div th:replace="~{fragments/flash :: messages}"></div>
+    <th:block th:replace="${content}"></th:block>
+</main>
+
+<footer class="border-top bg-white py-3 mt-auto">
+    <div class="container text-center text-muted small">
+        <span th:text="${siteName}">JobPortal</span>
+        <span>&#45; an online job portal built as a college project.</span>
+    </div>
+</footer>
+
+<script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/js/forms.js}"></script>
+<th:block th:replace="${scripts}"></th:block>
+
+</body>
+</html>

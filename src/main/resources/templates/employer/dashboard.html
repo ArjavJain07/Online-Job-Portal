@@ -1,17 +1,34 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title th:text="${siteName} + ' - Employer Dashboard'">Employer Dashboard</title>
-</head>
-<body>
 <!--
-  M1 placeholder only (Section 11.2): just needs to exist so a seeded employer account has
-  somewhere to land after login. M7 replaces this with the real employer dashboard (KPIs,
-  recent applications, recommendations link), built on the shared layout and fragments/*
-  once those are in place, rather than kept self-contained like this page.
+  M1 placeholder only (Section 11.2): just needs to exist, on the shared dashboard layout
+  with the employer sidebar, so a seeded employer account has somewhere to land after
+  login. Milestone M7 replaces this with the real employer dashboard (KPIs, recent
+  applications, recommendations link, statistics chart).
+
+  EmployerDashboardController passes no model attributes of its own, only the global ones
+  from GlobalModelAttributes (currentUser, siteName, announcement, currentPath,
+  unreadMessageCount), so this page uses only those.
 -->
-<h1>Employer Dashboard</h1>
-<p>Signed in as <span th:text="${currentUser != null ? currentUser.fullName : ''}">Employer</span>.</p>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Employer Dashboard', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Employer Dashboard</h1>
+    <p class="text-muted mb-4">
+        Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Employer</span>.
+        <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Employer</span>
+    </p>
+
+    <div class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-cone-striped icon"></i>
+            <p class="message">
+                This is a placeholder page (Section 11.2). The full employer dashboard - KPIs,
+                recent applications and the applications chart - is built in <strong>Milestone M7</strong>.
+                In the meantime, use the sidebar to post and manage jobs.
+            </p>
+        </div>
+    </div>
+</main>
 </body>
 </html>

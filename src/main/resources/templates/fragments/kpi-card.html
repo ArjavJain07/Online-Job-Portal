@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<!--
+  Dashboard number card (Section 7.1): an icon, a big number and a label, linking to the
+  page that explains the number (for example "6 Live jobs" links to /admin/jobs). The
+  markup matches the .kpi-card / .icon / .content / .value / .label rules already in
+  app.css. "icon" is a Bootstrap Icons class such as "bi-people" (Section 7.1 icon list).
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<a th:fragment="card(icon, value, label, link)" th:href="${link}" class="card shadow-sm kpi-card text-decoration-none">
+    <i th:class="'bi ' + ${icon} + ' icon'"></i>
+    <div class="content">
+        <span class="value" th:text="${value}">0</span>
+        <span class="label" th:text="${label}">Label</span>
+    </div>
+</a>
+</body>
+</html>

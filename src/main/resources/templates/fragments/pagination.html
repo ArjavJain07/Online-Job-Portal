@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<!--
+  Page links for a Spring Data Page<T> (Section 7.9): Previous, up to 5 page numbers
+  centred on the current page, Next, and a "Showing 11-20 of 57" summary. Every link goes
+  through @pageLinks (web.support.PageLinks), which rebuilds the CURRENT request's URL
+  with only the "page" parameter replaced, so every other filter (q, status, sort, ...)
+  survives the click. @pageLinks.page(n) already returns a full URL, so its result is used
+  directly as the href - it must not be wrapped in another @{...} link expression.
+
+  Nothing is shown when there is only one page (or none).
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="pagination(page)" aria-label="Pagination" th:if="${page != null and page.totalPages > 1}">
+    <ul class="pagination justify-content-center flex-wrap">
+        <li class="page-item" th:classappend="${page.first} ? 'disabled'">
+            <a class="page-link" th:href="${page.first} ? '#' : ${@pageLinks.page(page.number - 1)}">Previous</a>
+        </li>
+        <li class="page-item"
+            th:each="i : ${#numbers.sequence(
+                            T(java.lang.Math).max(0, page.number - 2),
+                            T(java.lang.Math).min(page.totalPages - 1, page.number + 2))}"
+            th:classappend="${i == page.number} ? 'active'">
+            <a class="page-link" th:href="${@pageLinks.page(i)}" th:text="${i + 1}">1</a>
+        </li>
+        <li class="page-item" th:classappend="${page.last} ? 'disabled'">
+            <a class="page-link" th:href="${page.last} ? '#' : ${@pageLinks.page(page.number + 1)}">Next</a>
+        </li>
+    </ul>
+    <p class="text-center text-muted small"
+       th:text="'Showing ' + ${page.number * page.size + 1} + '-'
+                + ${T(java.lang.Math).min((page.number + 1) * page.size, page.totalElements)}
+                + ' of ' + ${page.totalElements}">
+        Showing 11-20 of 57
+    </p>
+</nav>
+</body>
+</html>

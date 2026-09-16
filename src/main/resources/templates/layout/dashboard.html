@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<!--
+  Dashboard layout (Section 7.1): used by every /admin/**, /employer/**, /seeker/** page
+  and /account/password. Same "hand in your <main> as a parameter" pattern as
+  layout/public.html, but with a role sidebar down the left:
+
+    <html th:replace="~{layout/dashboard :: layout(title='My Jobs', content=~{::main}, scripts=~{})}">
+
+  A page with a chart defines its own <th:block th:fragment="scripts"> as a SIBLING of
+  <main> (never inside it - see the comment in fragments/navbar.html and Section 7.1) and
+  passes scripts=~{::scripts}; a page with nothing extra to run passes scripts=~{}.
+-->
+<html th:fragment="layout(title, content, scripts)" lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' | ' + ${siteName}">Page | JobPortal</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<nav th:replace="~{fragments/navbar :: navbar}"></nav>
+
+<div th:replace="~{fragments/flash :: announcement}"></div>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- fragments/sidebar.html supplies its own <aside>; below the lg breakpoint it
+             turns into a Bootstrap "offcanvas" panel opened by the button below
+             (Section 7.1: "becomes an offcanvas menu below the lg breakpoint"). -->
+        <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+        <div class="col-lg-10 py-4">
+            <button class="btn btn-outline-secondary btn-sm d-lg-none mb-3" type="button"
+                    data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
+                <i class="bi bi-list"></i> Menu
+            </button>
+
+            <div th:replace="~{fragments/flash :: messages}"></div>
+            <th:block th:replace="${content}"></th:block>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/webjars/chart.js/dist/chart.umd.js}"></script>
+<script th:src="@{/js/charts.js}"></script>
+<script th:src="@{/js/forms.js}"></script>
+<th:block th:replace="${scripts}"></th:block>   <!-- page scripts always run after the libraries -->
+
+</body>
+</html>

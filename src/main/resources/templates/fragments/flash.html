@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--
+  Flash messages and the system announcement banner (Section 7.2).
+
+  "messages" renders the three flash/model keys a controller can set after a
+  Post/Redirect/Get: "success" (green), "error" (red) and "warning" (yellow, a plain
+  model attribute used for search warnings rather than a flash attribute). Any of the
+  three may be absent, in which case Thymeleaf simply evaluates it to null and nothing
+  is shown - no controller has to set all three every time.
+
+  "announcement" is the admin-configured banner (SystemSettings.announcement, Section
+  7.5) shown above the page content on every page when it is not blank.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="messages">
+    <div class="alert alert-success alert-dismissible fade show" role="alert"
+         data-auto-dismiss="true" th:if="${success != null}">
+        <span th:text="${success}">Success message.</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${error != null}">
+        <span th:text="${error}">Error message.</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div class="alert alert-warning alert-dismissible fade show" role="alert" th:if="${warning != null}">
+        <span th:text="${warning}">Warning message.</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+</div>
+
+<div th:fragment="announcement" class="bg-warning-subtle border-bottom"
+     th:if="${announcement != null and !#strings.isEmpty(announcement)}">
+    <div class="container-fluid py-2 text-center small">
+        <i class="bi bi-megaphone me-1"></i>
+        <span th:text="${announcement}">Announcement text.</span>
+    </div>
+</div>
+
+</body>
+</html>

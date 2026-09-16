@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!--
+  Generic error page (Section 7.1, 7.3): the view name "error", which Spring Boot's
+  BasicErrorController falls back to for any status that has no more specific template
+  (no error/<code>.html and no error/4xx.html or error/5xx.html) - for example 400 Bad
+  Request or 405 Method Not Allowed. A file at templates/error/error.html would never be
+  picked up; it must live here, at the top level of templates/ (Section 7.1, 9).
+
+  Self-contained like the rest of templates/error/*.html (see error/403.html), but this
+  one DOES read "status" and "error", which Spring Boot's DefaultErrorAttributes always
+  adds to the model for error views, regardless of our own GlobalModelAttributes.
+-->
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Something went wrong | JobPortal</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+</head>
+<body class="bg-light">
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <i class="bi bi-exclamation-circle text-secondary" style="font-size: 3.5rem;"></i>
+            <h1 class="h3 mt-3">
+                <span th:if="${status != null}" th:text="'Error ' + ${status}">Error</span>
+                <span th:unless="${status != null}">Error</span>
+            </h1>
+            <p class="text-muted" th:if="${error != null and !#strings.isEmpty(error)}" th:text="${error}">
+                An unexpected error occurred.
+            </p>
+            <a class="btn btn-primary" th:href="@{/dashboard}">Go to my dashboard</a>
+            <a class="btn btn-link" th:href="@{/}">Back to the home page</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

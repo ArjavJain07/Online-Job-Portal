@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<!--
+  Top navigation (Section 7.1). Shared by both layouts, so it must work for anonymous
+  visitors (public pages) and for every logged-in role (dashboard pages). sec:authorize
+  comes from thymeleaf-extras-springsecurity6 and reads the same authorities Spring
+  Security already put in the session, so this markup never needs its own "is logged in"
+  checks in Java.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<nav th:fragment="navbar" class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" th:href="@{/}" th:text="${siteName}">JobPortal</a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarContent" aria-controls="navbarContent"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/jobs}">Find jobs</a>
+                </li>
+            </ul>
+
+            <!-- Anonymous visitor: log in / register -->
+            <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2" sec:authorize="isAnonymous()">
+                <li class="nav-item"><a class="btn btn-outline-primary btn-sm my-1" th:href="@{/login}">Log in</a></li>
+                <li class="nav-item"><a class="btn btn-primary btn-sm my-1" th:href="@{/register}">Register</a></li>
+            </ul>
+
+            <!-- Logged-in user: unread-messages envelope (employer and seeker only) and the account menu -->
+            <ul class="navbar-nav ms-auto align-items-lg-center" sec:authorize="isAuthenticated()">
+                <li class="nav-item" sec:authorize="hasRole('EMPLOYER')">
+                    <a class="nav-link position-relative" th:href="@{/employer/messages}" title="Messages">
+                        <i class="bi bi-envelope fs-5"></i>
+                        <span class="badge rounded-pill bg-danger"
+                              th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
+                              th:text="${unreadMessageCount}">0</span>
+                    </a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('JOB_SEEKER')">
+                    <a class="nav-link position-relative" th:href="@{/seeker/messages}" title="Messages">
+                        <i class="bi bi-envelope fs-5"></i>
+                        <span class="badge rounded-pill bg-danger"
+                              th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
+                              th:text="${unreadMessageCount}">0</span>
+                    </a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="userMenuToggle" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle me-1"></i>
+                        <span th:text="${currentUser != null ? currentUser.fullName : ''}">User name</span>
+                        <span class="badge bg-secondary ms-1" th:if="${currentUser != null}"
+                              th:text="${currentUser.role.label}">Role</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuToggle">
+                        <li><a class="dropdown-item" th:href="@{/dashboard}">My dashboard</a></li>
+                        <li><a class="dropdown-item" th:href="@{/account/password}">Change password</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form th:action="@{/logout}" method="post" class="px-3 py-1">
+                                <button type="submit" class="btn btn-link dropdown-item p-0">Log out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+</body>
+</html>

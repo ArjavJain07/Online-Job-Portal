@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--
+  Status history timelines (Section 7.1, entities in Section 5.5/5.6).
+
+  "jobTimeline(changes)" renders a list of JobStatusChange, oldest problem first: each
+  entry is coloured by the status it moved TO and shows who made the change and, if the
+  admin gave one, the reason.
+
+  "applicationTimeline(changes, audience)" renders a list of ApplicationStatusChange the
+  same way, reusing fragments/status-badge :: application so the colour and wording match
+  every other place a status is shown to this audience (employer/admin vs seeker).
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<ol th:fragment="jobTimeline(changes)" class="timeline">
+    <li class="timeline-item" th:each="change : ${changes}" th:switch="${change.toStatus.name()}">
+        <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+        <div class="content">
+            <span th:case="'APPROVED'"         class="status badge job-live"    th:text="${change.toStatus.label}">Approved</span>
+            <span th:case="'PENDING_APPROVAL'" class="status badge job-pending" th:text="${change.toStatus.label}">Pending approval</span>
+            <span th:case="'REJECTED'"         class="status badge job-rejected" th:text="${change.toStatus.label}">Rejected</span>
+            <span th:case="'CLOSED'"           class="status badge job-closed"  th:text="${change.toStatus.label}">Closed</span>
+            <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by Admin User</span>
+            <p class="note" th:if="${change.reason != null}" th:text="${change.reason}">Reason given by the admin.</p>
+        </div>
+    </li>
+</ol>
+
+<ol th:fragment="applicationTimeline(changes, audience)" class="timeline">
+    <li class="timeline-item" th:each="change : ${changes}">
+        <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+        <div class="content">
+            <span class="status" th:replace="~{fragments/status-badge :: application(${change.toStatus}, ${audience})}"></span>
+            <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by HR Manager</span>
+            <p class="note" th:if="${change.noteToCandidate != null}" th:text="${change.noteToCandidate}">Note to the candidate.</p>
+        </div>
+    </li>
+</ol>
+
+</body>
+</html>
