@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<!--
+  Seeker application history (Section 6.4 S-D4). SeekerApplicationController#history puts
+  a real Spring Data Page<JobApplication> under "page" (pagination only, Section 7.9), the
+  same applications in the same order under "rows" (each one a SeekerApplicationHistoryRow -
+  the application plus its pre-formatted result label, decided-on date and duration, built
+  in JobApplicationService so this template only has to th:text them, never format a date,
+  compute a day count or branch on application.status itself - the same page+rows pairing
+  JobService.EmployerJobHistory already uses for E-D4), "view" ("final", the default, or
+  "all"), "result" (the effective result filter: ALL/HIRED/REJECTED/WITHDRAWN, Section 7.9
+  binding rule) and "summary" (the pre-built "You have applied to N jobs: ..." sentence,
+  always over every application regardless of the current filter).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Application History', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <div>
+            <h1 class="h3 mb-1">Application history</h1>
+            <p class="text-muted mb-0" th:text="${summary}">You have applied to 4 jobs: 0 hired, 1 not selected, 0 withdrawn, 3 in progress.</p>
+        </div>
+        <a th:href="@{/seeker/applications}" class="btn btn-outline-secondary">Back to active applications</a>
+    </div>
+
+    <ul class="nav nav-tabs mt-3 mb-3">
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${view == 'final'} ? 'active'"
+               th:href="@{/seeker/applications/history(view='final', result=${result})}">Final results</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${view == 'all'} ? 'active'"
+               th:href="@{/seeker/applications/history(view='all', result=${result})}">All applications</a>
+        </li>
+    </ul>
+
+    <div class="mb-3 d-flex flex-wrap gap-2">
+        <a th:href="@{/seeker/applications/history(view=${view}, result='ALL')}" class="btn btn-sm"
+           th:classappend="${result == 'ALL'} ? 'btn-primary' : 'btn-outline-secondary'">All results</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='HIRED')}" class="btn btn-sm"
+           th:classappend="${result == 'HIRED'} ? 'btn-primary' : 'btn-outline-secondary'">Hired</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='REJECTED')}" class="btn btn-sm"
+           th:classappend="${result == 'REJECTED'} ? 'btn-primary' : 'btn-outline-secondary'">Not selected</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='WITHDRAWN')}" class="btn btn-sm"
+           th:classappend="${result == 'WITHDRAWN'} ? 'btn-primary' : 'btn-outline-secondary'">Withdrawn</a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(rows)}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-clock-history icon"></i>
+            <p class="message">No completed applications yet. Results will appear here once employers make a decision.</p>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(rows)}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Job</th>
+                    <th>Company</th>
+                    <th>Applied on</th>
+                    <th>Result</th>
+                    <th>Decided on</th>
+                    <th>Duration</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${rows}">
+                    <td>
+                        <a th:href="@{/seeker/applications/{id}(id=${row.application.id})}" th:text="${row.application.job.title}">Job title</a>
+                    </td>
+                    <td th:text="${row.application.job.employer.companyName}">Company</td>
+                    <td th:text="${#temporals.format(row.application.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td th:switch="${row.application.status.name()}">
+                        <span th:case="'HIRED'" class="badge app-hired" th:text="${row.resultLabel}">Hired</span>
+                        <span th:case="'REJECTED'" class="badge app-rejected" th:text="${row.resultLabel}">Not selected</span>
+                        <span th:case="'WITHDRAWN'" class="badge app-withdrawn" th:text="${row.resultLabel}">Withdrawn</span>
+                        <span th:case="*" class="badge bg-secondary" th:text="${row.resultLabel}">In progress</span>
+                    </td>
+                    <td th:text="${row.decidedOnText}">16 Sep 2026</td>
+                    <td th:text="${row.durationText}">7 days</td>
+                    <td>
+                        <a th:href="@{/seeker/applications/{id}(id=${row.application.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>

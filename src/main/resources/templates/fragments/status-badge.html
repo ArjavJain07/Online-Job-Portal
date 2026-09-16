@@ -27,7 +27,7 @@
 </span>
 
 <span th:fragment="application(status, audience)"
-      th:with="text=${audience == 'seeker'} ? ${status.seekerLabel} : ${status.label}"
+      th:with="text=${audience == 'SEEKER'} ? ${status.seekerLabel} : ${status.label}"
       th:switch="${status.name()}">
     <span th:case="'APPLIED'"       class="badge app-applied"       th:text="${text}">Applied</span>
     <span th:case="'UNDER_REVIEW'"  class="badge app-under-review"  th:text="${text}">Under review</span>

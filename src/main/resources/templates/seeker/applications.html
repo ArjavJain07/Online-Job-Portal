@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<!--
+  Seeker active applications (Section 6.4 S-F3+S-D2). SeekerApplicationController#active
+  puts the active applications (already filtered to "status" and sorted by latest activity,
+  Section 7.9) under "applications", the effective status filter under "status", the four
+  chip counts as their own long attributes (totalActive/appliedCount/underReviewCount/
+  shortlistedCount/interviewCount - always the UNFILTERED totals, so the chips stay stable
+  while the table follows the chosen filter) and per-application unread message counts
+  under "unreadCounts" (Section 6.5.3), the same Map<Long,Long> pattern
+  employer/applications.html already uses.
+
+  Only non-zero status chips are shown next to "All N" (Section 6.4 S-D2 screen example
+  "All 3 - Applied 1 - Under review 1 - Interview 1" has no "Shortlisted 0").
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='My Applications', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1">My applications</h1>
+            <p class="text-muted mb-0">Track the status of the jobs you've applied to.</p>
+        </div>
+        <a th:href="@{/seeker/applications/history}" class="btn btn-outline-secondary">View application history</a>
+    </div>
+
+    <div th:if="${totalActive > 0}" class="mb-3 d-flex flex-wrap gap-2">
+        <a th:href="@{/seeker/applications}" class="btn btn-sm"
+           th:classappend="${status == 'ALL'} ? 'btn-primary' : 'btn-outline-secondary'">
+            All <span th:text="${totalActive}">3</span>
+        </a>
+        <a th:if="${appliedCount > 0}" th:href="@{/seeker/applications(status='APPLIED')}" class="btn btn-sm"
+           th:classappend="${status == 'APPLIED'} ? 'btn-primary' : 'btn-outline-secondary'">
+            Applied <span th:text="${appliedCount}">1</span>
+        </a>
+        <a th:if="${underReviewCount > 0}" th:href="@{/seeker/applications(status='UNDER_REVIEW')}" class="btn btn-sm"
+           th:classappend="${status == 'UNDER_REVIEW'} ? 'btn-primary' : 'btn-outline-secondary'">
+            Under review <span th:text="${underReviewCount}">1</span>
+        </a>
+        <a th:if="${shortlistedCount > 0}" th:href="@{/seeker/applications(status='SHORTLISTED')}" class="btn btn-sm"
+           th:classappend="${status == 'SHORTLISTED'} ? 'btn-primary' : 'btn-outline-secondary'">
+            Shortlisted <span th:text="${shortlistedCount}">1</span>
+        </a>
+        <a th:if="${interviewCount > 0}" th:href="@{/seeker/applications(status='INTERVIEW')}" class="btn btn-sm"
+           th:classappend="${status == 'INTERVIEW'} ? 'btn-primary' : 'btn-outline-secondary'">
+            Interview <span th:text="${interviewCount}">1</span>
+        </a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(applications)}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-inbox icon"></i>
+            <p class="message">You have no active applications. Browse jobs to get started.</p>
+            <a th:href="@{/seeker/jobs}" class="btn btn-primary action">Browse jobs</a>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(applications)}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Job</th>
+                    <th>Company</th>
+                    <th>Applied on</th>
+                    <th>Status</th>
+                    <th>Last update</th>
+                    <th>Unread</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="a : ${applications}">
+                    <td>
+                        <a th:href="@{/seeker/applications/{id}(id=${a.id})}" th:text="${a.job.title}">Job title</a>
+                        <span th:if="${a.updatedForSeeker}" class="badge bg-warning text-dark ms-1">Updated</span>
+                    </td>
+                    <td th:text="${a.job.employer.companyName}">Company</td>
+                    <td th:text="${#temporals.format(a.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td><span th:replace="~{fragments/status-badge :: application(${a.status}, 'SEEKER')}"></span></td>
+                    <td>
+                        <span th:if="${a.statusChangedAt != null}" th:text="${#temporals.format(a.statusChangedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+                        <span th:unless="${a.statusChangedAt != null}">&ndash;</span>
+                    </td>
+                    <td>
+                        <span th:if="${unreadCounts.get(a.id) != null}" class="badge bg-danger"
+                              th:text="${unreadCounts.get(a.id)}">1</span>
+                        <span th:unless="${unreadCounts.get(a.id) != null}" class="text-muted">-</span>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a th:href="@{/seeker/applications/{id}(id=${a.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                            <form th:action="@{/seeker/applications/{id}/withdraw(id=${a.id})}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        data-confirm="Withdraw this application? You will not be able to apply to this job again.">
+                                    Withdraw
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

@@ -39,7 +39,7 @@
 
 <ol th:fragment="applicationTimeline(changes, audience)" class="timeline">
     <li class="timeline-item" th:each="change : ${changes}"
-        th:with="text=${audience == 'seeker'} ? ${change.toStatus.seekerLabel} : ${change.toStatus.label}"
+        th:with="text=${audience == 'SEEKER'} ? ${change.toStatus.seekerLabel} : ${change.toStatus.label}"
         th:switch="${change.toStatus.name()}">
         <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
         <div class="content">

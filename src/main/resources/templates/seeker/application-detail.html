@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<!--
+  Seeker application detail (Section 6.4 S-F2 confirmation output, S-F3). Named
+  "jobApplication" in the model, never "application" (Section 7.1 "Reserved model
+  attribute names" / 11.3 contract item 9 - Thymeleaf reserves "application" for the
+  servlet context attribute map, and a model attribute with that name is shadowed
+  silently). SeekerApplicationController#detail also passes "applicationStatusChanges"
+  (oldest first, for fragments/timeline), "trackerStepIndex" (0-4 for the five-step
+  status tracker below, or null for the two final states Rejected/Withdrawn, which show as
+  a plain badge instead - Section 6.4 S-F3 "Status tracker") and "notLiveMessage" (the
+  ready-made "not Live" note text, or null when the job is Live - built in the controller,
+  not with Job.displayStatus(...) here, because that bean call needs
+  T(java.time.LocalDate).now() as its argument and Thymeleaf 3.1 can reject exactly that
+  combination in some attribute positions, the same reasoning PageLinks.build(Page)
+  documents).
+
+  The confirmation banner ("Application submitted! ...") is read straight from
+  ${param.submitted}, present only on the redirect right after S-F2's apply POST
+  (/seeker/applications/{id}?submitted) - Thymeleaf's own built-in "param" object, safe to
+  use directly in a page (only a MODEL ATTRIBUTE literally named "param" would be
+  shadowed, Section 7.1); it is not a flash message because it must still show if the page
+  is reloaded.
+
+  Messaging (Section 6.5.1) is a separate milestone (M6) that embeds
+  fragments/message-thread on this page once that fragment exists, the same note
+  employer/application-detail.html carries; nothing here depends on it.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${jobApplication.reference}, content=~{::main}, scripts=~{})}">
+<body>
+<main>
+
+    <div class="alert alert-success" th:if="${param.submitted != null}">
+        Application submitted! Your application for '<span th:text="${jobApplication.job.title}">Job title</span>'
+        at <span th:text="${jobApplication.job.employer.companyName}">Company</span> was received on
+        <span th:text="${#temporals.format(jobApplication.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span>.
+        Reference: <span th:text="${jobApplication.reference}">APP-00001</span>.
+        You can track its status under <a th:href="@{/seeker/applications}">My Applications</a>.
+    </div>
+
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <div>
+            <h1 class="h3 mb-1">
+                <span th:text="${jobApplication.job.title}">Job title</span>
+                <span class="text-muted fw-normal">at</span>
+                <span th:text="${jobApplication.job.employer.companyName}">Company</span>
+            </h1>
+            <p class="text-muted mb-0">
+                Reference <span th:text="${jobApplication.reference}">APP-00001</span>
+                <span class="ms-2">&middot; Applied on
+                    <span th:text="${#temporals.format(jobApplication.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+                </span>
+            </p>
+        </div>
+        <a th:href="@{/seeker/applications}" class="btn btn-outline-secondary">Back to applications</a>
+    </div>
+
+    <p class="alert alert-warning mt-3" th:if="${notLiveMessage != null}" th:text="${notLiveMessage}">
+        This job is no longer open, but your application is still being processed.
+    </p>
+
+    <div class="card shadow-sm mb-4 mt-3">
+        <div class="card-header">Status</div>
+        <div class="card-body">
+            <div th:if="${trackerStepIndex != null}" class="d-flex flex-wrap gap-2 justify-content-between text-center">
+                <div class="flex-fill">
+                    <span class="badge" th:classappend="${trackerStepIndex >= 0} ? 'app-applied' : 'bg-light text-muted border'">Applied</span>
+                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 0}">Current</div>
+                </div>
+                <div class="flex-fill">
+                    <span class="badge" th:classappend="${trackerStepIndex >= 1} ? 'app-under-review' : 'bg-light text-muted border'">Under review</span>
+                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 1}">Current</div>
+                </div>
+                <div class="flex-fill">
+                    <span class="badge" th:classappend="${trackerStepIndex >= 2} ? 'app-shortlisted' : 'bg-light text-muted border'">Shortlisted</span>
+                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 2}">Current</div>
+                </div>
+                <div class="flex-fill">
+                    <span class="badge" th:classappend="${trackerStepIndex >= 3} ? 'app-interview' : 'bg-light text-muted border'">Interview</span>
+                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 3}">Current</div>
+                </div>
+                <div class="flex-fill">
+                    <span class="badge" th:classappend="${trackerStepIndex >= 4} ? 'app-hired' : 'bg-light text-muted border'">Hired</span>
+                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 4}">Current</div>
+                </div>
+            </div>
+            <div th:if="${trackerStepIndex == null}">
+                <span th:replace="~{fragments/status-badge :: application(${jobApplication.status}, 'SEEKER')}"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Job details</div>
+                <div class="card-body">
+                    <dl class="row small mb-0">
+                        <dt class="col-sm-4">Location</dt>
+                        <dd class="col-sm-8" th:text="${jobApplication.job.location}">Location</dd>
+
+                        <dt class="col-sm-4">Salary</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.salaryRange(jobApplication.job)}">INR 6,00,000 - 9,00,000 per year</dd>
+
+                        <dt class="col-sm-4">Application deadline</dt>
+                        <dd class="col-sm-8" th:text="${#temporals.format(jobApplication.job.applicationDeadline, 'dd MMM yyyy')}">30 Sep 2026</dd>
+                    </dl>
+                    <a th:href="@{/jobs/{id}(id=${jobApplication.job.id})}" class="small">View job posting</a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Cover letter</div>
+                <div class="card-body">
+                    <p th:if="${jobApplication.coverLetter != null}" class="pre-line mb-0" th:text="${jobApplication.coverLetter}">Cover letter.</p>
+                    <p th:if="${jobApplication.coverLetter == null}" class="text-muted mb-0">No cover letter provided.</p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Resume</div>
+                <div class="card-body">
+                    <a th:href="@{/seeker/applications/{id}/resume(id=${jobApplication.id})}" target="_blank" rel="noopener">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>View submitted resume
+                        (<span th:text="${jobApplication.resumeOriginalName}">resume.pdf</span>,
+                        <span th:text="${@fmt.fileSize(jobApplication.resumeSizeBytes)}">180 KB</span>)
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">Timeline</div>
+                <div class="card-body">
+                    <div th:replace="~{fragments/timeline :: applicationTimeline(${applicationStatusChanges}, 'SEEKER')}"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body" th:if="${jobApplication.status.active}">
+                    <form th:action="@{/seeker/applications/{id}/withdraw(id=${jobApplication.id})}" method="post">
+                        <button type="submit" class="btn btn-outline-danger w-100"
+                                data-confirm="Withdraw this application? You will not be able to apply to this job again.">
+                            Withdraw application
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body text-muted small" th:unless="${jobApplication.status.active}">
+                    This application is final and can no longer be withdrawn.
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>
