@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!--
+  Messaging UI (Section 6.5.1). Two reusable fragments:
+
+  "bubbles(messages)" - the chat-style thread view embedded on employer/message-thread.html,
+  seeker/message-thread.html AND both application-detail pages (Section 6.5.1: "the same
+  thread is embedded on /employer/applications/{id} and /seeker/applications/{id}"). One
+  .message-thread of .message-item bubbles (app.css Section 16): right-aligned .msg-own for
+  the signed-in user's own messages, left-aligned .msg-other for the other party's. Each own
+  message shows "Sent" or "Read 16 Sep, 11:02" (Section 6.5.1 "Delivery confirmation").
+  "messages" is a List<Message> ordered OLDEST FIRST - both MessageService#openThreadForEmployer
+  and #openThreadForSeeker return them that way, and only after the read-receipt bulk update
+  has already run (Section 6.5.1 "Read receipts", 7.10), so a caller must never load messages
+  itself and pass them here. The signed-in user is read from the ambient "currentUser" model
+  attribute (GlobalModelAttributes, present on every com.jobportal.web page) instead of a
+  fragment parameter of its own - the same way fragments/job-card's card(job, applied) reads
+  the ambient "selectedJobId" (Section 7.1): a fragment call keeps access to the surrounding
+  page's model, it is not a sealed scope limited to its declared parameters.
+
+  "threadList(threads, activeApplicationId, basePath)" - the LinkedIn-style conversation
+  list, reused unchanged by employer/seeker messages.html (the plain inbox) and
+  employer/seeker message-thread.html (the same list beside the open thread). One row per
+  MessageThreadSummary (MessageService.inboxForEmployer/inboxForSeeker): an initials chip,
+  the other party's name, the job the thread belongs to, a message snippet and a relative
+  time, all bold with a red count badge while unread > 0 (Section 6.5.1 "Unread counts").
+  "activeApplicationId" (nullable) highlights the row for the thread currently open, or is
+  null on the plain inbox page where none is open yet. "basePath" is "/employer/messages" or
+  "/seeker/messages" - the two roles link to their own thread route, so it cannot be
+  hard-coded in this one shared fragment.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="bubbles(messages)" class="message-thread">
+    <div class="message-item" th:each="message : ${messages}"
+         th:classappend="${message.sender.id == currentUser.id} ? 'msg-own' : 'msg-other'">
+        <div>
+            <p class="message-bubble mb-0" th:text="${message.body}">Message body.</p>
+            <p class="message-time mb-0">
+                <span th:text="${message.sender.id == currentUser.id} ? 'You' : ${message.sender.fullName}">Sender</span>
+                &middot;
+                <span th:text="${#temporals.format(message.sentAt, 'dd MMM, HH:mm')}">16 Sep, 11:02</span>
+                <!-- Section 6.5.1 "Delivery confirmation": own messages only. Written as
+                     two plain th:if/th:unless spans, not a single ternary, so the "Read "
+                     + formatted-date concatenation never has to sit inside a ternary
+                     branch - kept simple and easy to follow. -->
+                <th:block th:if="${message.sender.id == currentUser.id}">
+                    &middot;
+                    <span th:if="${message.readAt == null}">Sent</span>
+                    <span th:unless="${message.readAt == null}"
+                          th:text="'Read ' + ${#temporals.format(message.readAt, 'dd MMM, HH:mm')}">Read 16 Sep, 11:02</span>
+                </th:block>
+            </p>
+        </div>
+    </div>
+    <p th:if="${#lists.isEmpty(messages)}" class="text-muted small mb-0">No messages yet.</p>
+</div>
+
+<div th:fragment="threadList(threads, activeApplicationId, basePath)">
+    <a th:each="t : ${threads}" th:href="@{${basePath} + '/' + ${t.applicationId}}"
+       class="feed-item text-decoration-none text-reset"
+       th:classappend="${activeApplicationId != null and activeApplicationId == t.applicationId} ? 'bg-light' : ''"
+       th:with="initials=${t.otherPartyName != null and !t.otherPartyName.isEmpty()} ? ${t.otherPartyName.substring(0,1).toUpperCase()} : '?'">
+        <span class="jp-avatar" aria-hidden="true" th:text="${initials}">C</span>
+        <span class="flex-grow-1">
+            <span class="d-flex justify-content-between gap-2">
+                <span th:text="${t.otherPartyName}" th:classappend="${t.unreadCount > 0} ? 'fw-bold'">Other party</span>
+                <span class="jp-sub text-nowrap" th:text="${@fmt.ago(t.lastMessageAt)}">3 days ago</span>
+            </span>
+            <span class="d-block jp-sub" th:text="${t.jobTitle}">Job title</span>
+            <span class="d-block small" th:classappend="${t.unreadCount > 0} ? 'fw-bold' : 'text-muted'"
+                  th:text="${t.snippet}">Last message preview</span>
+        </span>
+        <span th:if="${t.unreadCount > 0}" class="badge bg-danger rounded-pill align-self-center"
+              th:text="${t.unreadCount}">1</span>
+    </a>
+    <p th:if="${#lists.isEmpty(threads)}" class="text-muted small mb-0 p-3">No conversations yet.</p>
+</div>
+
+</body>
+</html>

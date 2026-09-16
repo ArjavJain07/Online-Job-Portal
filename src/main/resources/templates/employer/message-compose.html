@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!--
+  Employer "New message" compose page (Section 6.5.1 "Compose page"). EmployerMessageController
+  #composeForm provides "messageForm" (applicationId pre-selected from ?applicationId= only
+  when it names one of this employer's own applications, Section 7.9 lenient query binding -
+  blank, non-numeric or foreign simply pre-selects nothing, the page still renders with the
+  full select) and "applications" (this employer's own applications, excluding withdrawn ones
+  and deactivated candidates). Leaving the select on its blank first option fails Spring's own
+  String-to-Long binding for applicationId and re-renders this page with the framework's
+  default field error - see MessageForm's own class comment for why that field carries no
+  bean-validation annotation of its own.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='New message', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">New message</h1>
+            <p>Send a candidate a message about one of your job applications.</p>
+        </div>
+        <a th:href="@{/employer/messages}" class="btn btn-outline-secondary">Back to messages</a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form th:action="@{/employer/messages}" th:object="${messageForm}" method="post">
+                <div class="mb-3">
+                    <label class="form-label required" for="applicationId">Candidate</label>
+                    <select class="form-select" id="applicationId" th:field="*{applicationId}"
+                            th:classappend="${#fields.hasErrors('applicationId')} ? 'is-invalid'">
+                        <option value="">Choose a candidate</option>
+                        <option th:each="a : ${applications}" th:value="${a.id}"
+                                th:text="${a.seeker.fullName} + ': ' + ${a.job.title}">Candidate: Job title</option>
+                    </select>
+                    <div class="invalid-feedback" th:errors="*{applicationId}">Choose a candidate.</div>
+                    <p class="form-text mb-0" th:if="${#lists.isEmpty(applications)}">
+                        You have no applications to message yet.
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label required" for="body">Message</label>
+                    <textarea class="form-control" id="body" th:field="*{body}" rows="5" maxlength="2000"
+                              th:classappend="${#fields.hasErrors('body')} ? 'is-invalid'"></textarea>
+                    <div class="invalid-feedback" th:errors="*{body}">Message error.</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Send message</button>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

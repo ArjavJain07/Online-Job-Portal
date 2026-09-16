@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--
+  Seeker message inbox (Section 6.5.1 "Seeker inbox"). SeekerMessageController#inbox
+  provides "threads": one MessageThreadSummary per application with at least one message,
+  newest last message first (MessageService.inboxForSeeker). Same two-pane shape as
+  employer/messages.html (Section 7.1, app.css ".jp-layout" reused as a nested grid). The
+  seeker never starts a thread (decision D-13), so there is no "New message" action here -
+  a conversation only ever appears once an employer has sent the first message.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Messages', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Messages</h1>
+            <p>Conversations with employers about jobs you've applied to.</p>
+        </div>
+    </div>
+
+    <div th:if="${#lists.isEmpty(threads)}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-envelope icon"></i>
+            <p class="message">No messages yet. Employers can contact you about your applications here.</p>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(threads)}" class="jp-layout">
+        <div class="card shadow-sm">
+            <div class="card-header">Conversations</div>
+            <div th:replace="~{fragments/message-thread :: threadList(${threads}, null, '/seeker/messages')}"></div>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-chat-dots fs-1 d-block mb-2" aria-hidden="true"></i>
+                Select a conversation to view its messages.
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

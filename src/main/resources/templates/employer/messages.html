@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!--
+  Employer message inbox (Section 6.5.1, E-D3). EmployerMessageController#inbox provides
+  "threads": one MessageThreadSummary per application with at least one message, newest
+  last message first (MessageService.inboxForEmployer).
+
+  Two-pane LinkedIn-style layout (Section 7.1): app.css's ".jp-layout" (a 300px column plus
+  a flexible one) is reused here for a SECOND, nested grid - the outer one already laid out
+  by layout/dashboard is the role sidebar beside this page's <main>; this inner one is the
+  conversation list beside the open thread, the same way employer/application-detail.html
+  reuses ".jp-layout-wide" for its own record-plus-rail shape. No thread is open on this
+  page, so the right pane is a plain placeholder; fragments/message-thread :: threadList
+  supplies the left-hand rows, reused unchanged on employer/message-thread.html.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Messages', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Messages</h1>
+            <p>Conversations with candidates who applied to your jobs.</p>
+        </div>
+        <a th:href="@{/employer/messages/new}" class="btn btn-primary">
+            <i class="bi bi-pencil-square" aria-hidden="true"></i> New message
+        </a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(threads)}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-envelope icon"></i>
+            <p class="message">No conversations yet. Open an application and send the candidate a message.</p>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(threads)}" class="jp-layout">
+        <div class="card shadow-sm">
+            <div class="card-header">Conversations</div>
+            <div th:replace="~{fragments/message-thread :: threadList(${threads}, null, '/employer/messages')}"></div>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-chat-dots fs-1 d-block mb-2" aria-hidden="true"></i>
+                Select a conversation to view its messages.
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

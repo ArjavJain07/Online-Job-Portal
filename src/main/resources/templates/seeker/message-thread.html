@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<!--
+  Seeker open thread (Section 6.5.1). SeekerMessageController#thread provides
+  "jobApplication" (ownership already checked, Section 4.5), "messages" (this thread's
+  messages oldest first, loaded only AFTER the read-receipt bulk update has run - Section
+  6.5.1 "Read receipts", 7.10), "blockedReason" (null when the seeker may reply, otherwise
+  the exact sentence to show instead of the composer - including "You can reply once the
+  employer has messaged you." when no employer message exists yet, Section 6.5.1 "Blocked
+  when"/"Check order"), "threads" (the same inbox rows as seeker/messages.html, for the
+  left-hand conversation list, this thread highlighted) and "messageForm" (bound to the
+  composer, or already carrying a field error after a failed POST, Section 7.2). This is
+  one of the four pages that marks a thread read (Section 6.5.1), so "unreadMessageCount"
+  is also overwritten here with a fresh count for this same response's navbar badge.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${jobApplication.job.employer.companyName}, content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Messages</h1>
+            <p>Conversations with employers about jobs you've applied to.</p>
+        </div>
+    </div>
+
+    <div class="jp-layout">
+        <div class="card shadow-sm">
+            <div class="card-header">Conversations</div>
+            <div th:replace="~{fragments/message-thread :: threadList(${threads}, ${jobApplication.id}, '/seeker/messages')}"></div>
+        </div>
+
+        <!-- Section view: company + job in the header, the bubble history in the body,
+             the composer PINNED at the bottom of the card as its own card-footer. -->
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <span>
+                    <span th:text="${jobApplication.job.employer.companyName}">Company</span>
+                    <span class="jp-sub">&middot; <span th:text="${jobApplication.job.title}">Job title</span></span>
+                </span>
+                <a th:href="@{/seeker/applications/{id}(id=${jobApplication.id})}" class="btn btn-sm btn-outline-secondary">
+                    View application
+                </a>
+            </div>
+            <div class="card-body">
+                <div th:replace="~{fragments/message-thread :: bubbles(${messages})}"></div>
+            </div>
+            <div class="card-footer">
+                <p th:if="${blockedReason != null}" class="text-muted small mb-0" th:text="${blockedReason}">
+                    Blocked reason.
+                </p>
+                <form th:if="${blockedReason == null}" th:action="@{/seeker/messages/{id}(id=${jobApplication.id})}"
+                      th:object="${messageForm}" method="post" class="d-flex gap-2 align-items-start">
+                    <div class="flex-grow-1">
+                        <label class="visually-hidden" for="body">Message</label>
+                        <textarea class="form-control" id="body" th:field="*{body}" rows="2" maxlength="2000"
+                                  placeholder="Write a message..."
+                                  th:classappend="${#fields.hasErrors('body')} ? 'is-invalid'"></textarea>
+                        <div class="invalid-feedback" th:errors="*{body}">Message error.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

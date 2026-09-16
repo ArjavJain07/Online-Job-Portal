@@ -9,9 +9,17 @@
   private-note card is always shown and is never reached from any seeker/* template
   (Section 6.3 E-F2 business rule 6, D-27).
 
-  Messaging (Section 6.5.1) is a separate milestone (M6) that embeds
-  fragments/message-thread on this page once that fragment exists; nothing here depends
-  on it.
+  Messaging (Section 6.5.1): the "Messages" card below embeds fragments/message-thread ::
+  bubbles(messages), the same view employer/message-thread.html uses. It needs three more
+  model attributes from EmployerApplicationController#detail, built with the exact same
+  calls that controller already makes for the dedicated thread page (MessageService, M6):
+  "messages" and "blockedReason" from messageService.openThreadForEmployer(id, employerId)
+  (its ThreadView record), a fresh "messageForm" when one is not already in the model from
+  a failed POST (Section 7.2, the same pattern this class already uses for statusForm/
+  noteForm), and "unreadMessageCount" overwritten with messageService.unreadCount(employerId)
+  afterwards - this page is one of the four pages that marks a thread read (Section 6.5.1
+  "Badge on a page that marks messages read"), so the value GlobalModelAttributes computed
+  before the handler ran is now stale.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/dashboard :: layout(title=${jobApplication.reference}, content=~{::main}, scripts=~{})}">
@@ -98,10 +106,44 @@
                 </div>
             </div>
 
-            <div class="card shadow-sm">
+            <div class="card shadow-sm mb-4">
                 <div class="card-header">Status history</div>
                 <div class="card-body">
                     <div th:replace="~{fragments/timeline :: applicationTimeline(${applicationStatusChanges}, 'EMPLOYER')}"></div>
+                </div>
+            </div>
+
+            <!-- Messaging (Section 6.5.1): same bubble view and pinned composer as
+                 employer/message-thread.html, so a candidate conversation can be read and
+                 replied to without leaving this page. "from=application" on the composer
+                 sends the redirect back here instead of to the thread page (Section 6.5.1
+                 "?from=application"). Guarded on "messages" (rather than always rendering)
+                 so this card simply stays hidden - with no error - until
+                 EmployerApplicationController#detail is updated to add it and the other
+                 two attributes the class comment above lists; once that lands, deleting
+                 this th:if is not even necessary, since "messages" will then always be
+                 present. -->
+            <div class="card shadow-sm" th:if="${messages != null}">
+                <div class="card-header">Messages</div>
+                <div class="card-body">
+                    <div th:replace="~{fragments/message-thread :: bubbles(${messages})}"></div>
+                </div>
+                <div class="card-footer">
+                    <p th:if="${blockedReason != null}" class="text-muted small mb-0" th:text="${blockedReason}">
+                        Blocked reason.
+                    </p>
+                    <form th:if="${blockedReason == null}" th:action="@{/employer/messages/{id}(id=${jobApplication.id})}"
+                          th:object="${messageForm}" method="post" class="d-flex gap-2 align-items-start">
+                        <input type="hidden" name="from" value="application">
+                        <div class="flex-grow-1">
+                            <label class="visually-hidden" for="messageBody">Message</label>
+                            <textarea class="form-control" id="messageBody" th:field="*{body}" rows="2" maxlength="2000"
+                                      placeholder="Write a message..."
+                                      th:classappend="${#fields.hasErrors('body')} ? 'is-invalid'"></textarea>
+                            <div class="invalid-feedback" th:errors="*{body}">Message error.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Send</button>
+                    </form>
                 </div>
             </div>
 
