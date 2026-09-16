@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!--
+  Admin job review (Section 6.2 A-F2). AdminJobController hands over the job itself, its
+  full status history ("jobStatusChanges", oldest first) and "today" (computed with the
+  injected Clock - see the note in admin/jobs.html). The decision forms shown at the
+  bottom depend only on job.status (Section 5.5): PENDING_APPROVAL gets Approve and
+  Reject, APPROVED gets Take down, REJECTED/CLOSED get neither. A reason that fails
+  validation (10-500 characters) re-renders this same page with "jobReviewForm" carrying
+  the submitted value and its field error (Section 7.2); a stale status (the job was
+  already decided elsewhere) is a plain BusinessRuleException that never reaches this
+  page - it flashes an error and redirects back instead (Section 7.3).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${job.title}, content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <div>
+            <h1 class="h3 mb-1" th:text="${job.title}">Job title</h1>
+            <p class="text-muted mb-0">
+                <span th:replace="~{fragments/status-badge :: job(${job})}"></span>
+                <span class="ms-2" th:text="${job.employer.companyName}">Company</span>
+                &middot;
+                <span th:text="${job.location}">Location</span>
+            </p>
+        </div>
+        <a th:href="@{/admin/jobs}" class="btn btn-outline-secondary">Back to jobs</a>
+    </div>
+
+    <div class="row g-4 mt-1">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <span class="badge text-bg-light border me-1" th:text="${job.jobType.label}">Full-time</span>
+                        <span class="badge text-bg-light border me-1" th:text="${job.workMode.label}">Remote</span>
+                        <span class="badge text-bg-light border" th:text="${job.category.label}">Category</span>
+                    </div>
+
+                    <dl class="row small mb-0">
+                        <dt class="col-sm-4">Salary</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</dd>
+
+                        <dt class="col-sm-4">Experience needed</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.experience(job.minExperienceYears)}">Freshers welcome</dd>
+
+                        <dt class="col-sm-4">Openings</dt>
+                        <dd class="col-sm-8" th:text="${job.openings}">1</dd>
+
+                        <dt class="col-sm-4">Submitted</dt>
+                        <dd class="col-sm-8" th:text="${#temporals.format(job.createdAt, 'dd MMM yyyy')}">16 Sep 2026</dd>
+
+                        <dt class="col-sm-4">Deadline</dt>
+                        <dd class="col-sm-8">
+                            <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">30 Sep 2026</span>
+                            <span class="badge text-bg-danger ms-1" th:if="${job.applicationDeadline.isBefore(today)}">Passed</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5">Job description</h2>
+                    <p class="pre-line" th:text="${job.description}">Description</p>
+
+                    <h2 class="h5">Requirements</h2>
+                    <p class="pre-line" th:text="${job.requirements}">Requirements</p>
+
+                    <th:block th:if="${!#lists.isEmpty(job.skillList())}">
+                        <h2 class="h5">Skills</h2>
+                        <p>
+                            <span class="badge text-bg-light border me-1" th:each="skill : ${job.skillList()}"
+                                  th:text="${skill}">Skill</span>
+                        </p>
+                    </th:block>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">Status history</div>
+                <div class="card-body">
+                    <div th:replace="~{fragments/timeline :: jobTimeline(${jobStatusChanges})}"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Employer</div>
+                <div class="card-body">
+                    <dl class="row small mb-0">
+                        <dt class="col-sm-5">Company</dt>
+                        <dd class="col-sm-7" th:text="${job.employer.companyName}">Company</dd>
+
+                        <dt class="col-sm-5">Contact</dt>
+                        <dd class="col-sm-7" th:text="${job.employer.fullName}">Contact name</dd>
+
+                        <dt class="col-sm-5">Email</dt>
+                        <dd class="col-sm-7" th:text="${job.employer.email}">email@example.com</dd>
+
+                        <dt class="col-sm-5">Account</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge" th:classappend="${job.employer.enabled} ? 'text-bg-success' : 'text-bg-secondary'"
+                                  th:text="${job.employer.enabled} ? 'Active' : 'Inactive'">Active</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm" th:if="${job.status.name() == 'PENDING_APPROVAL' or job.status.name() == 'APPROVED'}">
+                <div class="card-header">Decision</div>
+                <div class="card-body">
+
+                    <th:block th:if="${job.status.name() == 'PENDING_APPROVAL'}">
+                        <form th:action="@{/admin/jobs/{id}/approve(id=${job.id})}" method="post" class="mb-3">
+                            <button type="submit" class="btn btn-success w-100"><i class="bi bi-check-lg me-1"></i>Approve</button>
+                        </form>
+
+                        <hr>
+
+                        <form th:action="@{/admin/jobs/{id}/reject(id=${job.id})}" th:object="${jobReviewForm}" method="post">
+                            <label class="form-label required" for="reason">Reject with reason</label>
+                            <textarea class="form-control mb-2" th:field="*{reason}" rows="3"
+                                      th:classappend="${#fields.hasErrors('reason')} ? 'is-invalid'"
+                                      placeholder="10-500 characters. The employer will see this."></textarea>
+                            <div class="invalid-feedback mb-2" th:errors="*{reason}">Reason error.</div>
+                            <button type="submit" class="btn btn-outline-danger w-100">Reject</button>
+                        </form>
+                    </th:block>
+
+                    <form th:if="${job.status.name() == 'APPROVED'}"
+                          th:action="@{/admin/jobs/{id}/take-down(id=${job.id})}" th:object="${jobReviewForm}" method="post">
+                        <label class="form-label required" for="reason">Take down with reason</label>
+                        <textarea class="form-control mb-2" th:field="*{reason}" rows="3"
+                                  th:classappend="${#fields.hasErrors('reason')} ? 'is-invalid'"
+                                  placeholder="10-500 characters. The employer will see this."></textarea>
+                        <div class="invalid-feedback mb-2" th:errors="*{reason}">Reason error.</div>
+                        <button type="submit" class="btn btn-danger w-100"
+                                data-confirm="Take this job down? The employer will see your reason and applicants will still be visible to them.">
+                            Take down
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

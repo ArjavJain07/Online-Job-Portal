@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<!--
+  Admin job listing management (Section 6.2 A-F2/A-D2). AdminJobController#list puts the
+  Spring Data Page under "page", the tab counts under "counts", each row's application
+  count (keyed by job id - Section 6.2 A-D2 "Applications" column) under
+  "applicationCounts", and "today" (computed with the injected Clock, never
+  T(java.time.LocalDate).now() in this template - see the note in JobBrowseController)
+  for the "deadline passed" flag. Status badges still come from fragments/status-badge,
+  which resolves "today" itself for the DISPLAY status (Live/Expired/Hidden/...); that is
+  a separate concern from the plain "has the deadline passed" flag used here.
+
+  Pending rows get inline Approve/Reject controls (Section 6.2 A-D2): Reject expands a
+  Bootstrap collapse with a reason textarea, the same id/data-bs-target pattern
+  fragments/chart-card.html uses for its "View data" toggle.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Job Approvals', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Job listings</h1>
+    <p class="text-muted mb-3">Review pending postings, and approve, reject or take down any job.</p>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'PENDING_APPROVAL'} ? 'active'"
+               th:href="@{/admin/jobs(status='PENDING_APPROVAL', q=${q})}">
+                Pending approval <span class="badge text-bg-secondary" th:text="${counts.pending}">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'APPROVED'} ? 'active'"
+               th:href="@{/admin/jobs(status='APPROVED', q=${q})}">
+                Approved <span class="badge text-bg-secondary" th:text="${counts.approved}">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'REJECTED'} ? 'active'"
+               th:href="@{/admin/jobs(status='REJECTED', q=${q})}">
+                Rejected <span class="badge text-bg-secondary" th:text="${counts.rejected}">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'CLOSED'} ? 'active'"
+               th:href="@{/admin/jobs(status='CLOSED', q=${q})}">
+                Closed <span class="badge text-bg-secondary" th:text="${counts.closed}">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'ALL'} ? 'active'"
+               th:href="@{/admin/jobs(status='ALL', q=${q})}">
+                All <span class="badge text-bg-secondary" th:text="${counts.all}">0</span>
+            </a>
+        </li>
+    </ul>
+
+    <form method="get" th:action="@{/admin/jobs}" class="row g-2 mb-3">
+        <input type="hidden" name="status" th:value="${activeTab}">
+        <div class="col-12 col-md-5">
+            <input type="text" class="form-control" name="q" maxlength="100" placeholder="Search title or company"
+                   th:value="${q}">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+        </div>
+    </form>
+
+    <div th:if="${page.empty and activeTab == 'PENDING_APPROVAL'}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-check2-circle icon"></i>
+            <p class="message">No jobs are waiting for approval.</p>
+        </div>
+    </div>
+    <div th:if="${page.empty and activeTab != 'PENDING_APPROVAL'}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-briefcase icon"></i>
+            <p class="message">No jobs match this view.</p>
+        </div>
+    </div>
+
+    <div th:unless="${page.empty}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Company</th>
+                    <th>Category</th>
+                    <th>Submitted</th>
+                    <th>Deadline</th>
+                    <th>Status</th>
+                    <th>Applications</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <th:block th:each="j : ${page.content}">
+                    <tr>
+                        <td><a th:href="@{/admin/jobs/{id}(id=${j.id})}" th:text="${j.title}">Job title</a></td>
+                        <td th:text="${j.employer.companyName}">Company</td>
+                        <td th:text="${j.category.label}">Category</td>
+                        <td th:text="${#temporals.format(j.createdAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                        <td>
+                            <span th:text="${#temporals.format(j.applicationDeadline, 'dd MMM yyyy')}">30 Sep 2026</span>
+                            <span class="badge text-bg-danger ms-1" th:if="${j.applicationDeadline.isBefore(today)}">Passed</span>
+                        </td>
+                        <td><span th:replace="~{fragments/status-badge :: job(${j})}"></span></td>
+                        <td th:text="${applicationCounts.get(j.id)}">0</td>
+                        <td>
+                            <div class="d-flex gap-1 flex-wrap">
+                                <a th:href="@{/admin/jobs/{id}(id=${j.id})}" class="btn btn-sm btn-outline-secondary">Review</a>
+                                <th:block th:if="${j.status.name() == 'PENDING_APPROVAL'}">
+                                    <form th:action="@{/admin/jobs/{id}/approve(id=${j.id})}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Approve</button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="collapse"
+                                            th:attr="data-bs-target=${'#reject-' + j.id}, aria-controls=${'reject-' + j.id}"
+                                            aria-expanded="false">
+                                        Reject
+                                    </button>
+                                </th:block>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:if="${j.status.name() == 'PENDING_APPROVAL'}">
+                        <td colspan="8" class="p-0 border-0">
+                            <div class="collapse" th:id="${'reject-' + j.id}">
+                                <form th:action="@{/admin/jobs/{id}/reject(id=${j.id})}" method="post" class="p-3 bg-light border-top">
+                                    <label class="form-label" th:for="${'reason-' + j.id}">Reason for rejecting</label>
+                                    <textarea class="form-control mb-2" th:id="${'reason-' + j.id}" name="reason" rows="2"
+                                              minlength="10" maxlength="500"
+                                              placeholder="10-500 characters. The employer will see this."></textarea>
+                                    <button type="submit" class="btn btn-sm btn-danger">Confirm reject</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </th:block>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>
