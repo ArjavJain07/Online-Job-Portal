@@ -37,8 +37,11 @@
         <strong>Rejected:</strong> <span th:text="${job.rejectionReason}">Reason</span>
     </div>
 
-    <div class="row g-4 mt-1">
-        <div class="col-lg-8">
+    <!-- Main column plus a secondary rail (app.css .jp-layout-wide / .jp-rail), the same
+         "record + side actions" shape admin/job-review.html uses - stacks below the
+         job detail on narrower screens. -->
+    <div class="jp-layout-wide mt-1">
+        <div>
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
                     <div class="mb-3 d-flex flex-wrap gap-1">
@@ -95,7 +98,7 @@
             </div>
         </div>
 
-        <div class="col-lg-4">
+        <div class="jp-rail">
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Quick stats</div>
                 <div class="card-body">

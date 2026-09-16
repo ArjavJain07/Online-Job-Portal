@@ -20,24 +20,30 @@
 <main>
 
     <section class="text-center py-4 py-md-5 mb-5">
-        <h1 class="display-6 fw-bold mb-2">Find your next job</h1>
+        <!-- Quiet heading (Section 7.1 core rule 3: page h1 stays 1.5rem, no large
+             marketing display type) - plain <h1>, styled entirely by app.css. -->
+        <h1 class="mb-2">Find your next job</h1>
         <p class="text-muted mb-4">Search live openings from verified employers and apply in minutes.</p>
 
         <form method="get" th:action="@{/jobs}" class="row justify-content-center g-2">
             <div class="col-12 col-md-4">
                 <label class="visually-hidden" for="home-q">Job title, skill or company</label>
-                <input type="text" class="form-control" id="home-q" name="q" maxlength="100"
-                       placeholder="Job title, skill or company">
+                <div class="input-group">
+                    <span class="input-group-text bg-white" aria-hidden="true"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="home-q" name="q" maxlength="100"
+                           placeholder="Job title, skill or company">
+                </div>
             </div>
             <div class="col-12 col-md-3">
                 <label class="visually-hidden" for="home-location">Location</label>
-                <input type="text" class="form-control" id="home-location" name="location" maxlength="100"
-                       placeholder="Location">
+                <div class="input-group">
+                    <span class="input-group-text bg-white" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
+                    <input type="text" class="form-control" id="home-location" name="location" maxlength="100"
+                           placeholder="Location">
+                </div>
             </div>
             <div class="col-12 col-md-auto">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search" aria-hidden="true"></i> Search jobs
-                </button>
+                <button type="submit" class="btn btn-primary">Search jobs</button>
             </div>
         </form>
 

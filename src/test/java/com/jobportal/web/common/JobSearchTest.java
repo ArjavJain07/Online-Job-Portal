@@ -140,6 +140,122 @@ class JobSearchTest extends IntegrationTestBase {
                 .andExpect(content().string(containsString("Showing 6-6 of 6")));
     }
 
+    // Section 7.1 core rule 7 (two-pane jobs page): with no "job" request parameter, the
+    // pane opens on the first result of the current page - "newest" is the default sort,
+    // and Spring Boot Intern (J2, approved 5 days ago) is newer than Java Developer (J1,
+    // approved 19 days ago), so it is first. Only the pane renders a job's full
+    // description (fragments/job-card never does), so a snippet of it is used to tell
+    // "shown in the pane" apart from merely "present in the list".
+    @Test
+    void jobsListPaneDefaultsToFirstResult() throws Exception {
+        String body = mockMvc.perform(get("/jobs").param("q", "java").param("location", "pune"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("learn to build real backend features"); // Spring Boot Intern's own description
+        assertThat(body).doesNotContain("join our backend team in Pune"); // Java Developer's own description
+        assertThat(cardIsSelected(body, "Spring Boot Intern")).isTrue();
+        assertThat(cardIsSelected(body, "Java Developer")).isFalse();
+    }
+
+    // ?job={id} opens that job in the pane instead of the first result, and marks only its
+    // own card ".is-selected".
+    @Test
+    void jobParamSelectsRequestedJob() throws Exception {
+        Long javaDeveloperId = data.jobId("Java Developer");
+
+        String body = mockMvc.perform(get("/jobs").param("q", "java").param("location", "pune")
+                        .param("job", javaDeveloperId.toString()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("join our backend team in Pune"); // Java Developer's own description
+        assertThat(body).doesNotContain("learn to build real backend features"); // Spring Boot Intern's
+        assertThat(cardIsSelected(body, "Java Developer")).isTrue();
+        assertThat(cardIsSelected(body, "Spring Boot Intern")).isFalse();
+    }
+
+    // A "job" id that is not one of this result page's jobs (here, not seeded at all)
+    // falls back to the first result, the same as no "job" parameter.
+    @Test
+    void unknownJobParamFallsBackToFirstResult() throws Exception {
+        String body = mockMvc.perform(get("/jobs").param("q", "java").param("location", "pune")
+                        .param("job", "999999"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("learn to build real backend features"); // Spring Boot Intern's own description
+        assertThat(cardIsSelected(body, "Spring Boot Intern")).isTrue();
+        assertThat(cardIsSelected(body, "Java Developer")).isFalse();
+    }
+
+    // Same pane wiring on GET /seeker/jobs, plus the seeker-specific apply/login CTA
+    // (Section 7.1 core rule 7): the pane shows "You applied on ..." for a job Priya has
+    // already applied to (Java Developer, A1) and "Apply now" for one she has not (Spring
+    // Boot Intern).
+    @Test
+    void seekerJobsPaneReflectsApplicationStatus() throws Exception {
+        UserDetails priya = userDetailsService.loadUserByUsername("priya@demo.local");
+        Long javaDeveloperId = data.jobId("Java Developer");
+        Long springBootInternId = data.jobId("Spring Boot Intern");
+
+        String appliedBody = mockMvc.perform(get("/seeker/jobs").param("q", "java").param("location", "pune")
+                        .param("job", javaDeveloperId.toString()).with(user(priya)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(appliedBody).contains("join our backend team in Pune", "You applied on", "View application");
+        assertThat(cardIsSelected(appliedBody, "Java Developer")).isTrue();
+
+        String notAppliedBody = mockMvc.perform(get("/seeker/jobs").param("q", "java").param("location", "pune")
+                        .param("job", springBootInternId.toString()).with(user(priya)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(notAppliedBody).contains("learn to build real backend features", "Apply now");
+        assertThat(notAppliedBody).doesNotContain("You applied on");
+        assertThat(cardIsSelected(notAppliedBody, "Spring Boot Intern")).isTrue();
+    }
+
+    // Same pane default/fallback rules as jobsListPaneDefaultsToFirstResult and
+    // unknownJobParamFallsBackToFirstResult above (Section 7.1 core rule 7), exercised on
+    // GET /seeker/jobs so both routes that gained the "job" parameter are covered the same
+    // way: with no "job" parameter the pane opens on the first result (Spring Boot Intern,
+    // newer than Java Developer under the default "newest" sort), and an id that is not one
+    // of this result page's own jobs falls back to that same first result.
+    @Test
+    void seekerJobsPaneDefaultsToFirstResultAndFallsBackOnUnknownId() throws Exception {
+        UserDetails priya = userDetailsService.loadUserByUsername("priya@demo.local");
+
+        String defaultBody = mockMvc.perform(get("/seeker/jobs").param("q", "java").param("location", "pune")
+                        .with(user(priya)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(defaultBody).contains("learn to build real backend features"); // Spring Boot Intern's own description
+        assertThat(cardIsSelected(defaultBody, "Spring Boot Intern")).isTrue();
+        assertThat(cardIsSelected(defaultBody, "Java Developer")).isFalse();
+
+        String unknownIdBody = mockMvc.perform(get("/seeker/jobs").param("q", "java").param("location", "pune")
+                        .param("job", "999999").with(user(priya)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(unknownIdBody).contains("learn to build real backend features");
+        assertThat(cardIsSelected(unknownIdBody, "Spring Boot Intern")).isTrue();
+        assertThat(cardIsSelected(unknownIdBody, "Java Developer")).isFalse();
+    }
+
+    // Whether a job's list card carries ".is-selected" (Section 7.1 core rule 7). Same
+    // "split on the card's own opening class string" technique as assertAppliedBadge below,
+    // for the same reason: it isolates one job's card markup without risking a
+    // fixed-size window spilling into the next one.
+    private boolean cardIsSelected(String body, String jobTitle) {
+        String[] cards = body.split("card shadow-sm mb-3");
+        for (String candidate : cards) {
+            if (candidate.contains(jobTitle)) {
+                return candidate.contains("is-selected");
+            }
+        }
+        throw new AssertionError("No job card found for " + jobTitle);
+    }
+
     // fragments/job-card only prints the "Applied" badge (class="badge app-applied") when
     // this seeker has already applied; an unapplied job's card has no such badge. Each
     // card starts with the literal "card shadow-sm mb-3" (its own, more specific class

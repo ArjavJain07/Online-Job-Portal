@@ -19,7 +19,7 @@
         <a th:href="@{/admin/users/new}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Create user</a>
     </div>
 
-    <form method="get" th:action="@{/admin/users}" class="card shadow-sm jp-filters mb-4">
+    <form method="get" th:action="@{/admin/users}" class="card jp-filters mb-4">
         <div class="card-body">
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-md-4">
@@ -56,14 +56,14 @@
         </div>
     </form>
 
-    <div th:if="${page.empty}" class="card shadow-sm">
+    <div th:if="${page.empty}" class="card">
         <div class="card-body empty-state">
             <i class="bi bi-people icon"></i>
             <p class="message">No users match these filters.</p>
         </div>
     </div>
 
-    <div th:unless="${page.empty}" class="card shadow-sm">
+    <div th:unless="${page.empty}" class="card">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead>

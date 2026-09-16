@@ -7,8 +7,10 @@
 
     <html th:replace="~{layout/public :: layout(title='Find jobs', content=~{::main}, scripts=~{})}">
 
-  Structure: navbar, announcement banner, flash messages, page content in a centred
-  container, footer.
+  Structure (Section 7.1 UI pass, LinkedIn convention): navbar, announcement banner, flash
+  messages, page content centred in the ".jp-page" column (max-width 1128px, the same
+  column layout/dashboard.html uses for its rail + main grid), footer. Fragment signature
+  (title, content, scripts) is unchanged.
 -->
 <html th:fragment="layout(title, content, scripts)" lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -25,13 +27,13 @@
 
 <div th:replace="~{fragments/flash :: announcement}"></div>
 
-<main class="container py-4 flex-grow-1">
+<main class="jp-page px-3 flex-grow-1">
     <div th:replace="~{fragments/flash :: messages}"></div>
     <th:block th:replace="${content}"></th:block>
 </main>
 
 <footer class="border-top bg-white py-4 mt-auto">
-    <div class="container text-center text-muted small">
+    <div class="jp-page px-3 py-0 text-center text-muted small">
         <i class="bi bi-briefcase-fill me-1" aria-hidden="true"></i>
         <span th:text="${siteName}">JobPortal</span>
         <span>&#45; an online job portal built as a college project.</span>

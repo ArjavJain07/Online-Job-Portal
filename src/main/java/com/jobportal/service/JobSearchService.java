@@ -270,4 +270,26 @@ public class JobSearchService {
     public long countEmployersHiring() {
         return jobRepository.countDistinctEmployersWithLiveJobs(JobStatus.APPROVED, LocalDate.now(clock));
     }
+
+    // ---- Two-pane jobs page (Section 7.1 core rule 7) ----
+
+    // Small, additive helper for JobBrowseController#search and SeekerJobController#search:
+    // the job shown in the right-hand ".jp-jobs-detail" pane is the requested "job" id when
+    // it is one of this result page's jobs, otherwise the first job on the page (or null
+    // when the page has none). Does not change what search() returns, and never counts a
+    // view - view counting stays exactly where it is today, in recordView() above, called
+    // only from the standalone GET /jobs/{id} route.
+    public Job selectForPane(List<Job> pageContent, Long requestedJobId) {
+        if (pageContent.isEmpty()) {
+            return null;
+        }
+        if (requestedJobId != null) {
+            for (Job job : pageContent) {
+                if (job.getId().equals(requestedJobId)) {
+                    return job;
+                }
+            }
+        }
+        return pageContent.get(0);
+    }
 }

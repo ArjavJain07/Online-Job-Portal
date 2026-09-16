@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 // Seeker job search and applying (Section 6.4 S-F1, S-D1, S-F2, 6.6 route summary). Thin
@@ -46,13 +47,23 @@ public class SeekerJobController {
     // GET /seeker/jobs?... (S-F1, S-D1): the same search JobBrowseController runs for the
     // public /jobs page, with an "Applied" badge added per row for this seeker (Section
     // 6.4 S-F1 output: "any status, including withdrawn").
+    // "job" (added for the two-pane layout, Section 7.1 core rule 7): same optional
+    // parameter and fallback rule as JobBrowseController#search, picking which of this
+    // page's own results opens in the right-hand ".jp-jobs-detail" pane.
     @GetMapping("/seeker/jobs")
-    public String search(JobSearchCriteria criteria, @AuthenticationPrincipal AppUserDetails me, Model model) {
+    public String search(JobSearchCriteria criteria, @RequestParam(name = "job", required = false) Long jobId,
+            @AuthenticationPrincipal AppUserDetails me, Model model) {
         JobSearchResult result = jobSearchService.search(criteria);
         model.addAttribute("criteria", criteria);
         model.addAttribute("page", result.jobs());
         model.addAttribute("warning", firstWarningOrNull(result));
         model.addAttribute("rows", jobApplicationService.withAppliedFlags(result.jobs().getContent(), me.getId()));
+
+        Job selectedJob = jobSearchService.selectForPane(result.jobs().getContent(), jobId);
+        model.addAttribute("selectedJob", selectedJob);
+        model.addAttribute("selectedJobId", selectedJob == null ? null : selectedJob.getId());
+        model.addAttribute("existingApplication", selectedJob == null ? null
+                : jobApplicationService.findExisting(selectedJob.getId(), me.getId()).orElse(null));
         return "seeker/jobs";
     }
 

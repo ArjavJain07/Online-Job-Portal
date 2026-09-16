@@ -2,13 +2,19 @@
 <!--
   Dashboard layout (Section 7.1): used by every /admin/**, /employer/**, /seeker/** page
   and /account/password. Same "hand in your <main> as a parameter" pattern as
-  layout/public.html, but with a role sidebar down the left:
+  layout/public.html, but with a narrow role-menu rail beside the main column, the way
+  LinkedIn lays out its own dashboard-like pages:
 
     <html th:replace="~{layout/dashboard :: layout(title='My Jobs', content=~{::main}, scripts=~{})}">
 
   A page with a chart defines its own <th:block th:fragment="scripts"> as a SIBLING of
   <main> (never inside it - see the comment in fragments/navbar.html and Section 7.1) and
   passes scripts=~{::scripts}; a page with nothing extra to run passes scripts=~{}.
+
+  ".jp-layout" (app.css Section 5) is a CSS grid of a fixed-width rail column and a
+  flexible main column; fragments/sidebar.html supplies its own rail wrapper (".jp-rail")
+  and, inside it, the Bootstrap "offcanvas" drawer that the rail collapses into below the
+  lg breakpoint - the "Menu" button below opens that drawer.
 -->
 <html th:fragment="layout(title, content, scripts)" lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -25,22 +31,18 @@
 
 <div th:replace="~{fragments/flash :: announcement}"></div>
 
-<div class="container-fluid">
-    <div class="row">
-        <!-- fragments/sidebar.html supplies its own <aside>, already sized to match the
-             col-lg-9/col-xl-10 content column below; below the lg breakpoint it turns into
-             a Bootstrap "offcanvas" panel opened by the button below (Section 7.1: "becomes
-             an offcanvas menu below the lg breakpoint"). -->
-        <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+<div class="jp-page px-3">
+    <div class="d-lg-none mb-3">
+        <button class="btn btn-outline-secondary btn-sm" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
+            <i class="bi bi-list" aria-hidden="true"></i> Menu
+        </button>
+    </div>
 
-        <div class="col-lg-9 col-xl-10 py-4">
-            <div class="d-lg-none border-bottom bg-white py-2 mb-3">
-                <button class="btn btn-outline-secondary btn-sm" type="button"
-                        data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
-                    <i class="bi bi-list" aria-hidden="true"></i> Menu
-                </button>
-            </div>
+    <div class="jp-layout">
+        <div th:replace="~{fragments/sidebar :: sidebar}"></div>
 
+        <div>
             <div th:replace="~{fragments/flash :: messages}"></div>
             <th:block th:replace="${content}"></th:block>
         </div>

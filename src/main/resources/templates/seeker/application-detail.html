@@ -61,41 +61,45 @@
         This job is no longer open, but your application is still being processed.
     </p>
 
-    <!-- Horizontal status tracker (Section 6.4 S-F3). Each step carries a thin connector
-         line (Bootstrap border utilities, no new CSS) filled in primary blue up to the
-         seeker's current stage, with the status badge and word underneath it - colour is
-         never the only signal here (core rule 7). The two final states (Rejected,
-         Withdrawn) have no forward step, so trackerStepIndex is null and they fall back to
-         the plain status badge instead. -->
+    <!-- Horizontal status tracker (Section 6.4 S-F3, app.css Section 14 ".jp-tracker"):
+         each step is a word with a decorative icon in front of it, done steps in success
+         green and the seeker's current stage in primary blue - colour is never the only
+         signal here (core rule 7), the word and the "Current" label carry the state too.
+         The two final states (Rejected, Withdrawn) have no forward step, so
+         trackerStepIndex is null and they fall back to the plain status badge instead. -->
     <div class="card shadow-sm mb-4">
         <div class="card-header">Status</div>
         <div class="card-body">
-            <div th:if="${trackerStepIndex != null}" class="d-flex flex-wrap gap-1 text-center">
-                <div class="flex-fill px-1">
-                    <div class="border-top border-3 border-primary mb-2"></div>
-                    <span class="badge" th:classappend="${trackerStepIndex >= 0} ? 'app-applied' : 'bg-light text-muted border'">Applied</span>
-                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 0}">Current</div>
-                </div>
-                <div class="flex-fill px-1">
-                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 1} ? 'border-primary' : 'border-secondary-subtle'"></div>
-                    <span class="badge" th:classappend="${trackerStepIndex >= 1} ? 'app-under-review' : 'bg-light text-muted border'">Under review</span>
-                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 1}">Current</div>
-                </div>
-                <div class="flex-fill px-1">
-                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 2} ? 'border-primary' : 'border-secondary-subtle'"></div>
-                    <span class="badge" th:classappend="${trackerStepIndex >= 2} ? 'app-shortlisted' : 'bg-light text-muted border'">Shortlisted</span>
-                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 2}">Current</div>
-                </div>
-                <div class="flex-fill px-1">
-                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 3} ? 'border-primary' : 'border-secondary-subtle'"></div>
-                    <span class="badge" th:classappend="${trackerStepIndex >= 3} ? 'app-interview' : 'bg-light text-muted border'">Interview</span>
-                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 3}">Current</div>
-                </div>
-                <div class="flex-fill px-1">
-                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 4} ? 'border-primary' : 'border-secondary-subtle'"></div>
-                    <span class="badge" th:classappend="${trackerStepIndex >= 4} ? 'app-hired' : 'bg-light text-muted border'">Hired</span>
-                    <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 4}">Current</div>
-                </div>
+            <div th:if="${trackerStepIndex != null}" class="jp-tracker">
+                <span class="step" th:classappend="${trackerStepIndex > 0} ? 'is-done' : (${trackerStepIndex == 0} ? 'is-current' : '')">
+                    <i class="bi" th:classappend="${trackerStepIndex >= 0} ? 'bi-check-circle-fill' : 'bi-circle'" aria-hidden="true"></i>
+                    <span>Applied</span>
+                    <span th:if="${trackerStepIndex == 0}">&middot; Current</span>
+                </span>
+                <i class="bi bi-chevron-right text-muted small" aria-hidden="true"></i>
+                <span class="step" th:classappend="${trackerStepIndex > 1} ? 'is-done' : (${trackerStepIndex == 1} ? 'is-current' : '')">
+                    <i class="bi" th:classappend="${trackerStepIndex >= 1} ? 'bi-check-circle-fill' : 'bi-circle'" aria-hidden="true"></i>
+                    <span>Under review</span>
+                    <span th:if="${trackerStepIndex == 1}">&middot; Current</span>
+                </span>
+                <i class="bi bi-chevron-right text-muted small" aria-hidden="true"></i>
+                <span class="step" th:classappend="${trackerStepIndex > 2} ? 'is-done' : (${trackerStepIndex == 2} ? 'is-current' : '')">
+                    <i class="bi" th:classappend="${trackerStepIndex >= 2} ? 'bi-check-circle-fill' : 'bi-circle'" aria-hidden="true"></i>
+                    <span>Shortlisted</span>
+                    <span th:if="${trackerStepIndex == 2}">&middot; Current</span>
+                </span>
+                <i class="bi bi-chevron-right text-muted small" aria-hidden="true"></i>
+                <span class="step" th:classappend="${trackerStepIndex > 3} ? 'is-done' : (${trackerStepIndex == 3} ? 'is-current' : '')">
+                    <i class="bi" th:classappend="${trackerStepIndex >= 3} ? 'bi-check-circle-fill' : 'bi-circle'" aria-hidden="true"></i>
+                    <span>Interview</span>
+                    <span th:if="${trackerStepIndex == 3}">&middot; Current</span>
+                </span>
+                <i class="bi bi-chevron-right text-muted small" aria-hidden="true"></i>
+                <span class="step" th:classappend="${trackerStepIndex == 4} ? 'is-current'">
+                    <i class="bi" th:classappend="${trackerStepIndex >= 4} ? 'bi-check-circle-fill' : 'bi-circle'" aria-hidden="true"></i>
+                    <span>Hired</span>
+                    <span th:if="${trackerStepIndex == 4}">&middot; Current</span>
+                </span>
             </div>
             <div th:if="${trackerStepIndex == null}">
                 <span th:replace="~{fragments/status-badge :: application(${jobApplication.status}, 'SEEKER')}"></span>
@@ -103,8 +107,11 @@
         </div>
     </div>
 
-    <div class="row g-4">
-        <div class="col-lg-8">
+    <!-- Main column plus a secondary rail (app.css .jp-layout-wide / .jp-rail), the same
+         "record + side actions" shape admin/job-review.html uses - stacks below the
+         job details on narrower screens. -->
+    <div class="jp-layout-wide">
+        <div>
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Job details</div>
@@ -151,7 +158,7 @@
 
         </div>
 
-        <div class="col-lg-4">
+        <div class="jp-rail">
             <div class="card shadow-sm">
                 <div class="card-body" th:if="${jobApplication.status.active}">
                     <form th:action="@{/seeker/applications/{id}/withdraw(id=${jobApplication.id})}" method="post">

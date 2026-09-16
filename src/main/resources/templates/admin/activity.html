@@ -20,7 +20,7 @@
 
     <div th:if="${liveView}" class="row g-4 mb-4">
         <div class="col-lg-8">
-            <div class="card shadow-sm h-100">
+            <div class="card h-100">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <span>
                         <i class="bi bi-broadcast text-success me-1"></i>
@@ -34,7 +34,7 @@
             </div>
         </div>
         <div class="col-lg-4">
-            <div class="card shadow-sm h-100">
+            <div class="card h-100">
                 <div class="card-header">Latest applications</div>
                 <div class="card-body p-0">
                     <div th:replace="~{fragments/activity-feed :: applications(${latestApplications})}"></div>
@@ -43,7 +43,7 @@
         </div>
     </div>
 
-    <div class="card shadow-sm">
+    <div class="card">
         <div class="card-header">
             <form method="get" th:action="@{/admin/activity}" class="row g-2 align-items-end">
                 <div class="col-auto">

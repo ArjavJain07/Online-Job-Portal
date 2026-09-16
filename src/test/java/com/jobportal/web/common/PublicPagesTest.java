@@ -111,6 +111,21 @@ class PublicPagesTest extends IntegrationTestBase {
         assertThat(currentViewCount(javaJobId)).isEqualTo(before + 1);
     }
 
+    // The two-pane /jobs list (JobSearchTest) adds a new "job" request parameter and a
+    // ".jp-jobs-detail" pane, but must not touch the standalone GET /jobs/{id} route at
+    // all - it is still a public route with its own tests (this class's other methods
+    // already exercise its pending/expired/view-count behaviour; this one checks the plain
+    // Live case an anonymous visitor sees every day still renders with its own apply CTA).
+    @Test
+    void standaloneDetailPageStillWorksForLiveJob() throws Exception {
+        Long javaJobId = data.jobId("Java Developer");
+
+        String body = mockMvc.perform(get("/jobs/{id}", javaJobId)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("Java Developer", "Acme Technologies", "Log in to apply");
+    }
+
     private void setEmployerRegistrationOpen(boolean open) {
         SystemSettings settings = systemSettingsRepository.findById(1L).orElseThrow();
         settings.setEmployerRegistrationOpen(open);

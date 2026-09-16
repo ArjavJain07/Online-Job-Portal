@@ -21,7 +21,7 @@
 
     <div class="row">
         <div class="col-md-9 col-lg-7">
-            <div class="card shadow-sm mb-3">
+            <div class="card mb-3">
                 <div class="card-header">Account details</div>
                 <div class="card-body">
                     <dl class="row mb-0">
@@ -37,7 +37,7 @@
                 </div>
             </div>
 
-            <div class="card shadow-sm">
+            <div class="card">
                 <div class="card-header">Related records</div>
                 <div class="card-body">
                     <!-- Compact key numbers, same dl pattern as the card above, so a reader
@@ -70,7 +70,10 @@
                             <div class="alert alert-danger" th:text="${blockedMessage}">Blocking message.</div>
                             <form th:if="${targetUser.enabled}" th:action="@{/admin/users/{id}/toggle-status(id=${targetUser.id})}"
                                   method="post">
-                                <button type="submit" class="btn btn-warning">Deactivate instead</button>
+                                <button type="submit" class="btn btn-warning"
+                                        data-confirm="Deactivate this account? They will be logged out and won't be able to log in until reactivated.">
+                                    Deactivate instead
+                                </button>
                             </form>
                         </div>
                     </div>

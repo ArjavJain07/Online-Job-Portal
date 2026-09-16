@@ -28,8 +28,11 @@
         </a>
     </p>
 
-    <div class="row g-4">
-        <div class="col-lg-8">
+    <!-- Main column plus a secondary rail (app.css .jp-layout-wide / .jp-rail), the same
+         "record + side actions" shape admin/job-review.html uses - stacks below the
+         job detail on narrower screens. -->
+    <div class="jp-layout-wide">
+        <div>
 
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
@@ -91,7 +94,7 @@
 
         </div>
 
-        <div class="col-lg-4">
+        <div class="jp-rail">
             <div th:if="${banner != null}" th:class="'alert alert-' + ${banner.style}">
                 <span th:text="${banner.text}">Banner text</span>
                 <a th:if="${banner.showReviewButton}" th:href="@{/admin/jobs/{id}(id=${job.id})}"

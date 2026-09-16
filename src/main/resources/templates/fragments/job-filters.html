@@ -17,8 +17,8 @@
   application enum such as JobCategory cannot be referenced with T(...) from a template.
   The values below must stay in sync with domain.enums.JobCategory/JobType/WorkMode.
 
-  The panel sits in a narrow left column from lg up, so its fields stack one per row
-  there and sit two per row while the panel is full width on smaller screens.
+  The panel opens full width under the "All filters" pill, so its fields sit in a grid
+  rather than stacking.
 
   ".jp-filters" (Section 7.1 filter panel pattern) tightens the label size and card-body
   padding (app.css Section 9); the card carries a header with its 600-weight title (Section
@@ -34,17 +34,17 @@
     </div>
     <div class="card-body">
         <div class="row g-3">
-            <div class="col-12">
+            <div class="col-12 col-md-4">
                 <label class="form-label" for="filter-q">Keyword</label>
                 <input type="text" class="form-control" id="filter-q" name="q" maxlength="100"
                        placeholder="Job title, skill or company" th:value="${criteria.q}">
             </div>
-            <div class="col-12">
+            <div class="col-12 col-md-4">
                 <label class="form-label" for="filter-location">Location</label>
                 <input type="text" class="form-control" id="filter-location" name="location" maxlength="100"
                        placeholder="City or 'remote'" th:value="${criteria.location}">
             </div>
-            <div class="col-12 col-sm-6 col-lg-12">
+            <div class="col-12 col-md-4">
                 <label class="form-label" for="filter-category">Category</label>
                 <select class="form-select" id="filter-category" name="category">
                     <option value="" th:selected="${criteria.category == null or criteria.category == ''}">Any category</option>
@@ -60,7 +60,7 @@
                     <option value="OTHER" th:selected="${criteria.category == 'OTHER'}">Other</option>
                 </select>
             </div>
-            <div class="col-12 col-sm-6 col-lg-12">
+            <div class="col-6 col-md-3">
                 <label class="form-label" for="filter-job-type">Job type</label>
                 <select class="form-select" id="filter-job-type" name="jobType">
                     <option value="" th:selected="${criteria.jobType == null or criteria.jobType == ''}">Any type</option>
@@ -71,7 +71,7 @@
                 </select>
             </div>
 
-            <div class="col-12 col-sm-6 col-lg-12">
+            <div class="col-6 col-md-3">
                 <label class="form-label" for="filter-work-mode">Work mode</label>
                 <select class="form-select" id="filter-work-mode" name="workMode">
                     <option value="" th:selected="${criteria.workMode == null or criteria.workMode == ''}">Any mode</option>
@@ -80,12 +80,12 @@
                     <option value="HYBRID" th:selected="${criteria.workMode == 'HYBRID'}">Hybrid</option>
                 </select>
             </div>
-            <div class="col-12 col-sm-6 col-lg-12">
+            <div class="col-6 col-md-2">
                 <label class="form-label" for="filter-min-salary">Min. salary (INR)</label>
                 <input type="number" class="form-control" id="filter-min-salary" name="minSalary" min="0"
                        placeholder="e.g. 600000" th:value="${criteria.minSalary}">
             </div>
-            <div class="col-12 col-sm-6 col-lg-12">
+            <div class="col-6 col-md-2">
                 <label class="form-label" for="filter-experience">Experience</label>
                 <select class="form-select" id="filter-experience" name="maxExperience">
                     <option value="" th:selected="${criteria.maxExperience == null or criteria.maxExperience == ''}">Any experience</option>
@@ -96,7 +96,7 @@
                     <option value="10" th:selected="${criteria.maxExperience == '10'}">Up to 10 years</option>
                 </select>
             </div>
-            <div class="col-12 col-sm-6 col-lg-12">
+            <div class="col-6 col-md-2">
                 <label class="form-label" for="filter-posted-within">Posted within</label>
                 <select class="form-select" id="filter-posted-within" name="postedWithin">
                     <option value="" th:selected="${criteria.postedWithin == null or criteria.postedWithin == ''}">Any time</option>
@@ -105,7 +105,7 @@
                     <option value="30" th:selected="${criteria.postedWithin == '30'}">Last 30 days</option>
                 </select>
             </div>
-            <div class="col-12">
+            <div class="col-6 col-md-3">
                 <label class="form-label" for="filter-sort">Sort by</label>
                 <select class="form-select" id="filter-sort" name="sort">
                     <option value="newest" th:selected="${criteria.sort == null or criteria.sort == '' or criteria.sort == 'newest'}">Newest</option>

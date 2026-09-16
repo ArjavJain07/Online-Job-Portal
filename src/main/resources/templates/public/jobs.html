@@ -4,21 +4,35 @@
   the Spring Data Page under the model key "page" (read by both fragments/job-card's loop
   and fragments/pagination) and the raw JobSearchCriteria under "criteria" (read by
   fragments/job-filters, which keeps every entered value - even an invalid one - in the
-  form). "warning" is a plain model attribute, not a flash message, and is already rendered
-  by layout/public.html's fragments/flash :: messages before this page's own content.
+  form, and by the quick filter pills and the pane-select links below, which read it the
+  same way). "warning" is a plain model attribute, not a flash message, and is already
+  rendered by layout/public.html's fragments/flash :: messages before this page's own
+  content.
 
-  Classic job-site layout (Section 7.1 UI pass): filters in a left column at >= lg,
-  collapsed above the results on smaller screens. The panel is wrapped in Bootstrap's
-  ".collapse" so it toggles below lg, plus ".d-lg-block" so it is always open at lg+ - the
-  utility's "display: block !important" media rule always wins over ".collapse"'s plain
-  "display: none", which is exactly how Bootstrap's own ".navbar-collapse" does the same
-  trick. fragments/job-filters already carries its own "Sort by" field (Section 7.1 core
-  rule 6), so the line above the results is a plain result-count summary, not a second
-  "sort" control - adding one here would duplicate that form field. Every field id/name in
-  the filters fragment, and the "N jobs found" text JobSearchTest#keywordAndLocationReturnOnlyLiveMatches
-  and friends assert on, is unchanged from before the restyle.
+  Two-pane layout (Section 7.1 core rule 7, LinkedIn's jobs page): a scrollable list of
+  job cards on the left, the selected job open beside it on the right. The selected job is
+  chosen by JobBrowseController#search from the new optional "job" request parameter -
+  whichever of this page's own results it names, or the first result otherwise - and handed
+  to the template as "selectedJob"/"selectedJobId"/"existingApplication". Marking the
+  matching list card is entirely fragments/job-card's own job: it already appends
+  ".is-selected" whenever the plain model attribute "selectedJobId" equals a card's job id
+  (see that fragment's header comment), so nothing here has to pass a third argument to it.
+
+  Each card's own click target is a ".stretched-link" placed as a SIBLING of the
+  fragments/job-card call (inside a small ".position-relative" wrapper this page owns) -
+  not a wrapper around it - because job-card.html already has its own nested
+  ".job-title" anchor (to the standalone /jobs/{id} page, which must keep working exactly
+  as it does today) and HTML forbids nesting one <a> inside another. The stretched link
+  covers the whole card and points at this same list URL with every current filter and
+  page parameter plus job={id}, so selecting a job is a normal, bookmarkable GET - no
+  JavaScript required. Below the lg breakpoint app.css stacks ".jp-jobs-detail" under the
+  list (Section 5 core rule 7), so the pane still appears, just further down the page.
+
+  Filters, results-count wording and the empty state are all unchanged from before this
+  pass - only the results column's own layout changed from a flat list to the two-pane.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="~{layout/public :: layout(title='Find jobs', content=~{::main}, scripts=~{})}">
 <body>
 <main>
@@ -31,21 +45,42 @@
         </div>
     </div>
 
-    <div class="row g-4">
-        <!-- Filters: left column at >= lg; a collapsible panel above the results below it. -->
-        <div class="col-12 col-lg-3">
-            <button class="btn btn-outline-secondary w-100 d-lg-none mb-3" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#jobFiltersPanel"
-                    aria-expanded="false" aria-controls="jobFiltersPanel">
-                <i class="bi bi-funnel me-1" aria-hidden="true"></i>Filters
-            </button>
-            <div class="collapse d-lg-block" id="jobFiltersPanel">
+    <!-- Pills, the filter panel and the two-pane list.
+         (Before this rework the filters had their own left column; LinkedIn keeps them
+         behind an "All filters" pill instead, so the list and the detail pane get the
+         full width.) -->
+    <div>
+            <!-- Quick filter pills (Section 7.1 core rule 9): shortcuts onto the same
+                 fields the filters panel already has, each a plain GET link that keeps
+                 every other filter. ".is-on" marks whichever one matches the current
+                 criteria; "All jobs" is on when neither jobType nor workMode is set. -->
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <a class="jp-chip-filter"
+                   th:classappend="${(criteria.jobType == null or criteria.jobType == '') and (criteria.workMode == null or criteria.workMode == '')} ? 'is-on'"
+                   th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin=${criteria.postedWithin}, sort=${criteria.sort})}">All jobs</a>
+                <a class="jp-chip-filter" th:classappend="${criteria.jobType == 'FULL_TIME'} ? 'is-on'"
+                   th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, jobType='FULL_TIME', workMode=${criteria.workMode}, minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin=${criteria.postedWithin}, sort=${criteria.sort})}">Full-time</a>
+                <a class="jp-chip-filter" th:classappend="${criteria.jobType == 'PART_TIME'} ? 'is-on'"
+                   th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, jobType='PART_TIME', workMode=${criteria.workMode}, minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin=${criteria.postedWithin}, sort=${criteria.sort})}">Part-time</a>
+                <a class="jp-chip-filter" th:classappend="${criteria.jobType == 'INTERNSHIP'} ? 'is-on'"
+                   th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, jobType='INTERNSHIP', workMode=${criteria.workMode}, minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin=${criteria.postedWithin}, sort=${criteria.sort})}">Internship</a>
+                <a class="jp-chip-filter" th:classappend="${criteria.workMode == 'REMOTE'} ? 'is-on'"
+                   th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, jobType=${criteria.jobType}, workMode='REMOTE', minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin=${criteria.postedWithin}, sort=${criteria.sort})}">Remote</a>
+                <a class="jp-chip-filter" th:classappend="${criteria.postedWithin == '1'} ? 'is-on'"
+                   th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, jobType=${criteria.jobType}, workMode=${criteria.workMode}, minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin='1', sort=${criteria.sort})}">Posted today</a>
+                <button class="jp-chip-filter" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#jobFiltersPanel" aria-controls="jobFiltersPanel"
+                        th:attr="aria-expanded=${(criteria.q != null and criteria.q != '') or (criteria.location != null and criteria.location != '') or (criteria.category != null and criteria.category != '') or (criteria.minSalary != null and criteria.minSalary != '') or (criteria.maxExperience != null and criteria.maxExperience != '')}">
+                    <i class="bi bi-sliders2" aria-hidden="true"></i> All filters
+                </button>
+            </div>
+
+            <!-- The full filter panel, opened by the "All filters" pill and already open
+                 whenever a detailed filter is in use, so nothing is hidden by surprise. -->
+            <div class="collapse mb-3" id="jobFiltersPanel" th:classappend="${(criteria.q != null and criteria.q != '') or (criteria.location != null and criteria.location != '') or (criteria.category != null and criteria.category != '') or (criteria.minSalary != null and criteria.minSalary != '') or (criteria.maxExperience != null and criteria.maxExperience != '')} ? 'show'">
                 <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/jobs')}"></div>
             </div>
-        </div>
 
-        <!-- Results -->
-        <div class="col-12 col-lg-9">
             <p class="text-muted mb-3"
                th:text="|${page.totalElements} ${page.totalElements == 1 ? 'job found' : 'jobs found'}|">0 jobs found</p>
 
@@ -57,15 +92,92 @@
                 </div>
             </div>
 
-            <div th:unless="${page.empty}">
-                <div th:each="job : ${page.content}">
-                    <div th:replace="~{fragments/job-card :: card(${job}, false)}"></div>
+            <div class="jp-jobs-pane" th:unless="${page.empty}">
+                <div class="jp-jobs-list">
+                    <!-- Each row: the unmodified job-card fragment, plus this page's own
+                         full-card click target as a sibling (see the header comment for
+                         why it cannot wrap the fragment). -->
+                    <div class="position-relative" th:each="job : ${page.content}">
+                        <div th:replace="~{fragments/job-card :: card(${job}, false)}"></div>
+                        <a class="stretched-link" th:attr="aria-label=|Show ${job.title} in this page|"
+                           th:href="@{/jobs(q=${criteria.q}, location=${criteria.location}, category=${criteria.category}, jobType=${criteria.jobType}, workMode=${criteria.workMode}, minSalary=${criteria.minSalary}, maxExperience=${criteria.maxExperience}, postedWithin=${criteria.postedWithin}, sort=${criteria.sort}, page=${criteria.page}, job=${job.id})}"></a>
+                    </div>
+                </div>
+
+                <!-- Selected job, sticky beside the list at >= lg (app.css .jp-jobs-detail);
+                     stacks below the list on smaller screens. -->
+                <div class="jp-jobs-detail">
+                    <div class="card" th:if="${selectedJob != null}">
+                        <div class="card-body">
+                            <div class="d-flex gap-3 mb-3">
+                                <span class="jp-logo" aria-hidden="true"
+                                      th:text="${selectedJob.employer.companyName.substring(0,1).toUpperCase()}">C</span>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                        <h2 class="h4 mb-1" th:text="${selectedJob.title}">Job title</h2>
+                                        <a class="small text-nowrap" th:href="@{/jobs/{id}(id=${selectedJob.id})}">
+                                            <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open full page</a>
+                                    </div>
+                                    <p class="job-company mb-0" th:text="${selectedJob.employer.companyName}">Company</p>
+                                    <p class="job-meta mb-2" th:text="${selectedJob.location}">Location</p>
+                                    <p class="job-salary mb-0" th:text="${@fmt.salaryRange(selectedJob)}">Salary</p>
+                                </div>
+                            </div>
+
+                            <div class="mb-3 d-flex flex-wrap gap-1">
+                                <span class="jp-chip" th:text="${selectedJob.jobType.label}">Full-time</span>
+                                <span class="jp-chip" th:text="${selectedJob.workMode.label}">Remote</span>
+                                <span class="jp-chip" th:text="${selectedJob.category.label}">Category</span>
+                            </div>
+
+                            <!-- Apply/login call to action (Section 7.1 core rule 7): the
+                                 same three states as public/job-detail.html's apply panel,
+                                 gated by role instead of a model boolean since every job
+                                 shown here is already Live (search() only returns Live
+                                 jobs) - only "who is looking" is left to decide. -->
+                            <div class="mb-4">
+                                <div th:if="${existingApplication != null}">
+                                    <p class="mb-2">
+                                        You applied on
+                                        <span th:text="${#temporals.format(existingApplication.appliedAt, 'dd MMM yyyy')}">12 Sep 2026</span>
+                                        (Status: <span th:text="${existingApplication.status.seekerLabel}">Under review</span>)
+                                    </p>
+                                    <a th:href="@{/seeker/applications/{id}(id=${existingApplication.id})}"
+                                       class="btn btn-outline-primary btn-sm">View application</a>
+                                </div>
+                                <th:block th:if="${existingApplication == null}">
+                                    <div sec:authorize="isAnonymous()">
+                                        <a th:href="@{/seeker/jobs/{id}/apply(id=${selectedJob.id})}" class="btn btn-primary">Log in to apply</a>
+                                        <p class="small mt-2 mb-0">
+                                            <a th:href="@{/register/seeker}">New here? Create a job seeker account</a>
+                                        </p>
+                                    </div>
+                                    <div sec:authorize="hasRole('JOB_SEEKER')">
+                                        <a th:href="@{/seeker/jobs/{id}/apply(id=${selectedJob.id})}" class="btn btn-primary">Apply now</a>
+                                    </div>
+                                </th:block>
+                            </div>
+
+                            <h3 class="h6">Job description</h3>
+                            <p class="pre-line" th:text="${selectedJob.description}">Description</p>
+
+                            <h3 class="h6">Requirements</h3>
+                            <p class="pre-line mb-0" th:text="${selectedJob.requirements}">Requirements</p>
+
+                            <th:block th:if="${!#lists.isEmpty(selectedJob.skillList())}">
+                                <h3 class="h6 mt-3">Skills</h3>
+                                <p class="mb-0">
+                                    <span class="jp-chip me-1" th:each="skill : ${selectedJob.skillList()}"
+                                          th:text="${skill}">Skill</span>
+                                </p>
+                            </th:block>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
         </div>
-    </div>
 </main>
 </body>
 </html>

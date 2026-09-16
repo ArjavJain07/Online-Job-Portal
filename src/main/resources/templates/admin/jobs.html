@@ -24,67 +24,64 @@
         </div>
     </div>
 
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'PENDING_APPROVAL'} ? 'active'"
-               th:href="@{/admin/jobs(status='PENDING_APPROVAL', q=${q})}">
-                Pending approval <span class="badge text-bg-secondary" th:text="${counts.pending}">0</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'APPROVED'} ? 'active'"
-               th:href="@{/admin/jobs(status='APPROVED', q=${q})}">
-                Approved <span class="badge text-bg-secondary" th:text="${counts.approved}">0</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'REJECTED'} ? 'active'"
-               th:href="@{/admin/jobs(status='REJECTED', q=${q})}">
-                Rejected <span class="badge text-bg-secondary" th:text="${counts.rejected}">0</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'CLOSED'} ? 'active'"
-               th:href="@{/admin/jobs(status='CLOSED', q=${q})}">
-                Closed <span class="badge text-bg-secondary" th:text="${counts.closed}">0</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'ALL'} ? 'active'"
-               th:href="@{/admin/jobs(status='ALL', q=${q})}">
-                All <span class="badge text-bg-secondary" th:text="${counts.all}">0</span>
-            </a>
-        </li>
-    </ul>
+    <!-- Status tabs as LinkedIn-style filter pills (app.css .jp-chip-filter / .is-on for
+         the active one) instead of Bootstrap nav-tabs - same links, same order, same
+         counts, only the shape changed. -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'PENDING_APPROVAL'} ? 'is-on'"
+           th:href="@{/admin/jobs(status='PENDING_APPROVAL', q=${q})}">
+            Pending approval <span class="badge text-bg-secondary" th:text="${counts.pending}">0</span>
+        </a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'APPROVED'} ? 'is-on'"
+           th:href="@{/admin/jobs(status='APPROVED', q=${q})}">
+            Approved <span class="badge text-bg-secondary" th:text="${counts.approved}">0</span>
+        </a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'REJECTED'} ? 'is-on'"
+           th:href="@{/admin/jobs(status='REJECTED', q=${q})}">
+            Rejected <span class="badge text-bg-secondary" th:text="${counts.rejected}">0</span>
+        </a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'CLOSED'} ? 'is-on'"
+           th:href="@{/admin/jobs(status='CLOSED', q=${q})}">
+            Closed <span class="badge text-bg-secondary" th:text="${counts.closed}">0</span>
+        </a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'ALL'} ? 'is-on'"
+           th:href="@{/admin/jobs(status='ALL', q=${q})}">
+            All <span class="badge text-bg-secondary" th:text="${counts.all}">0</span>
+        </a>
+    </div>
 
-    <form method="get" th:action="@{/admin/jobs}" class="row g-2 mb-3">
+    <form method="get" th:action="@{/admin/jobs}" class="card jp-filters mb-3">
         <input type="hidden" name="status" th:value="${activeTab}">
-        <div class="col-12 col-md-5">
-            <!-- Visible label (Section 7.1 accessibility rule: every input keeps one), kept
-                 small like the other inline search bars in the app. -->
-            <label class="form-label" for="admin-jobs-q">Search title or company</label>
-            <input type="text" class="form-control" id="admin-jobs-q" name="q" maxlength="100"
-                   placeholder="Search title or company" th:value="${q}">
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-5">
+                    <!-- Visible label (Section 7.1 accessibility rule: every input keeps one), kept
+                         small like the other inline search bars in the app. -->
+                    <label class="form-label" for="admin-jobs-q">Search title or company</label>
+                    <input type="text" class="form-control" id="admin-jobs-q" name="q" maxlength="100"
+                           placeholder="Search title or company" th:value="${q}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+                </div>
+            </div>
         </div>
     </form>
 
-    <div th:if="${page.empty and activeTab == 'PENDING_APPROVAL'}" class="card shadow-sm">
+    <div th:if="${page.empty and activeTab == 'PENDING_APPROVAL'}" class="card">
         <div class="card-body empty-state">
             <i class="bi bi-check2-circle icon"></i>
             <p class="message">No jobs are waiting for approval.</p>
         </div>
     </div>
-    <div th:if="${page.empty and activeTab != 'PENDING_APPROVAL'}" class="card shadow-sm">
+    <div th:if="${page.empty and activeTab != 'PENDING_APPROVAL'}" class="card">
         <div class="card-body empty-state">
             <i class="bi bi-briefcase icon"></i>
             <p class="message">No jobs match this view.</p>
         </div>
     </div>
 
-    <div th:unless="${page.empty}" class="card shadow-sm">
+    <div th:unless="${page.empty}" class="card">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead>

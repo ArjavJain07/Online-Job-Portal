@@ -1,27 +1,29 @@
 <!DOCTYPE html>
 <!--
-  Left sidebar menu (Section 7.1): one block of links per role, picked with sec:authorize
-  so the markup for the other two roles is never even sent to the browser. The active
-  link is highlighted by comparing the model attribute currentPath (the request URI, set
-  by GlobalModelAttributes) against each link's own URL.
+  Left rail (Section 7.1): a small profile summary card above one block of role links,
+  chosen with sec:authorize so the markup for the other two roles is never even sent to
+  the browser. The active link is highlighted by comparing the model attribute
+  currentPath (the request URI, set by GlobalModelAttributes) against each link's own URL.
 
-  This <aside> is a Bootstrap "responsive offcanvas": at the lg breakpoint and above the
-  offcanvas-lg class makes it behave like an ordinary static sidebar (sized with the same
-  col-lg-3/col-xl-2 grid columns layout/dashboard.html gives the content column); below lg
-  it is hidden until the "Menu" button in layout/dashboard.html opens it as a white drawer
-  (bg-white/border-end keep it opaque there, because app.css points the Bootstrap
+  Fragment root is a plain ".jp-rail" div (app.css Section 5: sticky, 300px wide, stacks
+  above the content below the lg breakpoint) wrapping the actual Bootstrap "offcanvas"
+  panel - Bootstrap's own offcanvas-lg rule forces "position: static !important" on the
+  panel itself once the viewport reaches lg, which would silently cancel ".jp-rail"'s own
+  "position: sticky" if the two classes ever landed on the same element. Splitting them
+  across an outer wrapper (sticky) and an inner panel (offcanvas) keeps both working: at lg
+  and above the panel behaves like an ordinary static block inside the sticky wrapper; below
+  lg it is hidden until the "Menu" button in layout/dashboard.html opens it as a white
+  drawer (bg-white keeps it opaque there, because app.css points the Bootstrap
   --bs-body-bg variable at the grey canvas colour, not white).
 
-  Inside, the <nav> itself carries "jp-sidebar" (Section 7.1 design system: icon + label
-  rows, small uppercase group headings, active state with a left accent bar - all defined
-  in app.css). The headings below ("Manage", "Insights", ...) are purely a grouping aid;
-  every link, its href, its icon, its badge and its order are unchanged from before the
-  restyle - only the wrapping markup and classes changed.
+  Every link, its href, its icon, its badge and its order below is unchanged from before
+  the restyle - only the wrapping markup and classes changed.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
-<aside th:fragment="sidebar" class="offcanvas-lg offcanvas-start col-lg-3 col-xl-2 bg-white border-end"
+<div th:fragment="sidebar" class="jp-rail">
+<aside class="offcanvas-lg offcanvas-start bg-white"
        tabindex="-1" id="sidebarMenu" aria-labelledby="sidebarMenuLabel">
 
     <div class="offcanvas-header d-lg-none">
@@ -31,6 +33,22 @@
     </div>
 
     <div class="offcanvas-body d-block p-0">
+
+        <!-- Profile summary (Section 7.1 core rule 5): cover band, overlapping round
+             initials avatar, name, role and one line of context - the employer's company
+             name where there is one, the account email otherwise. -->
+        <div class="jp-rail-card card mb-3" th:if="${currentUser != null}"
+             th:with="initials=${currentUser.fullName != null and !currentUser.fullName.isEmpty()} ? ${currentUser.fullName.substring(0,1).toUpperCase()} : '?',
+                       contextLine=${currentUser.companyName != null and !currentUser.companyName.isEmpty()} ? ${currentUser.companyName} : ${currentUser.email}">
+            <div class="jp-rail-cover"></div>
+            <div class="card-body pt-0 text-center">
+                <span class="jp-avatar-md d-inline-flex" aria-hidden="true" th:text="${initials}">U</span>
+                <p class="fw-semibold mb-0 mt-2" th:text="${currentUser.fullName}">User name</p>
+                <p class="jp-sub mb-1" th:text="${currentUser.role.label}">Role</p>
+                <p class="jp-meta mb-0 text-truncate" th:text="${contextLine}">context</p>
+            </div>
+        </div>
+
         <nav class="jp-sidebar nav flex-column">
 
             <!-- Admin menu -->
@@ -120,5 +138,6 @@
         </nav>
     </div>
 </aside>
+</div>
 </body>
 </html>

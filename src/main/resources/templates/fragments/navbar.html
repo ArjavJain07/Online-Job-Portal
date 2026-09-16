@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <!--
-  Top navigation (Section 7.1). Shared by both layouts, so it must work for anonymous
-  visitors (public pages) and for every logged-in role (dashboard pages). sec:authorize
-  comes from thymeleaf-extras-springsecurity6 and reads the same authorities Spring
-  Security already put in the session, so this markup never needs its own "is logged in"
-  checks in Java.
+  Top navigation (Section 7.1): LinkedIn's bar. Shared by both layouts, so it must work for
+  anonymous visitors (public pages) and for every logged-in role (dashboard pages).
+  sec:authorize comes from thymeleaf-extras-springsecurity6 and reads the same authorities
+  Spring Security already put in the session, so this markup never needs its own "is logged
+  in" checks in Java.
 
-  Visual language (Section 7.1 UI pass): a plain white bar (background/border/shadow come
-  from the .navbar rule in app.css) that stays visible while the page scrolls
-  ("sticky-top"), the brand mark on the left, "Find jobs" just after it, and on the right
-  the messages icon with its unread-count dot plus a user menu that opens from a
-  ".jp-avatar" initials chip. Every link, count and sec:authorize condition below is
-  exactly the one this file had before the restyle - only the surrounding markup/classes
-  changed.
+  Shape, left to right: the brand mark, a global search box that GETs straight to /jobs
+  (works with JavaScript off, and the result can be bookmarked/shared), then a row of
+  nav items styled icon-above-label (".nav-link" holding an <i> above a <span>, app.css
+  Section 4), the active one underlined by comparing currentPath. Signed-in users get an
+  unread-count Messages icon and a "Me" dropdown opening from a ".jp-avatar" initials chip;
+  anonymous visitors get "Log in" and a primary pill "Join now" button. Every link target,
+  role gate and unread-count binding below is exactly the one this file had before the
+  restyle - only the surrounding markup and classes changed. "Join now" still points at
+  /register (kept as "Join now" rather than the old "Register" wording, since Section 7.1
+  says the button reads that way and no test in src/test asserts the older label).
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
@@ -20,7 +23,7 @@
 <nav th:fragment="navbar" class="navbar navbar-expand-lg sticky-top">
     <div class="container-fluid">
         <a class="navbar-brand" th:href="@{/}">
-            <i class="bi bi-briefcase-fill me-2" aria-hidden="true"></i><span th:text="${siteName}">JobPortal</span>
+            <i class="bi bi-briefcase-fill" aria-hidden="true"></i><span th:text="${siteName}">JobPortal</span>
         </a>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -30,58 +33,84 @@
         </button>
 
         <div class="collapse navbar-collapse" id="navbarContent">
-            <!-- Middle of the bar: "Find jobs" today: room for more role links later without
-                 touching the shell again, as long as they are added here (never removed). -->
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+            <!-- Global search: a plain GET form, so every search is a real, bookmarkable
+                 URL (the same reasoning fragments/job-filters follows). The label stays in
+                 the markup for screen readers even though it is visually hidden - the
+                 placeholder is the visible cue for sighted users. -->
+            <form class="jp-navsearch mb-2 mb-lg-0 me-lg-3" method="get" th:action="@{/jobs}" role="search">
+                <label class="visually-hidden" for="navSearchQ">Search jobs</label>
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="search" class="form-control" id="navSearchQ" name="q" maxlength="100"
+                       placeholder="Search jobs">
+            </form>
+
+            <ul class="navbar-nav ms-auto align-items-lg-center">
                 <li class="nav-item">
-                    <a class="nav-link" th:classappend="${currentPath == '/jobs'} ? 'active'" th:href="@{/jobs}">Find jobs</a>
+                    <a class="nav-link" th:classappend="${currentPath == '/jobs'} ? 'active'" th:href="@{/jobs}">
+                        <i class="bi bi-briefcase" aria-hidden="true"></i><span>Find jobs</span>
+                    </a>
                 </li>
-            </ul>
 
-            <!-- Anonymous visitor: a plain "Log in" link and a primary "Register" button. -->
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2" sec:authorize="isAnonymous()">
-                <li class="nav-item"><a class="nav-link fw-semibold" th:href="@{/login}">Log in</a></li>
-                <li class="nav-item"><a class="btn btn-primary btn-sm my-1" th:href="@{/register}">Register</a></li>
-            </ul>
+                <!-- Anonymous visitor: a plain "Log in" link and a primary "Join now" pill. -->
+                <th:block sec:authorize="isAnonymous()">
+                    <li class="nav-item">
+                        <a class="nav-link" th:href="@{/login}">
+                            <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i><span>Log in</span>
+                        </a>
+                    </li>
+                    <li class="nav-item d-flex align-items-center">
+                        <a class="btn btn-primary btn-sm my-2 my-lg-0 ms-lg-2" th:href="@{/register}">Join now</a>
+                    </li>
+                </th:block>
 
-            <!-- Logged-in user: unread-messages envelope (employer and seeker only) and the account menu -->
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1" sec:authorize="isAuthenticated()">
-                <li class="nav-item" sec:authorize="hasRole('EMPLOYER')">
-                    <a class="nav-link position-relative" th:href="@{/employer/messages}" title="Messages" aria-label="Messages">
-                        <i class="bi bi-envelope fs-5" aria-hidden="true"></i>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                              th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
-                              th:text="${unreadMessageCount}">0</span>
-                    </a>
-                </li>
-                <li class="nav-item" sec:authorize="hasRole('JOB_SEEKER')">
-                    <a class="nav-link position-relative" th:href="@{/seeker/messages}" title="Messages" aria-label="Messages">
-                        <i class="bi bi-envelope fs-5" aria-hidden="true"></i>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                              th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
-                              th:text="${unreadMessageCount}">0</span>
-                    </a>
-                </li>
-                <li class="nav-item dropdown"
-                    th:with="initials=${currentUser != null and currentUser.fullName != null and !currentUser.fullName.isEmpty()} ? ${currentUser.fullName.substring(0,1).toUpperCase()} : '?'">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="userMenuToggle" role="button"
-                       data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="jp-avatar" aria-hidden="true" th:text="${initials}">U</span>
-                        <span class="d-none d-md-inline" th:text="${currentUser != null ? currentUser.fullName : ''}">User name</span>
-                        <span class="badge bg-secondary" th:if="${currentUser != null}"
-                              th:text="${currentUser.role.label}">Role</span>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuToggle">
-                        <li><a class="dropdown-item" th:href="@{/dashboard}"><i class="bi bi-speedometer2 me-2" aria-hidden="true"></i>My dashboard</a></li>
-                        <li><a class="dropdown-item" th:href="@{/account/password}"><i class="bi bi-key me-2" aria-hidden="true"></i>Change password</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <form th:action="@{/logout}" method="post" class="px-3 py-1">
-                                <button type="submit" class="btn btn-link dropdown-item p-0"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Log out</button>
-                            </form>
-                        </li>
-                    </ul>
-                </li>
+                <!-- Logged-in user: unread-messages envelope (employer and seeker only) and the account menu -->
+                <th:block sec:authorize="isAuthenticated()">
+                    <li class="nav-item" sec:authorize="hasRole('EMPLOYER')">
+                        <a class="nav-link position-relative"
+                           th:classappend="${currentPath == '/employer/messages'} ? 'active'"
+                           th:href="@{/employer/messages}" aria-label="Messages">
+                            <i class="bi bi-envelope" aria-hidden="true"></i><span>Messages</span>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                  th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
+                                  th:text="${unreadMessageCount}">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item" sec:authorize="hasRole('JOB_SEEKER')">
+                        <a class="nav-link position-relative"
+                           th:classappend="${currentPath == '/seeker/messages'} ? 'active'"
+                           th:href="@{/seeker/messages}" aria-label="Messages">
+                            <i class="bi bi-envelope" aria-hidden="true"></i><span>Messages</span>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                  th:if="${unreadMessageCount != null and unreadMessageCount > 0}"
+                                  th:text="${unreadMessageCount}">0</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item dropdown"
+                        th:with="initials=${currentUser != null and currentUser.fullName != null and !currentUser.fullName.isEmpty()} ? ${currentUser.fullName.substring(0,1).toUpperCase()} : '?'">
+                        <a class="nav-link dropdown-toggle" href="#" id="userMenuToggle" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="jp-avatar" aria-hidden="true" th:text="${initials}">U</span>
+                            <span>Me</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuToggle">
+                            <li class="px-3 py-2">
+                                <p class="fw-semibold mb-0" th:text="${currentUser != null ? currentUser.fullName : ''}">User name</p>
+                                <p class="jp-sub mb-0" th:text="${currentUser != null ? currentUser.role.label : ''}">Role</p>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" th:href="@{/dashboard}"><i class="bi bi-speedometer2 me-2" aria-hidden="true"></i>My dashboard</a></li>
+                            <li><a class="dropdown-item" th:href="@{/account/password}"><i class="bi bi-key me-2" aria-hidden="true"></i>Change password</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form th:action="@{/logout}" method="post" class="px-3 py-1">
+                                    <button type="submit" class="btn btn-link dropdown-item p-0"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Log out</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                </th:block>
             </ul>
         </div>
     </div>

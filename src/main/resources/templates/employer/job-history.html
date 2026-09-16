@@ -25,32 +25,23 @@
         </div>
     </div>
 
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'ALL'} ? 'active'"
-               th:href="@{/employer/jobs/history(status='ALL')}">All</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'LIVE'} ? 'active'"
-               th:href="@{/employer/jobs/history(status='LIVE')}">Live</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'EXPIRED'} ? 'active'"
-               th:href="@{/employer/jobs/history(status='EXPIRED')}">Expired</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'PENDING_APPROVAL'} ? 'active'"
-               th:href="@{/employer/jobs/history(status='PENDING_APPROVAL')}">Pending approval</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'REJECTED'} ? 'active'"
-               th:href="@{/employer/jobs/history(status='REJECTED')}">Rejected</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${activeTab == 'CLOSED'} ? 'active'"
-               th:href="@{/employer/jobs/history(status='CLOSED')}">Closed</a>
-        </li>
-    </ul>
+    <!-- Status tabs as LinkedIn-style filter pills (app.css .jp-chip-filter / .is-on for
+         the active one), the same pattern admin/jobs.html uses - same links, same order,
+         only the shape changed. -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'ALL'} ? 'is-on'"
+           th:href="@{/employer/jobs/history(status='ALL')}">All</a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'LIVE'} ? 'is-on'"
+           th:href="@{/employer/jobs/history(status='LIVE')}">Live</a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'EXPIRED'} ? 'is-on'"
+           th:href="@{/employer/jobs/history(status='EXPIRED')}">Expired</a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'PENDING_APPROVAL'} ? 'is-on'"
+           th:href="@{/employer/jobs/history(status='PENDING_APPROVAL')}">Pending approval</a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'REJECTED'} ? 'is-on'"
+           th:href="@{/employer/jobs/history(status='REJECTED')}">Rejected</a>
+        <a class="jp-chip-filter" th:classappend="${activeTab == 'CLOSED'} ? 'is-on'"
+           th:href="@{/employer/jobs/history(status='CLOSED')}">Closed</a>
+    </div>
 
     <div th:if="${#lists.isEmpty(rows)}" class="card shadow-sm">
         <div class="card-body empty-state">

@@ -14,6 +14,11 @@
             <div class="card shadow-sm">
                 <div class="card-body empty-state">
                     <i class="bi bi-door-closed icon"></i>
+                    <!-- This card is the whole page (Section 7.1 heading scale: one h1 per
+                         page), so the empty-state's own optional heading slot (app.css
+                         ".empty-state .empty-title") carries it instead of a page-head h1
+                         sitting above an otherwise-empty page. -->
+                    <h1 class="empty-title">Registration closed</h1>
                     <p class="message" th:text="${message}">Registration is currently closed. Please check back later.</p>
                     <div class="action">
                         <a class="btn btn-primary" th:href="@{/login}">Log in</a>

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 // Public job search and job detail (Section 6.1 P-2, 6.4 S-F1, 6.6 route summary): the
 // routes anyone can open, logged in or not. All querying (filtering, visibility, view
@@ -41,12 +42,29 @@ public class JobBrowseController {
     // GET /jobs: the public search list (S-F1). Anonymous, seeker, employer and admin all
     // see the same page here - only /seeker/jobs (built in M5) adds "Applied" badges, so
     // job-card is always called with applied = false from this controller.
+    // "job" (added for the two-pane layout, Section 7.1 core rule 7) is a new, optional
+    // request parameter: the id of the job to open in the right-hand ".jp-jobs-detail"
+    // pane. It never affects search() itself - JobSearchService.selectForPane just picks
+    // which of this page's own results to show, falling back to the first one when "job"
+    // is absent or belongs to a different page/filter combination.
     @GetMapping("/jobs")
-    public String search(JobSearchCriteria criteria, Model model) {
+    public String search(JobSearchCriteria criteria, @RequestParam(name = "job", required = false) Long jobId,
+            @AuthenticationPrincipal AppUserDetails me, Model model) {
         JobSearchResult result = jobSearchService.search(criteria);
         model.addAttribute("criteria", criteria);
         model.addAttribute("page", result.jobs());
         model.addAttribute("warning", firstWarningOrNull(result));
+
+        Job selectedJob = jobSearchService.selectForPane(result.jobs().getContent(), jobId);
+        model.addAttribute("selectedJob", selectedJob);
+        model.addAttribute("selectedJobId", selectedJob == null ? null : selectedJob.getId());
+        // Same "who can apply" question the standalone detail page answers, but only for
+        // whichever job the pane is currently showing - null for anyone but a job seeker,
+        // and null for a seeker who has not applied yet (see the pane's apply/login CTA).
+        Long viewerId = me == null ? null : me.getId();
+        Role viewerRole = me == null ? null : me.getRole();
+        model.addAttribute("existingApplication", selectedJob == null ? null
+                : jobSearchService.findSeekerApplication(selectedJob, viewerId, viewerRole).orElse(null));
         return "public/jobs";
     }
 

@@ -22,28 +22,25 @@
         </div>
     </div>
 
-    <!-- LinkedIn-shaped profile header: initials avatar, name, headline, location, then
-         the completeness meter underneath - every value here is read from the same
-         seekerProfileForm/completeness attributes the form below already binds, so it
-         previews what the form currently holds rather than adding a new lookup. -->
-    <div class="card shadow-sm mb-4"
+    <!-- LinkedIn profile header (app.css Section 8: ".jp-profile-card"): a cover band with
+         the round avatar overlapping it, name/headline/location, then the completeness
+         meter underneath - every value here is read from the same seekerProfileForm/
+         completeness attributes the form below already binds, so it previews what the
+         form currently holds rather than adding a new lookup. ".jp-avatar-lg" is a sizing
+         modifier meant to sit alongside the base ".jp-avatar" class, the same pairing the
+         navbar's small chip and the rail's ".jp-avatar-md" summary use at their own sizes. -->
+    <div class="card shadow-sm jp-profile-card mb-4"
          th:with="initials=${seekerProfileForm.fullName != null and !seekerProfileForm.fullName.isEmpty()} ? ${seekerProfileForm.fullName.substring(0,1).toUpperCase()} : '?'">
-        <div class="card-body">
-            <div class="d-flex gap-3 flex-wrap align-items-center">
-                <!-- Plain ".jp-avatar" (app.css has no larger variant, and this restyle
-                     does not add new CSS - Section 7.1 core rule 8) rather than an inline
-                     size override. -->
-                <span class="jp-avatar" aria-hidden="true" th:text="${initials}">U</span>
-                <div class="flex-grow-1">
-                    <h2 class="h5 mb-0" th:text="${seekerProfileForm.fullName}">Full name</h2>
-                    <p class="mb-0" th:if="${seekerProfileForm.headline != null and !seekerProfileForm.headline.isEmpty()}"
-                       th:text="${seekerProfileForm.headline}">Headline</p>
-                    <p class="text-muted small mb-0" th:if="${seekerProfileForm.location != null and !seekerProfileForm.location.isEmpty()}">
-                        <i class="bi bi-geo-alt" aria-hidden="true"></i>
-                        <span th:text="${seekerProfileForm.location}">Location</span>
-                    </p>
-                </div>
-            </div>
+        <div class="jp-profile-cover"></div>
+        <div class="jp-profile-body">
+            <span class="jp-avatar jp-avatar-lg" aria-hidden="true" th:text="${initials}">U</span>
+            <h2 class="jp-profile-name" th:text="${seekerProfileForm.fullName}">Full name</h2>
+            <p class="jp-profile-headline" th:if="${seekerProfileForm.headline != null and !seekerProfileForm.headline.isEmpty()}"
+               th:text="${seekerProfileForm.headline}">Headline</p>
+            <p class="jp-profile-location mb-0" th:if="${seekerProfileForm.location != null and !seekerProfileForm.location.isEmpty()}">
+                <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                <span th:text="${seekerProfileForm.location}">Location</span>
+            </p>
 
             <hr>
 

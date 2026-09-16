@@ -52,14 +52,13 @@
     <p class="text-muted small mb-4" th:text="${totalUsersBreakdown}">1 admin &middot; 3 employers &middot; 6 seekers</p>
 
     <!-- Pending approvals mini table (5 oldest PENDING_APPROVAL jobs, oldest first) next to
-         the latest-applications panel, side by side as the design calls for. -->
+         the latest-applications panel, side by side as the design calls for. Each is a
+         LinkedIn-style section card: a plain title row, then a "Show all" link footer
+         (app.css .jp-showall) instead of a header button. -->
     <div class="row g-4 mb-4">
         <div class="col-lg-8">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <span>Pending approvals</span>
-                    <a th:href="@{/admin/jobs}" class="btn btn-sm btn-outline-secondary">View all</a>
-                </div>
+            <div class="card h-100">
+                <div class="card-header">Pending approvals</div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead>
@@ -85,13 +84,19 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="card-footer">
+                    <a th:href="@{/admin/jobs}" class="jp-showall">View all</a>
+                </div>
             </div>
         </div>
         <div class="col-lg-4">
-            <div class="card shadow-sm h-100">
+            <div class="card h-100">
                 <div class="card-header">Latest applications</div>
                 <div class="card-body p-0">
                     <div th:replace="~{fragments/activity-feed :: applications(${latestApplications})}"></div>
+                </div>
+                <div class="card-footer">
+                    <a th:href="@{/admin/activity(type='APPLICATION_SUBMITTED')}" class="jp-showall">Show all</a>
                 </div>
             </div>
         </div>
@@ -99,13 +104,15 @@
 
     <!-- Live activity widget (last 10 events), full width, fed by the same polling script
          as /admin/activity (Section 7.7). -->
-    <div class="card shadow-sm mb-4">
+    <div class="card mb-4">
         <div class="card-header">
             <span><i class="bi bi-broadcast text-success me-1"></i>Live activity</span>
-            <a th:href="@{/admin/activity}">Open activity monitor</a>
         </div>
         <div class="card-body p-0 jp-scroll-panel-sm">
             <div th:replace="~{fragments/activity-feed :: feed(${liveEvents}, ${liveEventsLastId}, ${feedIntervalMs})}"></div>
+        </div>
+        <div class="card-footer">
+            <a th:href="@{/admin/activity}" class="jp-showall">Open activity monitor</a>
         </div>
     </div>
 
@@ -116,7 +123,7 @@
       both arrive in Milestone M7. Do not build the chart here - AdminStatisticsController
       and /admin/statistics do not exist yet in M3.
     -->
-    <div class="card shadow-sm">
+    <div class="card">
         <div class="card-body empty-state">
             <i class="bi bi-graph-up icon"></i>
             <p class="message">The "Applications, last 30 days" chart and full statistics arrive in Milestone M7.</p>

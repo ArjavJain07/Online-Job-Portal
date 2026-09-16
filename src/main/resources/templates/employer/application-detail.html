@@ -28,14 +28,17 @@
                 <span th:replace="~{fragments/status-badge :: application(${jobApplication.status}, 'EMPLOYER')}"></span>
                 <span class="ms-2">Applied for</span>
                 <a th:href="@{/employer/jobs/{id}(id=${jobApplication.job.id})}" th:text="${jobApplication.job.title}">Job title</a>
-                <span class="ms-2">on <span th:text="${#temporals.format(application.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span></span>
+                <span class="ms-2">on <span th:text="${#temporals.format(jobApplication.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span></span>
             </p>
         </div>
         <a th:href="@{/employer/applications}" class="btn btn-outline-secondary">Back to applications</a>
     </div>
 
-    <div class="row g-4 mt-1">
-        <div class="col-lg-8">
+    <!-- Main column plus a secondary rail (app.css .jp-layout-wide / .jp-rail), the same
+         "record + side actions" shape admin/job-review.html uses - stacks below the
+         candidate detail on narrower screens. -->
+    <div class="jp-layout-wide mt-1">
+        <div>
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Candidate</div>
@@ -104,7 +107,7 @@
 
         </div>
 
-        <div class="col-lg-4">
+        <div class="jp-rail">
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Change status</div>
@@ -112,7 +115,7 @@
 
                     <p th:case="'WITHDRAWN'" class="text-muted mb-0">
                         The candidate withdrew on
-                        <span th:text="${#temporals.format(application.statusChangedAt, 'dd MMM yyyy')}">26 Aug 2026</span>.
+                        <span th:text="${#temporals.format(jobApplication.statusChangedAt, 'dd MMM yyyy')}">26 Aug 2026</span>.
                     </p>
                     <p th:case="'HIRED'" class="text-muted mb-0">This application is final (Hired).</p>
                     <p th:case="'REJECTED'" class="text-muted mb-0">This application is final (Rejected).</p>

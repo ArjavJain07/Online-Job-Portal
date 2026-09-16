@@ -26,25 +26,26 @@
         <a th:href="@{/seeker/applications/history}" class="btn btn-outline-secondary">View application history</a>
     </div>
 
+    <!-- Quick top-of-list filter pills (Section 7.1 core rule 9: ".jp-chip-filter",
+         ".is-on" for the active one) - same hrefs/counts/condition as before the restyle. -->
     <div th:if="${totalActive > 0}" class="mb-3 d-flex flex-wrap gap-2">
-        <a th:href="@{/seeker/applications}" class="btn btn-sm"
-           th:classappend="${status == 'ALL'} ? 'btn-primary' : 'btn-outline-secondary'">
+        <a th:href="@{/seeker/applications}" class="jp-chip-filter" th:classappend="${status == 'ALL'} ? 'is-on'">
             All <span th:text="${totalActive}">3</span>
         </a>
-        <a th:if="${appliedCount > 0}" th:href="@{/seeker/applications(status='APPLIED')}" class="btn btn-sm"
-           th:classappend="${status == 'APPLIED'} ? 'btn-primary' : 'btn-outline-secondary'">
+        <a th:if="${appliedCount > 0}" th:href="@{/seeker/applications(status='APPLIED')}" class="jp-chip-filter"
+           th:classappend="${status == 'APPLIED'} ? 'is-on'">
             Applied <span th:text="${appliedCount}">1</span>
         </a>
-        <a th:if="${underReviewCount > 0}" th:href="@{/seeker/applications(status='UNDER_REVIEW')}" class="btn btn-sm"
-           th:classappend="${status == 'UNDER_REVIEW'} ? 'btn-primary' : 'btn-outline-secondary'">
+        <a th:if="${underReviewCount > 0}" th:href="@{/seeker/applications(status='UNDER_REVIEW')}" class="jp-chip-filter"
+           th:classappend="${status == 'UNDER_REVIEW'} ? 'is-on'">
             Under review <span th:text="${underReviewCount}">1</span>
         </a>
-        <a th:if="${shortlistedCount > 0}" th:href="@{/seeker/applications(status='SHORTLISTED')}" class="btn btn-sm"
-           th:classappend="${status == 'SHORTLISTED'} ? 'btn-primary' : 'btn-outline-secondary'">
+        <a th:if="${shortlistedCount > 0}" th:href="@{/seeker/applications(status='SHORTLISTED')}" class="jp-chip-filter"
+           th:classappend="${status == 'SHORTLISTED'} ? 'is-on'">
             Shortlisted <span th:text="${shortlistedCount}">1</span>
         </a>
-        <a th:if="${interviewCount > 0}" th:href="@{/seeker/applications(status='INTERVIEW')}" class="btn btn-sm"
-           th:classappend="${status == 'INTERVIEW'} ? 'btn-primary' : 'btn-outline-secondary'">
+        <a th:if="${interviewCount > 0}" th:href="@{/seeker/applications(status='INTERVIEW')}" class="jp-chip-filter"
+           th:classappend="${status == 'INTERVIEW'} ? 'is-on'">
             Interview <span th:text="${interviewCount}">1</span>
         </a>
     </div>
@@ -68,7 +69,7 @@
                     <th>Status</th>
                     <th>Last update</th>
                     <th>Unread</th>
-                    <th></th>
+                    <th>Actions</th>
                 </tr>
                 </thead>
                 <tbody>

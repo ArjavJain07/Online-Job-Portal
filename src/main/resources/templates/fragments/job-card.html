@@ -17,11 +17,21 @@
   "card shadow-sm mb-3" intact and in that order: JobSearchTest#assertAppliedBadge splits
   the whole page on that exact text to isolate one job's card before checking whether it
   contains "app-applied", so "job-card" is appended after it rather than replacing it.
+
+  Signature is still exactly "card(job, applied)" - unchanged, so every existing caller
+  (public/index.html, public/jobs.html, seeker/jobs.html) keeps working with no edits. The
+  two-pane jobs page (Section 7.1 core rule 7: ".job-card.is-selected") does not need a
+  third parameter either: a page that wants one card marked selected just adds the plain
+  model attribute "selectedJobId" (a Long); this fragment appends ".is-selected" itself
+  when a job's id matches it, and does nothing when the attribute is absent (the normal
+  case on every page above), because th:with reads a missing model attribute as null.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="card(job, applied)" class="card shadow-sm mb-3 job-card">
+<div th:fragment="card(job, applied)" class="card shadow-sm mb-3 job-card"
+     th:with="isSelected=${selectedJobId != null and job != null and selectedJobId == job.id}"
+     th:classappend="${isSelected} ? 'is-selected'">
     <div class="d-flex gap-3">
         <span class="jp-logo" aria-hidden="true"
               th:text="${job.employer.companyName.substring(0,1).toUpperCase()}">C</span>

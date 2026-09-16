@@ -17,6 +17,10 @@
   Resume choice toggle and the cover letter counter are progressive enhancement from
   static/js/forms.js (data-toggle/data-resume-choice-target, data-counter) - the page is
   usable, just less convenient, if JavaScript is off.
+
+  Job summary card (Section 7.1 UI pass): the job being applied for, at a glance, above the
+  form - the same facts and classes as fragments/job-card (logo, title, company, location,
+  salary, chips), purely additive so the page head and the form below are unchanged.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/dashboard :: layout(title='Apply', content=~{::main}, scripts=~{})}">
@@ -34,6 +38,23 @@
                 &middot;
                 Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
             </p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body d-flex gap-3">
+            <span class="jp-logo" aria-hidden="true"
+                  th:text="${job.employer.companyName.substring(0,1).toUpperCase()}">C</span>
+            <div class="flex-grow-1">
+                <h2 class="h5 mb-1" th:text="${job.title}">Job title</h2>
+                <p class="job-company mb-0" th:text="${job.employer.companyName}">Company</p>
+                <p class="job-meta mb-2" th:text="${job.location}">Location</p>
+                <p class="job-salary mb-2" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</p>
+                <div class="d-flex flex-wrap gap-1">
+                    <span class="jp-chip" th:text="${job.jobType.label}">Full-time</span>
+                    <span class="jp-chip" th:text="${job.workMode.label}">Remote</span>
+                </div>
+            </div>
         </div>
     </div>
 

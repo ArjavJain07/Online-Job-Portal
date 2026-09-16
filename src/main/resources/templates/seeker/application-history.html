@@ -25,26 +25,27 @@
         <a th:href="@{/seeker/applications}" class="btn btn-outline-secondary">Back to active applications</a>
     </div>
 
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${view == 'final'} ? 'active'"
-               th:href="@{/seeker/applications/history(view='final', result=${result})}">Final results</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" th:classappend="${view == 'all'} ? 'active'"
-               th:href="@{/seeker/applications/history(view='all', result=${result})}">All applications</a>
-        </li>
-    </ul>
+    <!-- View tabs as LinkedIn-style filter pills (app.css .jp-chip-filter / .is-on for the
+         active one), the same pattern the status tabs elsewhere in the app use - same
+         links, same order, only the shape changed. -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="jp-chip-filter" th:classappend="${view == 'final'} ? 'is-on'"
+           th:href="@{/seeker/applications/history(view='final', result=${result})}">Final results</a>
+        <a class="jp-chip-filter" th:classappend="${view == 'all'} ? 'is-on'"
+           th:href="@{/seeker/applications/history(view='all', result=${result})}">All applications</a>
+    </div>
 
+    <!-- Quick top-of-list filter pills (Section 7.1 core rule 9: ".jp-chip-filter",
+         ".is-on" for the active one) - same hrefs/condition as before the restyle. -->
     <div class="mb-3 d-flex flex-wrap gap-2">
-        <a th:href="@{/seeker/applications/history(view=${view}, result='ALL')}" class="btn btn-sm"
-           th:classappend="${result == 'ALL'} ? 'btn-primary' : 'btn-outline-secondary'">All results</a>
-        <a th:href="@{/seeker/applications/history(view=${view}, result='HIRED')}" class="btn btn-sm"
-           th:classappend="${result == 'HIRED'} ? 'btn-primary' : 'btn-outline-secondary'">Hired</a>
-        <a th:href="@{/seeker/applications/history(view=${view}, result='REJECTED')}" class="btn btn-sm"
-           th:classappend="${result == 'REJECTED'} ? 'btn-primary' : 'btn-outline-secondary'">Not selected</a>
-        <a th:href="@{/seeker/applications/history(view=${view}, result='WITHDRAWN')}" class="btn btn-sm"
-           th:classappend="${result == 'WITHDRAWN'} ? 'btn-primary' : 'btn-outline-secondary'">Withdrawn</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='ALL')}" class="jp-chip-filter"
+           th:classappend="${result == 'ALL'} ? 'is-on'">All results</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='HIRED')}" class="jp-chip-filter"
+           th:classappend="${result == 'HIRED'} ? 'is-on'">Hired</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='REJECTED')}" class="jp-chip-filter"
+           th:classappend="${result == 'REJECTED'} ? 'is-on'">Not selected</a>
+        <a th:href="@{/seeker/applications/history(view=${view}, result='WITHDRAWN')}" class="jp-chip-filter"
+           th:classappend="${result == 'WITHDRAWN'} ? 'is-on'">Withdrawn</a>
     </div>
 
     <div th:if="${#lists.isEmpty(rows)}" class="card shadow-sm">
@@ -65,7 +66,7 @@
                     <th>Result</th>
                     <th>Decided on</th>
                     <th>Duration</th>
-                    <th></th>
+                    <th>View</th>
                 </tr>
                 </thead>
                 <tbody>

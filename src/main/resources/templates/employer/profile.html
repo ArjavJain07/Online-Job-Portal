@@ -16,6 +16,23 @@
         </div>
     </div>
 
+    <!-- Same LinkedIn profile header shape as seeker/profile.html (app.css Section 8:
+         ".jp-profile-card"), with the company's initial standing in for a logo - a read-
+         only preview of the companyName/companyWebsite fields the form below already
+         binds, not a new lookup. -->
+    <div class="card shadow-sm jp-profile-card mb-4"
+         th:with="initials=${employerProfileForm.companyName != null and !employerProfileForm.companyName.isEmpty()} ? ${employerProfileForm.companyName.substring(0,1).toUpperCase()} : '?'">
+        <div class="jp-profile-cover"></div>
+        <div class="jp-profile-body">
+            <span class="jp-avatar jp-avatar-lg" aria-hidden="true" th:text="${initials}">C</span>
+            <h2 class="jp-profile-name" th:text="${employerProfileForm.companyName}">Company name</h2>
+            <p class="jp-profile-location mb-0" th:if="${employerProfileForm.companyWebsite != null and !employerProfileForm.companyWebsite.isEmpty()}">
+                <i class="bi bi-globe" aria-hidden="true"></i>
+                <span th:text="${employerProfileForm.companyWebsite}">https://example.com</span>
+            </p>
+        </div>
+    </div>
+
     <!-- Constrained to a form-width column (Section 7.1 UI pass), the same
          ".col-md-9 col-lg-7" pattern admin/user-form.html and the auth registration pages
          use for a single form card, instead of an inline max-width. -->
