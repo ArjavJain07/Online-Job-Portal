@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<!--
+  Employer application/candidate-engagement statistics (Section 6.3 E-D5, 7.6), always
+  scoped to the signed-in employer's own jobs. EmployerStatisticsController puts everything
+  under "stats", an EmployerStatistics record: the normalised range, the echoed jobId (null
+  means "all of this employer's jobs"), the KPI row, three single-series charts, the
+  two-series "messagesOverTime" (fed to fragments/chart-card :: multi) and the two tables.
+  "ownJobs" is every one of this employer's own jobs (any status) for the job-filter select.
+
+  Scripts are a SIBLING of <main>, never inside it (Section 7.1), and follow the exact
+  inlining pattern Section 7.6 specifies for feeding Chart.js.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Statistics', content=~{::main}, scripts=~{::scripts})}">
+<body>
+<main>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Statistics</h1>
+            <p>Application trends and candidate engagement for your jobs.</p>
+        </div>
+    </div>
+
+    <!-- Range pills (carry the current job filter along) and a job select (carries the
+         current range along via a hidden field) - same .jp-chip-filter pattern as
+         admin/statistics.html, and the same auto-submitting select + noscript fallback
+         admin/activity.html uses for its type filter. -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div class="d-flex flex-wrap gap-2">
+            <a class="jp-chip-filter" th:classappend="${stats.days == 7} ? 'is-on'"
+               th:href="@{/employer/statistics(days=7, jobId=${stats.jobId})}">Last 7 days</a>
+            <a class="jp-chip-filter" th:classappend="${stats.days == 30} ? 'is-on'"
+               th:href="@{/employer/statistics(days=30, jobId=${stats.jobId})}">Last 30 days</a>
+            <a class="jp-chip-filter" th:classappend="${stats.days == 90} ? 'is-on'"
+               th:href="@{/employer/statistics(days=90, jobId=${stats.jobId})}">Last 90 days</a>
+        </div>
+        <form method="get" th:action="@{/employer/statistics}" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="days" th:value="${stats.days}">
+            <label for="filter-job" class="form-label mb-0 small text-muted">Job</label>
+            <select id="filter-job" name="jobId" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                <option value="" th:selected="${stats.jobId == null}">All jobs</option>
+                <option th:each="j : ${ownJobs}" th:value="${j.id}" th:text="${j.title}"
+                        th:selected="${stats.jobId != null and stats.jobId == j.id}">Job title</option>
+            </select>
+            <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button></noscript>
+        </form>
+    </div>
+
+    <!-- KPI row (Section 6.3 E-D5): Total applications, Awaiting review, In progress,
+         Hired, Rejected, Withdrawn, all for the selected range and job. Plain ".kpi-card"
+         tiles, same reasoning as admin/statistics.html: these KPIs have no link target. -->
+    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
+        <div class="col" th:each="kpi : ${stats.kpis}">
+            <div class="kpi-card">
+                <div class="content">
+                    <span class="value" th:text="${kpi.value}">0</span>
+                    <span class="label" th:text="${kpi.label}">Label</span>
+                    <span class="kpi-meta" th:if="${kpi.hint != null}" th:text="${kpi.hint}">Hint</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- The four charts of Section 6.3 E-D5; each keeps its own accessible data table. -->
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('applicationsChart', 'Applications over time', ${stats.applicationsOverTime})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('hiringPipelineChart', 'Hiring pipeline', ${stats.hiringPipeline})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('applicationsPerJobChart', 'Applications per job', ${stats.applicationsPerJob})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: multi('messagesChart', 'Candidate engagement: messages over time', ${stats.messagesOverTime})}"></div>
+        </div>
+    </div>
+
+    <!-- Per-job table, all time because view counts are not dated (Section 6.3 E-D5). -->
+    <div class="card mb-4">
+        <div class="card-header">Applications by job</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Job</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Views</th>
+                    <th scope="col">Applications</th>
+                    <th scope="col">Apply rate</th>
+                    <th scope="col">Shortlisted or further</th>
+                    <th scope="col">Hired</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${stats.jobStats}">
+                    <td th:text="${row.title}">Job title</td>
+                    <td th:text="${row.status}">Live</td>
+                    <td th:text="${row.views}">0</td>
+                    <td th:text="${row.applications}">0</td>
+                    <td th:text="${row.applyRate}">0.0%</td>
+                    <td th:text="${row.shortlistedOrFurther}">0</td>
+                    <td th:text="${row.hired}">0</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(stats.jobStats)}">
+                    <td colspan="7" class="text-center text-muted py-3">No data for this period.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Candidate engagement table (Section 6.3 E-D5, formulas from Section 7.6). -->
+    <div class="card mb-4">
+        <div class="card-header">Candidate engagement</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Metric</th>
+                    <th scope="col">Formula</th>
+                    <th scope="col">Value</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="metric : ${stats.engagementMetrics}">
+                    <td th:text="${metric.name}">Metric</td>
+                    <td class="text-muted small" th:text="${metric.formula}">Formula</td>
+                    <td th:text="${metric.value}">Value</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<th:block th:fragment="scripts">
+    <script th:inline="javascript">
+        const applications = /*[[${stats.applicationsOverTime}]]*/ null;
+        const hiringPipeline = /*[[${stats.hiringPipeline}]]*/ null;
+        const applicationsPerJob = /*[[${stats.applicationsPerJob}]]*/ null;
+        const messages = /*[[${stats.messagesOverTime}]]*/ null;
+
+        JobPortalCharts.line('applicationsChart', applications);
+        JobPortalCharts.bar('hiringPipelineChart', hiringPipeline);
+        JobPortalCharts.bar('applicationsPerJobChart', applicationsPerJob, true);
+        JobPortalCharts.groupedBar('messagesChart', messages);
+    </script>
+</th:block>
+</body>
+</html>

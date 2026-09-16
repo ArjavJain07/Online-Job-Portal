@@ -1,38 +1,145 @@
 <!DOCTYPE html>
 <!--
-  M1 placeholder only (Section 11.2): just needs to exist, on the shared dashboard layout
-  with the employer sidebar, so a seeded employer account has somewhere to land after
-  login. Milestone M7 replaces this with the real employer dashboard (KPIs, recent
-  applications, recommendations link, statistics chart).
+  Real employer dashboard (Section 6.3 DASH-E, 11.2 M7), replacing the M1 placeholder.
+  EmployerDashboardController puts: liveJobs/pendingApproval/newApplications (KPI row,
+  the last one borrowed straight from EmployerStatisticsService's own "Awaiting review"
+  figure); rejectedJobs/expiredJobs/staleApplications (the three "Needs attention" rows,
+  Section 6.3); recentApplications (last 5, E-D2's own list); and "stats" (an
+  EmployerStatistics for the default 30-day range, used here only for its
+  applicationsOverTime chart - the same record employer/statistics.html renders in full).
 
-  EmployerDashboardController passes no model attributes of its own, only the global ones
-  from GlobalModelAttributes (currentUser, siteName, announcement, currentPath,
-  unreadMessageCount), so this page uses only those.
+  Reading order top to bottom, the same "KPI strip, then queues, then the chart" shape
+  admin/dashboard.html uses: KPI row, Needs attention (only when it has something to
+  show), Recent applications, then the chart with its "Full statistics" link.
+
+  The scripts block is a SIBLING of <main> (Section 7.1), never inside it, so it runs
+  after the layout's own chart.umd.js/charts.js.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{layout/dashboard :: layout(title='Employer Dashboard', content=~{::main}, scripts=~{})}">
+      th:replace="~{layout/dashboard :: layout(title='Employer Dashboard', content=~{::main}, scripts=~{::scripts})}">
 <body>
 <main>
     <div class="jp-page-head">
         <div>
-            <h1 class="h3 mb-1">Employer Dashboard</h1>
-            <p>
-                Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Employer</span>.
-                <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Employer</span>
-            </p>
+            <h1 class="h3 mb-1">Employer dashboard</h1>
+            <p>An overview of your jobs, applicants and messages.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a th:href="@{/employer/applications}" class="btn btn-outline-secondary">View applications</a>
+            <a th:href="@{/employer/jobs/new}" class="btn btn-primary"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Post a job</a>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-body empty-state">
-            <i class="bi bi-cone-striped icon"></i>
-            <p class="message">
-                This is a placeholder page (Section 11.2). The full employer dashboard - KPIs,
-                recent applications and the applications chart - is built in <strong>Milestone M7</strong>.
-                In the meantime, use the sidebar to post and manage jobs.
-            </p>
+    <!-- KPI cards (AC-DE-1): Live jobs, Pending approval, New applications (status
+         APPLIED), Unread messages. "unreadMessageCount" is already in the model from
+         GlobalModelAttributes - this page never marks a thread read, so it is never
+         overwritten (Section 7.10). -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-briefcase', ${liveJobs}, 'Live jobs', @{/employer/jobs})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-hourglass-split', ${pendingApproval}, 'Pending approval', @{/employer/jobs})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-file-earmark-person', ${newApplications}, 'New applications', @{/employer/applications(status='APPLIED')})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-envelope', ${unreadMessageCount}, 'Unread messages', @{/employer/messages})}"></div>
         </div>
     </div>
+
+    <!-- Needs attention (Section 6.3 DASH-E): rejected jobs with their reason, expired
+         jobs, and applications still Applied after a week - only shown once there is
+         something to see. -->
+    <div class="card shadow-sm mb-4" th:if="${!#lists.isEmpty(rejectedJobs) or !#lists.isEmpty(expiredJobs) or !#lists.isEmpty(staleApplications)}">
+        <div class="card-header">
+            <span><i class="bi bi-exclamation-triangle me-2 text-warning" aria-hidden="true"></i>Needs attention</span>
+        </div>
+        <ul class="list-group list-group-flush">
+            <!-- "Title: Expired"/"Title: Rejected" is kept as one text run so the whole
+                 "{job}: {status}" line reads exactly as Section 6.3 DASH-E's own
+                 AC-DE-1 example ("Python Backend Developer: Expired") - the status badge
+                 fragment used elsewhere on this page would split it across two elements. -->
+            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-start gap-2" th:each="job : ${rejectedJobs}">
+                <div>
+                    <a th:href="@{/employer/jobs/{id}(id=${job.id})}" class="badge job-rejected text-decoration-none"
+                       th:text="${job.title} + ': Rejected'">Job title: Rejected</a>
+                    <p class="text-danger small mb-0 mt-1" th:text="${job.rejectionReason}">Reason</p>
+                </div>
+                <a th:href="@{/employer/jobs/{id}/edit(id=${job.id})}" class="btn btn-sm btn-outline-primary flex-shrink-0">Edit and resubmit</a>
+            </li>
+            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-start gap-2" th:each="job : ${expiredJobs}">
+                <div>
+                    <a th:href="@{/employer/jobs/{id}(id=${job.id})}" class="badge job-expired text-decoration-none"
+                       th:text="${job.title} + ': Expired'">Job title: Expired</a>
+                    <p class="text-muted small mb-0 mt-1">Close it, or edit it with a new deadline.</p>
+                </div>
+                <a th:href="@{/employer/jobs/{id}/edit(id=${job.id})}" class="btn btn-sm btn-outline-primary flex-shrink-0">Edit</a>
+            </li>
+            <li class="list-group-item d-flex flex-wrap justify-content-between align-items-start gap-2" th:each="a : ${staleApplications}">
+                <div>
+                    <span th:text="${a.seeker.fullName}">Candidate name</span>
+                    <span class="text-muted">applied for</span>
+                    <a th:href="@{/employer/jobs/{id}(id=${a.job.id})}" th:text="${a.job.title}">Job title</a>
+                    <p class="text-muted small mb-0" th:text="'Still Applied, ' + ${@fmt.ago(a.appliedAt)}">Still Applied, 9 days ago</p>
+                </div>
+                <a th:href="@{/employer/applications/{id}(id=${a.id})}" class="btn btn-sm btn-outline-primary flex-shrink-0">View</a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Recent applications: last 5 (Section 6.3 DASH-E). -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">Recent applications</div>
+        <div th:if="${#lists.isEmpty(recentApplications)}" class="card-body empty-state">
+            <i class="bi bi-file-earmark-person icon"></i>
+            <p class="message">No applications yet.</p>
+        </div>
+        <div th:unless="${#lists.isEmpty(recentApplications)}" class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Candidate</th>
+                    <th scope="col">Job</th>
+                    <th scope="col">Applied</th>
+                    <th scope="col">Status</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="a : ${recentApplications}">
+                    <td th:text="${a.seeker.fullName}">Candidate name</td>
+                    <td th:text="${a.job.title}">Job title</td>
+                    <td th:text="${#temporals.format(a.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td><span th:replace="~{fragments/status-badge :: application(${a.status}, 'EMPLOYER')}"></span></td>
+                    <td class="text-end">
+                        <a th:href="@{/employer/applications/{id}(id=${a.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <a th:href="@{/employer/applications}" class="jp-showall">Show all</a>
+        </div>
+    </div>
+
+    <!-- One chart: applications per day over the last 30 days, with a link to the full
+         statistics page (Section 6.3 DASH-E). -->
+    <div th:replace="~{fragments/chart-card :: card('applicationsChart', 'Applications, last 30 days', ${stats.applicationsOverTime})}"></div>
+    <div class="text-end mb-4">
+        <a th:href="@{/employer/statistics}" class="btn btn-sm btn-outline-primary">
+            Full statistics <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+        </a>
+    </div>
 </main>
+
+<th:block th:fragment="scripts">
+    <script th:inline="javascript">
+        const applications = /*[[${stats.applicationsOverTime}]]*/ null;
+        JobPortalCharts.line('applicationsChart', applications);
+    </script>
+</th:block>
 </body>
 </html>

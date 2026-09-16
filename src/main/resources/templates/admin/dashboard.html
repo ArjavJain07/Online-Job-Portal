@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <!--
-  The real admin dashboard (Section 6.2 DASH-A, 11.2 M3): KPI cards, the pending-approvals
-  mini table, the live activity widget and the latest-applications panel. This replaces the
-  M1 placeholder. The "Applications, last 30 days" chart is deliberately NOT here yet - see
-  the placeholder card near the bottom - M7 adds it together with the "Full statistics" link
-  (11.2: "everything on this page except the chart" ships in M3).
+  The real admin dashboard (Section 6.2 DASH-A, 11.2 M3/M7): KPI cards, the
+  pending-approvals mini table, the live activity widget, the latest-applications panel and
+  (added in M7) the "Applications, last 30 days" chart with its "Full statistics" link to
+  /admin/statistics.
 
   Reading order (top to bottom): KPI strip, then the pending-approvals queue next to the
-  latest-applications panel, then the full-width live activity widget - see MASTER.md's
-  "dashboard reads top-down" rule. Server-side data and ordering (pendingJobs stays oldest
-  first, liveEvents/latestApplications are unchanged) are untouched - only the layout below
-  is rearranged.
+  latest-applications panel, then the full-width live activity widget, then the chart - see
+  MASTER.md's "dashboard reads top-down" rule. Server-side data and ordering (pendingJobs
+  stays oldest first, liveEvents/latestApplications are unchanged) are untouched - only the
+  layout below is rearranged.
 
   The scripts block is a SIBLING of <main> (Section 7.1), never inside it, so it runs after
   the layout's own chart.umd.js/charts.js/forms.js. admin/dashboard.html and
@@ -25,6 +24,13 @@
             <h1 class="h3 mb-1">Admin dashboard</h1>
             <p>Overview of users, jobs and activity across the site.</p>
         </div>
+        <!-- Section 6.2 DASH-A / 11.2 M7: the dashboard's own chart is only a 30-day
+             preview; this is the "Full statistics" link the plan asks for, next to the
+             page title since fragments/chart-card's own card has no footer slot to put a
+             second link into (Section 7.1 fragment signature is frozen). -->
+        <a th:href="@{/admin/statistics}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-graph-up me-1" aria-hidden="true"></i>Full statistics
+        </a>
     </div>
 
     <!-- KPI cards (AC-DA-1): Total users, Live jobs, Pending approvals, Applications
@@ -116,23 +122,19 @@
         </div>
     </div>
 
-    <!--
-      M7 placeholder (Section 11.2 M3 note): the "Applications, last 30 days" line chart
-      (fragments/chart-card :: card(...), fed by JobApplicationRepository.findAppliedAtSince
-      through DateBuckets, Section 7.6) and its "Full statistics" link to /admin/statistics
-      both arrive in Milestone M7. Do not build the chart here - AdminStatisticsController
-      and /admin/statistics do not exist yet in M3.
-    -->
-    <div class="card">
-        <div class="card-body empty-state">
-            <i class="bi bi-graph-up icon"></i>
-            <p class="message">The "Applications, last 30 days" chart and full statistics arrive in Milestone M7.</p>
-        </div>
-    </div>
+    <!-- "Applications, last 30 days" (Section 6.2 DASH-A, 7.6 charts-by-page table): a
+         plain fragments/chart-card :: card(...), fed by AdminDashboardController's own
+         30-day query through DateBuckets, with its accessible data table. The "Full
+         statistics" link to /admin/statistics sits in the page head above (A-D4). -->
+    <div th:replace="~{fragments/chart-card :: card('applicationsChart', 'Applications, last 30 days', ${applicationsChart})}"></div>
 </main>
 
 <th:block th:fragment="scripts">
     <script th:src="@{/js/activity-feed.js}"></script>
+    <script th:inline="javascript">
+        const applications = /*[[${applicationsChart}]]*/ null;
+        JobPortalCharts.line('applicationsChart', applications);
+    </script>
 </th:block>
 </body>
 </html>

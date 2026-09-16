@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<!--
+  Full recommendations page (Section 6.4 S-D5, 7.8), top 20. SeekerJobController#recommendations
+  puts everything under "recommendations", a RecommendationResult (jobs + fallback, the
+  same record and the same "top 6 vs top 20" service call the dashboard's own card uses,
+  just with a bigger limit).
+
+  Unlike the dashboard's card-wrapped widget, this is a primary content page, so the job
+  cards sit directly in the main column - the same "heading, then a plain list of
+  fragments/job-card" shape public/index.html's "Latest openings" section already uses -
+  rather than nested inside another card.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Recommended For You', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1" th:text="${recommendations.fallback} ? 'Latest jobs' : 'Recommended for you'">Recommended for you</h1>
+            <p th:unless="${recommendations.fallback}">Jobs matched to your skills, location, experience and application history.</p>
+        </div>
+    </div>
+
+    <!-- Fallback (7.8 step 2): the profile has no skills and the seeker has never
+         applied, so there is nothing yet to score - shown above the newest-jobs list
+         below (AC-S-D5-3). -->
+    <div class="alert alert-warning" th:if="${recommendations.fallback}">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        Add your skills, location and preferred job type to get personalised recommendations.
+        <a th:href="@{/seeker/profile}">Update your profile</a>.
+    </div>
+
+    <!-- No match: qualified candidates exist but none clears the score threshold. -->
+    <div class="card shadow-sm" th:if="${!recommendations.fallback and #lists.isEmpty(recommendations.jobs)}">
+        <div class="card-body empty-state">
+            <i class="bi bi-search icon"></i>
+            <p class="message">No strong matches right now. Try adding more skills or browse all jobs.</p>
+            <a th:href="@{/seeker/jobs}" class="btn btn-primary action">Browse all jobs</a>
+        </div>
+    </div>
+
+    <!-- One card per recommendation: the match label (score itself stays internal,
+         Section 7.8), the job card, then the "Why recommended" line. -->
+    <div th:each="rec, iter : ${recommendations.jobs}" th:classappend="${!iter.last} ? 'mb-4'">
+        <p th:switch="${rec.label}" class="mb-1">
+            <span th:case="'Strong match'" class="badge job-live" th:text="${rec.label}">Strong match</span>
+            <span th:case="'Good match'" class="badge app-interview" th:text="${rec.label}">Good match</span>
+            <span th:case="'Fair match'" class="badge job-pending" th:text="${rec.label}">Fair match</span>
+            <span th:case="*" class="badge text-bg-secondary" th:text="${rec.label}">Latest jobs</span>
+        </p>
+        <div th:replace="~{fragments/job-card :: card(${rec.job}, false)}"></div>
+        <p class="text-muted small" th:if="${!#lists.isEmpty(rec.reasons)}">
+            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>
+            <span th:text="${#strings.listJoin(rec.reasons, ' &#183; ')}">Reasons</span>
+        </p>
+    </div>
+</main>
+</body>
+</html>

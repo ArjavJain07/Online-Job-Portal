@@ -1,39 +1,159 @@
 <!DOCTYPE html>
 <!--
-  M1 placeholder only (Section 11.2): just needs to exist, on the shared dashboard layout
-  with the job seeker sidebar, so a seeded job seeker account has somewhere to land after
-  login. Milestone M7 replaces this with the real seeker dashboard (application summary,
-  recommended jobs).
+  Real job seeker dashboard (Section 6.4 DASH-S, 11.2 M7), replacing the M1 placeholder.
+  SeekerDashboardController puts: activeApplicationsCount/interviewsCount/hiredCount (KPI
+  row - "Unread messages" is the global "unreadMessageCount" attribute, never
+  recomputed here, Section 7.10); "completeness" (ProfileCompleteness: percent + hint,
+  Section 6.4 S-F4); "recentUpdates" (the 5 latest employer-made ApplicationStatusChange
+  rows, newest first); and "recommendations" (a RecommendationResult - either the top 6
+  scored jobs or the "Latest jobs" fallback, Section 7.8).
 
-  SeekerDashboardController passes no model attributes of its own, only the global ones
-  from GlobalModelAttributes (currentUser, siteName, announcement, currentPath,
-  unreadMessageCount), so this page uses only those.
+  Layout: the quick search and KPI row span the full width, then a secondary rail
+  (app.css .jp-layout-wide / .jp-rail, the same "main column + side card" shape
+  employer/application-detail.html already uses, Section 7.1) holds the profile
+  completeness meter beside the main column's Recent updates / Recommended for you cards -
+  this page's own rail is IN ADDITION to the role-menu rail fragments/sidebar already puts
+  on the left of every dashboard page.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/dashboard :: layout(title='Job Seeker Dashboard', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence. No primary
-         action here - this placeholder has nothing to act on yet. -->
     <div class="jp-page-head">
         <div>
-            <h1 class="h3 mb-1">Job Seeker Dashboard</h1>
-            <p>
-                Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Job Seeker</span>.
-                <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Job Seeker</span>
-            </p>
+            <h1 class="h3 mb-1">
+                Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Job Seeker</span>
+            </h1>
+            <p>Here's what's happening with your job search.</p>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-body empty-state">
-            <i class="bi bi-cone-striped icon"></i>
-            <p class="message">
-                This is a placeholder page (Section 11.2). The full seeker dashboard - your
-                application summary and jobs recommended for you - is built in <strong>Milestone M7</strong>.
-                In the meantime, use the sidebar to find and apply for jobs.
-            </p>
+    <!-- Quick search (S-D1, AC-DS-2): a plain GET form to /seeker/jobs with "q"/"location" -
+         bookmarkable and works with JavaScript off, the same reasoning fragments/job-filters
+         follows. -->
+    <form method="get" th:action="@{/seeker/jobs}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-5">
+                    <label class="form-label" for="quick-q">Keyword</label>
+                    <input type="text" class="form-control" id="quick-q" name="q" maxlength="100"
+                           placeholder="Job title, skill or company">
+                </div>
+                <div class="col-12 col-md-5">
+                    <label class="form-label" for="quick-location">Location</label>
+                    <input type="text" class="form-control" id="quick-location" name="location" maxlength="100"
+                           placeholder="City or 'remote'">
+                </div>
+                <div class="col-12 col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search" aria-hidden="true"></i> Search
+                    </button>
+                </div>
+            </div>
         </div>
+    </form>
+
+    <!-- KPI cards (AC-DS-1): Active applications, Interviews, Hired, Unread messages. -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-send', ${activeApplicationsCount}, 'Active applications', @{/seeker/applications})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-calendar-check', ${interviewsCount}, 'Interviews', @{/seeker/applications(status='INTERVIEW')})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-trophy', ${hiredCount}, 'Hired', @{/seeker/applications/history(result='HIRED')})}"></div>
+        </div>
+        <div class="col">
+            <div th:replace="~{fragments/kpi-card :: card('bi-envelope', ${unreadMessageCount}, 'Unread messages', @{/seeker/messages})}"></div>
+        </div>
+    </div>
+
+    <!-- The secondary rail only exists while there is a completeness card to show it
+         (hidden at 100%, Section 6.4 DASH-S) - "jp-layout-wide" is appended only then, so
+         a seeker with a complete profile gets a full-width main column instead of an
+         empty gutter on the right. -->
+    <div th:classappend="${completeness.percent lt 100} ? 'jp-layout-wide'">
+        <div>
+
+            <!-- Recent updates (Section 6.4 DASH-S): latest 5 employer status changes,
+                 for example "Frontend Developer: Under review - 2 days ago". -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Recent updates</div>
+                <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(recentUpdates)}">
+                    <!-- Kept as one text run - "Frontend Developer: Under review" - so it
+                         reads exactly as Section 6.4 DASH-S's own example, rather than
+                         splitting the job title and status across separate elements. -->
+                    <li class="list-group-item" th:each="change : ${recentUpdates}">
+                        <a th:href="@{/seeker/applications/{id}(id=${change.application.id})}"
+                           th:text="${change.application.job.title} + ': ' + ${change.toStatus.seekerLabel}">Frontend Developer: Under review</a>
+                        &middot;
+                        <span class="text-muted small" th:text="${@fmt.ago(change.changedAt)}">2 days ago</span>
+                    </li>
+                </ul>
+                <div th:if="${#lists.isEmpty(recentUpdates)}" class="card-body empty-state">
+                    <i class="bi bi-clock-history icon"></i>
+                    <p class="message">No updates yet. This fills up once employers respond to your applications.</p>
+                </div>
+            </div>
+
+            <!-- Recommended for you (S-D5, 7.8): top 6, or the "Latest jobs" fallback with
+                 its prompt when the profile has nothing to match on yet. -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <span th:text="${recommendations.fallback} ? 'Latest jobs' : 'Recommended for you'">Recommended for you</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3" th:if="${recommendations.fallback}">
+                        Add your skills, location and preferred job type to get personalised recommendations.
+                        <a th:href="@{/seeker/profile}">Update your profile</a>
+                    </p>
+                    <div class="empty-state" th:if="${!recommendations.fallback and #lists.isEmpty(recommendations.jobs)}">
+                        <i class="bi bi-search icon"></i>
+                        <p class="message">No strong matches right now. Try adding more skills or browse all jobs.</p>
+                    </div>
+                    <div th:each="rec, iter : ${recommendations.jobs}" th:classappend="${!iter.last} ? 'mb-3'">
+                        <p th:switch="${rec.label}" class="mb-1">
+                            <span th:case="'Strong match'" class="badge job-live" th:text="${rec.label}">Strong match</span>
+                            <span th:case="'Good match'" class="badge app-interview" th:text="${rec.label}">Good match</span>
+                            <span th:case="'Fair match'" class="badge job-pending" th:text="${rec.label}">Fair match</span>
+                            <span th:case="*" class="badge text-bg-secondary" th:text="${rec.label}">Latest jobs</span>
+                        </p>
+                        <div th:replace="~{fragments/job-card :: card(${rec.job}, false)}"></div>
+                        <p class="text-muted small" th:if="${!#lists.isEmpty(rec.reasons)}">
+                            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>
+                            <span th:text="${#strings.listJoin(rec.reasons, ' &#183; ')}">Reasons</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a th:href="@{/seeker/recommendations}" class="jp-showall">See all recommendations</a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Secondary rail: profile completeness (Section 6.4 DASH-S, hidden at 100%). -->
+        <div class="jp-rail" th:if="${completeness.percent lt 100}">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Profile completeness</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="jp-eyebrow">Complete your profile</span>
+                        <span class="fw-semibold" th:text="${completeness.percent} + '%'">60%</span>
+                    </div>
+                    <div class="progress jp-progress">
+                        <div class="progress-bar" role="progressbar" th:style="'width: ' + ${completeness.percent} + '%'"
+                             th:attr="aria-valuenow=${completeness.percent}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <p class="form-text mb-0 mt-2" th:text="${completeness.hint}">Add your skills to get better job recommendations.</p>
+                </div>
+                <div class="card-footer">
+                    <a th:href="@{/seeker/profile}" class="jp-showall">Complete your profile</a>
+                </div>
+            </div>
+        </div>
+
     </div>
 </main>
 </body>

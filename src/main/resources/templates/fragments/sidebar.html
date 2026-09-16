@@ -42,7 +42,7 @@
                        contextLine=${currentUser.companyName != null and !currentUser.companyName.isEmpty()} ? ${currentUser.companyName} : ${currentUser.email}">
             <div class="jp-rail-cover"></div>
             <div class="card-body pt-0 text-center">
-                <span class="jp-avatar-md d-inline-flex" aria-hidden="true" th:text="${initials}">U</span>
+                <span class="jp-avatar jp-avatar-md" aria-hidden="true" th:text="${initials}">U</span>
                 <p class="fw-semibold mb-0 mt-2" th:text="${currentUser.fullName}">User name</p>
                 <p class="jp-sub mb-1" th:text="${currentUser.role.label}">Role</p>
                 <p class="jp-meta mb-0 text-truncate" th:text="${contextLine}">context</p>

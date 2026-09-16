@@ -3,11 +3,13 @@ package com.jobportal.web.seeker;
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
 import com.jobportal.dto.JobSearchResult;
+import com.jobportal.dto.RecommendationResult;
 import com.jobportal.exception.BusinessRuleException;
 import com.jobportal.exception.FileValidationException;
 import com.jobportal.security.AppUserDetails;
 import com.jobportal.service.JobApplicationService;
 import com.jobportal.service.JobSearchService;
+import com.jobportal.service.RecommendationService;
 import com.jobportal.web.form.ApplicationForm;
 import com.jobportal.web.form.JobSearchCriteria;
 import jakarta.validation.Valid;
@@ -25,22 +27,28 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-// Seeker job search and applying (Section 6.4 S-F1, S-D1, S-F2, 6.6 route summary). Thin
-// controller (11.3 contract item 1): every rule, ownership check and side effect lives in
-// JobApplicationService (and, for the search itself, the already-built JobSearchService),
-// this class only wires the form/PRG plumbing. /seeker/recommendations (S-D5) is a
-// separate feature and is not built here.
+// Seeker job search, applying and recommendations (Section 6.4 S-F1, S-D1, S-F2, S-D5,
+// 6.6 route summary). Thin controller (11.3 contract item 1): every rule, ownership check
+// and side effect lives in JobApplicationService/RecommendationService (and, for the
+// search itself, the already-built JobSearchService), this class only wires the form/PRG
+// plumbing.
 @Controller
 public class SeekerJobController {
 
+    // Section 6.4 S-D5, 7.8 step 5: the full recommendations page shows the top 20
+    // (the dashboard's own "top 6" is SeekerDashboardController's limit instead).
+    private static final int RECOMMENDATIONS_PAGE_LIMIT = 20;
+
     private final JobSearchService jobSearchService;
     private final JobApplicationService jobApplicationService;
+    private final RecommendationService recommendationService;
     private final Clock clock;
 
     public SeekerJobController(JobSearchService jobSearchService, JobApplicationService jobApplicationService,
-            Clock clock) {
+            RecommendationService recommendationService, Clock clock) {
         this.jobSearchService = jobSearchService;
         this.jobApplicationService = jobApplicationService;
+        this.recommendationService = recommendationService;
         this.clock = clock;
     }
 
@@ -65,6 +73,17 @@ public class SeekerJobController {
         model.addAttribute("existingApplication", selectedJob == null ? null
                 : jobApplicationService.findExisting(selectedJob.getId(), me.getId()).orElse(null));
         return "seeker/jobs";
+    }
+
+    // GET /seeker/recommendations (S-D5, Section 7.8): the full list, top 20, or the
+    // "Latest jobs" fallback when the profile has no skills and the seeker has never
+    // applied - the template reads result.fallback() to choose the heading/prompt, the
+    // same way SeekerDashboardController's own "top 6" card does.
+    @GetMapping("/seeker/recommendations")
+    public String recommendations(@AuthenticationPrincipal AppUserDetails me, Model model) {
+        RecommendationResult result = recommendationService.recommend(me.getId(), RECOMMENDATIONS_PAGE_LIMIT);
+        model.addAttribute("recommendations", result);
+        return "seeker/recommendations";
     }
 
     // GET /seeker/jobs/{jobId}/apply (S-F2). "Check order" (business rule 2) runs before

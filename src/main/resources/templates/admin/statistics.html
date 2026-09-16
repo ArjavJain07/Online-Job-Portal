@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<!--
+  Admin job/engagement statistics (Section 6.2 A-D4, 7.6). AdminStatisticsController puts
+  everything under "stats", an AdminStatistics record (Section 7.6): the normalised range
+  (7/30/90, used to highlight the active pill below), the KPI row, all seven ChartData
+  series and the two tables. Every chart is a fragments/chart-card (canvas + collapsible
+  data table, Section 7.1), wired from the scripts block below using the exact JavaScript
+  inlining pattern Section 7.6 specifies (a plain "const x = ..." per chart, built from a
+  Thymeleaf inline expression comment), so the JSON island the fragment writes next to
+  each canvas and the value passed to JobPortalCharts are the same object read two
+  different ways, never two separate queries that could drift apart.
+
+  NOTE for future edits: never write a literal double-square-bracket inline expression
+  (Thymeleaf's own "[[...]]" syntax) inside an HTML comment like this one, even as prose.
+  Thymeleaf's StandardInliningCommentProcessor scans EVERY HTML comment in a page rendered
+  as a full template (unlike a fragment file such as fragments/chart-card.html, where only
+  the selected th:fragment subtree is processed, never its file-level header comment) and
+  tries to evaluate anything inside "[[...]]" as a SpEL expression - a literal "..." placeholder
+  is not valid SpEL and throws SpelParseException, turning this page's own documentation
+  comment into a 500 error. Found the hard way when this exact sentence used to spell the
+  syntax out literally.
+
+  The scripts block is a SIBLING of <main>, never inside it (Section 7.1): content=~{::main}
+  would otherwise render it a second time before chart.umd.js/charts.js have loaded.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Statistics', content=~{::main}, scripts=~{::scripts})}">
+<body>
+<main>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Statistics</h1>
+            <p>Job postings, application trends and user engagement across the site.</p>
+        </div>
+    </div>
+
+    <!-- Range control (Section 6.2 A-D4): three LinkedIn-style filter pills, the same
+         .jp-chip-filter/.is-on pattern the /admin/jobs status tabs use. -->
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a class="jp-chip-filter" th:classappend="${stats.days == 7} ? 'is-on'" th:href="@{/admin/statistics(days=7)}">Last 7 days</a>
+        <a class="jp-chip-filter" th:classappend="${stats.days == 30} ? 'is-on'" th:href="@{/admin/statistics(days=30)}">Last 30 days</a>
+        <a class="jp-chip-filter" th:classappend="${stats.days == 90} ? 'is-on'" th:href="@{/admin/statistics(days=90)}">Last 90 days</a>
+    </div>
+
+    <!-- KPI row (Section 6.2 A-D4): New users, Jobs posted, Applications, Hires for the
+         range, plus Active users (7 days) and Live jobs (now) - rendered in whatever order
+         AdminStatisticsService built its "kpis" list, so this row never needs to change if
+         that order ever does. Plain ".kpi-card" tiles (app.css Section 6): the fragment
+         version of this component always requires a link, which none of these KPIs has. -->
+    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
+        <div class="col" th:each="kpi : ${stats.kpis}">
+            <div class="kpi-card">
+                <div class="content">
+                    <span class="value" th:text="${kpi.value}">0</span>
+                    <span class="label" th:text="${kpi.label}">Label</span>
+                    <span class="kpi-meta" th:if="${kpi.hint != null}" th:text="${kpi.hint}">Hint</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- The seven charts of Section 6.2 A-D4, two per row on wide screens; each keeps its
+         own accessible data table (fragments/chart-card "View data" toggle). -->
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('applicationsChart', 'Applications over time', ${stats.applicationsOverTime})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('jobsPostedChart', 'Jobs posted over time', ${stats.jobsPostedOverTime})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('registrationsChart', 'New registrations over time', ${stats.registrationsOverTime})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('jobsByStatusChart', 'Jobs by status, all time', ${stats.jobsByStatus})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('applicationsByCategoryChart', 'Applications by category', ${stats.applicationsByCategory})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('applicationOutcomesChart', 'Application outcomes', ${stats.applicationOutcomes})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('loginsChart', 'User engagement: logins over time', ${stats.loginsOverTime})}"></div>
+        </div>
+    </div>
+
+    <!-- Top 5 most-applied jobs in range (Section 6.2 A-D4 table). -->
+    <div class="card mb-4">
+        <div class="card-header">Top 5 most-applied jobs</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Job</th>
+                    <th scope="col">Company</th>
+                    <th scope="col">Applications</th>
+                    <th scope="col">Hired</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${stats.topJobs}">
+                    <td th:text="${row.title}">Job title</td>
+                    <td th:text="${row.company}">Company</td>
+                    <td th:text="${row.applications}">0</td>
+                    <td th:text="${row.hired}">0</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(stats.topJobs)}">
+                    <td colspan="4" class="text-center text-muted py-3">No data for this period.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- User engagement table (Section 6.2 A-D4, formulas from Section 7.6): each row
+         doubles as documentation of how its value is computed. -->
+    <div class="card mb-4">
+        <div class="card-header">User engagement</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Metric</th>
+                    <th scope="col">Formula</th>
+                    <th scope="col">Value</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="metric : ${stats.engagementMetrics}">
+                    <td th:text="${metric.name}">Metric</td>
+                    <td class="text-muted small" th:text="${metric.formula}">Formula</td>
+                    <td th:text="${metric.value}">Value</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<th:block th:fragment="scripts">
+    <script th:inline="javascript">
+        const applications = /*[[${stats.applicationsOverTime}]]*/ null;
+        const jobsPosted = /*[[${stats.jobsPostedOverTime}]]*/ null;
+        const registrations = /*[[${stats.registrationsOverTime}]]*/ null;
+        const jobsByStatus = /*[[${stats.jobsByStatus}]]*/ null;
+        const applicationsByCategory = /*[[${stats.applicationsByCategory}]]*/ null;
+        const applicationOutcomes = /*[[${stats.applicationOutcomes}]]*/ null;
+        const logins = /*[[${stats.loginsOverTime}]]*/ null;
+
+        JobPortalCharts.line('applicationsChart', applications);
+        JobPortalCharts.bar('jobsPostedChart', jobsPosted);
+        JobPortalCharts.bar('registrationsChart', registrations);
+        JobPortalCharts.doughnut('jobsByStatusChart', jobsByStatus);
+        JobPortalCharts.bar('applicationsByCategoryChart', applicationsByCategory, true);
+        JobPortalCharts.pie('applicationOutcomesChart', applicationOutcomes);
+        JobPortalCharts.bar('loginsChart', logins);
+    </script>
+</th:block>
+</body>
+</html>

@@ -4,12 +4,14 @@ import com.jobportal.domain.Job;
 import com.jobportal.domain.enums.JobStatus;
 import com.jobportal.domain.enums.Role;
 import com.jobportal.dto.ActivityDto;
+import com.jobportal.dto.ChartData;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.JobSpecifications;
 import com.jobportal.repository.UserRepository;
 import com.jobportal.service.ActivityLogService;
 import com.jobportal.service.SettingsService;
+import com.jobportal.util.DateBuckets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,9 +30,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 // JobApplicationRepository) belong to other agents' slices, so nothing here may add a
 // method to them, only call what already exists.
 //
-// The "Applications, last 30 days" chart is deliberately NOT built here - Section 11.2 M3
-// note: "everything on this page except the chart" ships now, M7 adds the chart and its
-// "Full statistics" link. See the placeholder comment near the bottom of admin/dashboard.html.
+// The "Applications, last 30 days" chart (Section 6.2 DASH-A, 7.6) is built here in M7,
+// alongside the "Full statistics" link on admin/dashboard.html - Section 11.2 M3 shipped
+// everything else on this page first, M7 adds only this one chart card.
 @Controller
 public class AdminDashboardController {
 
@@ -60,6 +62,7 @@ public class AdminDashboardController {
         addKpiCards(model, today, now);
         addPendingApprovals(model);
         addLiveActivity(model);
+        addApplicationsChart(model, today);
 
         model.addAttribute("feedIntervalMs", settingsService.get().getFeedRefreshSeconds() * 1000);
         return "admin/dashboard";
@@ -97,6 +100,17 @@ public class AdminDashboardController {
         model.addAttribute("liveEventsLastId", liveEvents.isEmpty() ? 0L : liveEvents.get(0).id());
         model.addAttribute("latestApplications",
                 activityLogService.latestApplications().stream().map(ActivityDto::from).toList());
+    }
+
+    // "Applications, last 30 days" (Section 6.2 DASH-A chart, Section 7.6 charts-by-page
+    // table): the same fixed 30-day window and bucketing DateBuckets.count uses elsewhere,
+    // fed by the same repository query AdminStatisticsService uses for its own "Applications
+    // over time" chart, so the two never disagree just because they were built separately.
+    private void addApplicationsChart(Model model, LocalDate today) {
+        LocalDateTime from = today.minusDays(29).atStartOfDay();
+        List<LocalDateTime> applicationTimestamps = jobApplicationRepository.findAppliedAtSince(from);
+        ChartData applicationsChart = DateBuckets.count(applicationTimestamps, today, 30, "Applications");
+        model.addAttribute("applicationsChart", applicationsChart);
     }
 
     // No countByRole method exists on UserRepository (owned by another slice), so this
