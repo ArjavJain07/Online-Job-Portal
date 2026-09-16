@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<!--
+  Employer application list (Section 6.3 E-D2). EmployerApplicationController#list puts
+  the Spring Data Page under "page" (read by fragments/pagination), the employer's own
+  jobs (every status, including closed - Section 6.3 E-D2) under "ownJobs" for the jobId
+  select, the two effective filter values under "jobId"/"status" so the filter bar keeps
+  whatever was submitted (an unrecognised or foreign value the service already fell back
+  to "no filter" for, Section 7.9), the full status list under "statuses" (an enum can't
+  be looped with T(...) in the template, Section 7.1 note), and per-application unread
+  message counts under "unreadCounts".
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Applications', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="mb-3">
+        <h1 class="h3 mb-1">Applications</h1>
+        <p class="text-muted mb-0">Review and manage everyone who applied to your jobs.</p>
+    </div>
+
+    <form method="get" th:action="@{/employer/applications}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-5">
+                    <label class="form-label" for="filter-job">Job</label>
+                    <select class="form-select" id="filter-job" name="jobId">
+                        <option value="" th:selected="${jobId == null}">All jobs</option>
+                        <option th:each="j : ${ownJobs}" th:value="${j.id}" th:text="${j.title}"
+                                th:selected="${jobId != null and jobId == j.id}">Job title</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="filter-status">Status</label>
+                    <select class="form-select" id="filter-status" name="status">
+                        <option value="ALL" th:selected="${status == 'ALL'}">Any</option>
+                        <option value="ACTIVE" th:selected="${status == 'ACTIVE'}">Active</option>
+                        <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.label}"
+                                th:selected="${status == s.name()}">Status</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel"></i> Filter</button>
+                    <a th:href="@{/employer/applications}" class="btn btn-outline-secondary" title="Clear filters">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div th:if="${page.empty}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-file-earmark-person icon"></i>
+            <p class="message">No applications match these filters.</p>
+        </div>
+    </div>
+
+    <div th:unless="${page.empty}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Reference</th>
+                    <th>Candidate</th>
+                    <th>Job</th>
+                    <th>Applied on</th>
+                    <th>Status</th>
+                    <th>Unread</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="a : ${page.content}">
+                    <td th:text="${a.reference}">APP-00001</td>
+                    <td>
+                        <span th:text="${a.seeker.fullName}">Candidate name</span>
+                        <span th:unless="${a.seeker.enabled}" class="badge text-bg-secondary ms-1">Account deactivated</span>
+                    </td>
+                    <td>
+                        <a th:href="@{/employer/jobs/{id}(id=${a.job.id})}" th:text="${a.job.title}">Job title</a>
+                    </td>
+                    <td th:text="${#temporals.format(a.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td>
+                        <!-- fragments/status-badge has no "New" case of its own, so the E-D2 override
+                             (Section 6.3: "Status badge ('New' for APPLIED)") is built here instead,
+                             reusing the same app-applied colour class; every other status still goes
+                             through the shared fragment (11.3 contract item 9). -->
+                        <span th:if="${a.status.name() == 'APPLIED'}" class="badge app-applied">New</span>
+                        <th:block th:unless="${a.status.name() == 'APPLIED'}">
+                            <span th:replace="~{fragments/status-badge :: application(${a.status}, 'EMPLOYER')}"></span>
+                        </th:block>
+                    </td>
+                    <td>
+                        <span th:if="${unreadCounts.get(a.id) != null}" class="badge bg-danger"
+                              th:text="${unreadCounts.get(a.id)}">1</span>
+                        <span th:unless="${unreadCounts.get(a.id) != null}" class="text-muted">-</span>
+                    </td>
+                    <td>
+                        <a th:href="@{/employer/applications/{id}(id=${a.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--
+  Employer application detail (Section 6.3 E-F2). EmployerApplicationController hands
+  over the application itself, the read-only "candidate" view model (Section 4.5's
+  ownership table: only these fields, never the profile resume, Section 6.5.2), its full
+  status history ("applicationStatusChanges", oldest first) and the two forms this page
+  posts to ("statusForm", "noteForm"). The status-change form is swapped for one of two
+  fixed sentences once the application is final (Section 6.3 E-F2 detail page); the
+  private-note card is always shown and is never reached from any seeker/* template
+  (Section 6.3 E-F2 business rule 6, D-27).
+
+  Messaging (Section 6.5.1) is a separate milestone (M6) that embeds
+  fragments/message-thread on this page once that fragment exists; nothing here depends
+  on it.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${applicationReference}, content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <div>
+            <h1 class="h3 mb-1">
+                <span th:text="${applicationReference}">APP-00001</span>
+                &middot;
+                <span th:text="${candidate.fullName}">Candidate name</span>
+            </h1>
+            <p class="text-muted mb-0">
+                <!-- statusName/statusLabel/jobId/jobTitle come from the controller
+                     instead of application.status/application.job - see the comment
+                     there for why. -->
+                <span th:switch="${statusName}">
+                    <span th:case="'APPLIED'"      class="badge app-applied"      th:text="${statusLabel}">Applied</span>
+                    <span th:case="'UNDER_REVIEW'" class="badge app-under-review" th:text="${statusLabel}">Under review</span>
+                    <span th:case="'SHORTLISTED'"  class="badge app-shortlisted"  th:text="${statusLabel}">Shortlisted</span>
+                    <span th:case="'INTERVIEW'"    class="badge app-interview"    th:text="${statusLabel}">Interview</span>
+                    <span th:case="'HIRED'"        class="badge app-hired"        th:text="${statusLabel}">Hired</span>
+                    <span th:case="'REJECTED'"     class="badge app-rejected"     th:text="${statusLabel}">Not selected</span>
+                    <span th:case="'WITHDRAWN'"    class="badge app-withdrawn"    th:text="${statusLabel}">Withdrawn</span>
+                </span>
+                <span class="ms-2">Applied for</span>
+                <a th:href="@{/employer/jobs/{id}(id=${jobId})}" th:text="${jobTitle}">Job title</a>
+                <span class="ms-2 text-muted">on <span th:text="${#temporals.format(application.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span></span>
+            </p>
+        </div>
+        <a th:href="@{/employer/applications}" class="btn btn-outline-secondary">Back to applications</a>
+    </div>
+
+    <div class="row g-4 mt-1">
+        <div class="col-lg-8">
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Candidate</div>
+                <div class="card-body">
+                    <dl class="row small mb-3">
+                        <dt class="col-sm-4">Email</dt>
+                        <dd class="col-sm-8" th:text="${candidate.email}">email@example.com</dd>
+
+                        <dt class="col-sm-4">Phone</dt>
+                        <dd class="col-sm-8" th:text="${candidate.phone != null ? candidate.phone : 'Not provided'}">Phone</dd>
+
+                        <dt class="col-sm-4">Location</dt>
+                        <dd class="col-sm-8" th:text="${candidate.location != null ? candidate.location : 'Not provided'}">Location</dd>
+
+                        <dt class="col-sm-4">Headline</dt>
+                        <dd class="col-sm-8" th:text="${candidate.headline != null ? candidate.headline : 'Not provided'}">Headline</dd>
+
+                        <dt class="col-sm-4">Experience</dt>
+                        <dd class="col-sm-8" th:text="${candidate.experienceYears} + ' years'">2 years</dd>
+
+                        <dt class="col-sm-4">Education</dt>
+                        <dd class="col-sm-8" th:text="${candidate.education != null ? candidate.education : 'Not provided'}">Education</dd>
+                    </dl>
+
+                    <th:block th:if="${!#lists.isEmpty(candidate.skills)}">
+                        <h2 class="h6">Skills</h2>
+                        <p>
+                            <span class="badge text-bg-light border me-1" th:each="skill : ${candidate.skills}"
+                                  th:text="${skill}">Skill</span>
+                        </p>
+                    </th:block>
+
+                    <th:block th:if="${candidate.about != null}">
+                        <h2 class="h6">About</h2>
+                        <p class="pre-line mb-0" th:text="${candidate.about}">About the candidate.</p>
+                    </th:block>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Cover letter</div>
+                <div class="card-body">
+                    <p th:if="${application.coverLetter != null}" class="pre-line mb-0" th:text="${application.coverLetter}">Cover letter.</p>
+                    <p th:if="${application.coverLetter == null}" class="text-muted mb-0">No cover letter provided.</p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Resume</div>
+                <div class="card-body">
+                    <a th:href="@{/employer/applications/{id}/resume(id=${applicationId})}" target="_blank" rel="noopener">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>View resume
+                        (<span th:text="${application.resumeOriginalName}">resume.pdf</span>,
+                        <span th:text="${resumeSizeText}">180 KB</span>)
+                    </a>
+                    <p class="form-text mb-0">The copy submitted with this application only.</p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">Status history</div>
+                <div class="card-body">
+                    <div th:replace="~{fragments/timeline :: applicationTimeline(${applicationStatusChanges}, 'EMPLOYER')}"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Change status</div>
+                <!-- statusName again, not application.status.name() - see the comment
+                     on the badge above and in EmployerApplicationController. -->
+                <div class="card-body" th:switch="${statusName}">
+
+                    <p th:case="'WITHDRAWN'" class="text-muted mb-0">
+                        The candidate withdrew on
+                        <span th:text="${#temporals.format(application.statusChangedAt, 'dd MMM yyyy')}">26 Aug 2026</span>.
+                    </p>
+                    <p th:case="'HIRED'" class="text-muted mb-0">This application is final (Hired).</p>
+                    <p th:case="'REJECTED'" class="text-muted mb-0">This application is final (Rejected).</p>
+
+                    <form th:case="*" th:action="@{/employer/applications/{id}/status(id=${applicationId})}"
+                          th:object="${statusForm}" method="post">
+                        <div class="mb-2">
+                            <label class="form-label required" for="status">New status</label>
+                            <select class="form-select" id="status" th:field="*{status}"
+                                    th:classappend="${#fields.hasErrors('status')} ? 'is-invalid'">
+                                <option value="">Choose a status</option>
+                                <option th:each="opt : ${statusOptions}" th:value="${opt.name}"
+                                        th:text="${opt.label}">Status</option>
+                            </select>
+                            <div class="invalid-feedback" th:errors="*{status}">Status error.</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="noteToCandidate">Note to candidate (optional, visible to the candidate)</label>
+                            <textarea class="form-control" id="noteToCandidate" th:field="*{noteToCandidate}" rows="3"
+                                      maxlength="500" th:classappend="${#fields.hasErrors('noteToCandidate')} ? 'is-invalid'"></textarea>
+                            <div class="invalid-feedback" th:errors="*{noteToCandidate}">Note error.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Update status</button>
+                    </form>
+
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">Private note</div>
+                <div class="card-body">
+                    <form th:action="@{/employer/applications/{id}/internal-note(id=${applicationId})}"
+                          th:object="${noteForm}" method="post">
+                        <label class="form-label" for="internalNote">Private note (only your company sees this)</label>
+                        <textarea class="form-control mb-2" id="internalNote" th:field="*{internalNote}" rows="4"
+                                  maxlength="1000" th:classappend="${#fields.hasErrors('internalNote')} ? 'is-invalid'"></textarea>
+                        <div class="invalid-feedback mb-2" th:errors="*{internalNote}">Note error.</div>
+                        <button type="submit" class="btn btn-outline-secondary w-100">Save private note</button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+</body>
+</html>
