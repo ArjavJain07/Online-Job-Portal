@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+  Job application form (Section 6.4 S-F2 screen). SeekerJobController has already run the
+  "Check order" guard (duplicate application, then Live) before this page ever renders, so
+  everything here is the form itself: "job" is the job being applied for, "resumeOptions"
+  (JobApplicationService.ResumeOptions) carries the seeker's current profile resume (or
+  null) plus the upload rules read from SettingsService, and "applicationForm" is the bound
+  ApplicationForm, pre-defaulted on a fresh GET (never touched on a re-render after a
+  validation error, Section 7.2 - "the chosen file must be picked again", business rule 7).
+
+  Multipart form: the CSRF token goes in the action URL, not only the body (Section 7.4/
+  D-11) - a file bigger than the 10 MB servlet cap makes Tomcat stop reading the body
+  before the hidden _csrf field would ever be parsed, so a token that lived only there
+  would be lost and the seeker would see a confusing 403 instead of the friendly
+  "file is too large" flash.
+
+  Resume choice toggle and the cover letter counter are progressive enhancement from
+  static/js/forms.js (data-toggle/data-resume-choice-target, data-counter) - the page is
+  usable, just less convenient, if JavaScript is off.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Apply', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Apply for <span th:text="${job.title}">Job title</span></h1>
+    <p class="text-muted mb-4">
+        <span th:text="${job.employer.companyName}">Company</span>
+        &middot;
+        <span th:text="${job.location}">Location</span>
+        &middot;
+        Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
+    </p>
+
+    <form method="post" enctype="multipart/form-data" th:object="${applicationForm}"
+          th:action="@{/seeker/jobs/{jobId}/apply(jobId=${job.id}, _csrf=${_csrf.token})}" novalidate>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">Resume</div>
+            <div class="card-body">
+
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="radio" th:field="*{resumeChoice}" value="PROFILE"
+                           id="resumeChoiceProfile" th:disabled="${!resumeOptions.hasProfileResume}">
+                    <label class="form-check-label" for="resumeChoiceProfile">
+                        Use my profile resume
+                        <th:block th:if="${resumeOptions.hasProfileResume}">: <strong
+                                th:text="${resumeOptions.profile.resumeOriginalName}">Priya_Sharma_Resume.pdf</strong> (<span
+                                th:text="${@fmt.fileSize(resumeOptions.profile.resumeSizeBytes)}">42 KB</span>, uploaded
+                            <span th:text="${#temporals.format(resumeOptions.profile.resumeUploadedAt, 'dd MMM yyyy')}">01 Sep 2026</span>)
+                            <a th:href="@{/seeker/profile/resume}" target="_blank" rel="noopener" class="ms-1">
+                                <i class="bi bi-file-earmark-pdf"></i> View</a>
+                        </th:block>
+                    </label>
+                    <div class="form-text mb-0" th:unless="${resumeOptions.hasProfileResume}">No resume in your profile yet.</div>
+                </div>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" th:field="*{resumeChoice}" value="UPLOAD"
+                           id="resumeChoiceUpload" data-toggle="#uploadResumeSection">
+                    <label class="form-check-label" for="resumeChoiceUpload">Upload a different resume</label>
+                </div>
+                <div class="invalid-feedback" th:errors="*{resumeChoice}">Resume choice error.</div>
+
+                <div id="uploadResumeSection" data-resume-choice-target class="ms-4 mt-2">
+                    <input type="file" class="form-control" th:field="*{resumeFile}"
+                           th:accept="${resumeOptions.acceptAttribute}"
+                           th:attr="data-max-size-mb=${resumeOptions.maxResumeSizeMb}" data-size-hint="resumeFileSizeHint"
+                           th:classappend="${#fields.hasErrors('resumeFile')} ? 'is-invalid'">
+                    <div class="form-text" th:text="${resumeOptions.resumeHint}">PDF, DOC or DOCX, max 2 MB</div>
+                    <span id="resumeFileSizeHint" class="file-size-hint"></span>
+                    <div class="invalid-feedback" th:errors="*{resumeFile}">Resume file error.</div>
+
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" th:field="*{saveToProfile}" id="saveToProfile">
+                        <label class="form-check-label" for="saveToProfile">Also save this resume to my profile</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">Cover letter <span class="text-muted">(optional)</span></div>
+            <div class="card-body">
+                <textarea class="form-control" th:field="*{coverLetter}" rows="6" maxlength="3000"
+                          data-maxlength="3000" data-counter="coverLetterCounter" placeholder="Why are you a good fit for this role?"
+                          th:classappend="${#fields.hasErrors('coverLetter')} ? 'is-invalid'"></textarea>
+                <span id="coverLetterCounter" class="char-counter">0 / 3000</span>
+                <div class="invalid-feedback" th:errors="*{coverLetter}">Cover letter error.</div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Submit application</button>
+            <a th:href="@{/jobs/{id}(id=${job.id})}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

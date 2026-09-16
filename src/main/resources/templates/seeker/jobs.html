@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!--
+  Seeker job search (Section 6.4 S-F1, S-D1). Same page as public/jobs.html, on the
+  dashboard layout with the seeker sidebar, plus an "Applied" badge on jobs this seeker has
+  already applied to. SeekerJobController#search puts the Spring Data Page under "page"
+  (read by fragments/pagination), the raw JobSearchCriteria under "criteria" (read by
+  fragments/job-filters) and, instead of looping over page.content directly, a ready-made
+  List<SeekerJobRow> under "rows" pairing each job with its own applied flag - see
+  SeekerJobRow for why that pairing is built in the controller/service rather than looked
+  up here with a bean call inside the fragment call.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Find jobs', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Find jobs</h1>
+    <p class="text-muted mb-4"
+       th:text="|${page.totalElements} ${page.totalElements == 1 ? 'job found' : 'jobs found'}|">0 jobs found</p>
+
+    <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/seeker/jobs')}"></div>
+
+    <div th:if="${page.empty}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-search icon"></i>
+            <p class="message">No jobs match your search. Try removing some filters.</p>
+            <a th:href="@{/seeker/jobs}" class="btn btn-outline-primary action">Clear filters</a>
+        </div>
+    </div>
+
+    <div th:unless="${page.empty}">
+        <div th:each="row : ${rows}">
+            <div th:replace="~{fragments/job-card :: card(${row.job}, ${row.applied})}"></div>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>
