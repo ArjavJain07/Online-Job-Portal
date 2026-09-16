@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<!--
+  System settings (Section 6.2 A-F3, A-D3; field definitions in 7.5). One form, five
+  cards, each field showing its current value, a help text and its allowed range.
+  AdminSettingsController re-renders this same template on a validation error (Section
+  7.2/7.3): nothing is saved and "error" (set directly on the Model, not a flash - there
+  was no redirect) is picked up by fragments/flash :: messages in the layout.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Settings', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">System settings</h1>
+    <p class="text-muted mb-1">Changes apply immediately across the site.</p>
+    <p class="text-muted small mb-4">
+        <span th:if="${lastSavedAt != null}">
+            Last saved <span th:text="${#temporals.format(lastSavedAt, 'dd MMM yyyy HH:mm')}">16 Sep 2026 10:42</span>
+            by <span th:text="${lastSavedBy}">Site Admin</span>
+        </span>
+        <span th:if="${lastSavedAt == null}">Not saved yet - these are the default values.</span>
+    </p>
+
+    <form th:action="@{/admin/settings}" th:object="${settingsForm}" method="post" novalidate>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">General</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="siteName" class="form-label required">Site name</label>
+                    <input type="text" class="form-control" id="siteName" th:field="*{siteName}" maxlength="60"
+                           th:classappend="${#fields.hasErrors('siteName')} ? 'is-invalid'">
+                    <div class="form-text">2-60 characters. Shown in the navbar and every page title.</div>
+                    <div class="invalid-feedback" th:errors="*{siteName}">Site name error.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="announcement" class="form-label">Announcement banner text</label>
+                    <textarea class="form-control" id="announcement" th:field="*{announcement}" rows="2" maxlength="200"
+                              th:classappend="${#fields.hasErrors('announcement')} ? 'is-invalid'"></textarea>
+                    <div class="form-text">At most 200 characters. Leave blank to hide the banner.</div>
+                    <div class="invalid-feedback" th:errors="*{announcement}">Announcement error.</div>
+                </div>
+                <div class="mb-0">
+                    <label for="pageSize" class="form-label required">Items per page</label>
+                    <input type="number" class="form-control" id="pageSize" th:field="*{pageSize}" min="5" max="50"
+                           th:classappend="${#fields.hasErrors('pageSize')} ? 'is-invalid'">
+                    <div class="form-text">Between 5 and 50. Rows shown on every paginated list.</div>
+                    <div class="invalid-feedback" th:errors="*{pageSize}">Page size error.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">Registration</div>
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" th:field="*{seekerRegistrationOpen}" id="seekerRegistrationOpen">
+                    <label class="form-check-label" for="seekerRegistrationOpen">Allow job seeker registration</label>
+                </div>
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" th:field="*{employerRegistrationOpen}" id="employerRegistrationOpen">
+                    <label class="form-check-label" for="employerRegistrationOpen">Allow employer registration</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">Jobs</div>
+            <div class="card-body">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" th:field="*{jobApprovalRequired}" id="jobApprovalRequired">
+                    <label class="form-check-label" for="jobApprovalRequired">Require admin approval for new and edited jobs</label>
+                </div>
+                <div class="mb-0">
+                    <label for="maxActiveJobsPerEmployer" class="form-label required">Maximum active jobs per employer</label>
+                    <input type="number" class="form-control" id="maxActiveJobsPerEmployer" th:field="*{maxActiveJobsPerEmployer}"
+                           min="1" max="100" th:classappend="${#fields.hasErrors('maxActiveJobsPerEmployer')} ? 'is-invalid'">
+                    <div class="form-text">Between 1 and 100.</div>
+                    <div class="invalid-feedback" th:errors="*{maxActiveJobsPerEmployer}">Max active jobs error.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">Uploads</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="maxResumeSizeMb" class="form-label required">Maximum resume size (MB)</label>
+                    <input type="number" class="form-control" id="maxResumeSizeMb" th:field="*{maxResumeSizeMb}"
+                           min="1" max="5" th:classappend="${#fields.hasErrors('maxResumeSizeMb')} ? 'is-invalid'">
+                    <div class="form-text">Between 1 and 5 MB.</div>
+                    <div class="invalid-feedback" th:errors="*{maxResumeSizeMb}">Max resume size error.</div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label required d-block">Allowed resume types</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" th:field="*{allowedResumeTypes}" value="pdf" id="resumeTypePdf">
+                        <label class="form-check-label" for="resumeTypePdf">PDF</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" th:field="*{allowedResumeTypes}" value="doc" id="resumeTypeDoc">
+                        <label class="form-check-label" for="resumeTypeDoc">DOC</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" th:field="*{allowedResumeTypes}" value="docx" id="resumeTypeDocx">
+                        <label class="form-check-label" for="resumeTypeDocx">DOCX</label>
+                    </div>
+                    <div class="invalid-feedback d-block" th:if="${#fields.hasErrors('allowedResumeTypes')}" th:errors="*{allowedResumeTypes}">
+                        Resume types error.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">Monitoring</div>
+            <div class="card-body">
+                <div class="mb-0">
+                    <label for="feedRefreshSeconds" class="form-label required">Activity feed refresh interval (seconds)</label>
+                    <input type="number" class="form-control" id="feedRefreshSeconds" th:field="*{feedRefreshSeconds}"
+                           min="3" max="60" th:classappend="${#fields.hasErrors('feedRefreshSeconds')} ? 'is-invalid'">
+                    <div class="form-text">Between 3 and 60 seconds. How often /admin/activity and the dashboard poll for new events.</div>
+                    <div class="invalid-feedback" th:errors="*{feedRefreshSeconds}">Feed refresh error.</div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save settings</button>
+    </form>
+</main>
+</body>
+</html>
