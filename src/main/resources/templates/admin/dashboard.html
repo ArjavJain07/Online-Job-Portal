@@ -61,9 +61,9 @@
          the latest-applications panel, side by side as the design calls for. Each is a
          LinkedIn-style section card: a plain title row, then a "Show all" link footer
          (app.css .jp-showall) instead of a header button. -->
-    <div class="row g-4 mb-4">
+    <div class="row g-4 mb-4 align-items-start">
         <div class="col-lg-8">
-            <div class="card h-100">
+            <div class="card">
                 <div class="card-header">Pending approvals</div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
@@ -96,7 +96,7 @@
             </div>
         </div>
         <div class="col-lg-4">
-            <div class="card h-100">
+            <div class="card">
                 <div class="card-header">Latest applications</div>
                 <div class="card-body p-0">
                     <div th:replace="~{fragments/activity-feed :: applications(${latestApplications})}"></div>
