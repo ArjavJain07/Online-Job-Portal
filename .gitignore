@@ -1,0 +1,16 @@
+.gradle/
+build/
+build-*/
+out/
+bin/
+*.class
+*.log
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+# Runtime data (H2 database files and uploaded resumes)
+data/
+uploads/
