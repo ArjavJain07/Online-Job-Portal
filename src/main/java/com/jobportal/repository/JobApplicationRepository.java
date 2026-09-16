@@ -92,4 +92,10 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     @Query("select count(distinct a.seeker.id) from JobApplication a where a.appliedAt >= :from")
     long countDistinctSeekersSince(@Param("from") LocalDateTime from);
+
+    // All-time hired count for one job (admin statistics "Top 5 most-applied jobs" table,
+    // Section 6.2 A-D4): not named as a query in Section 7.6's table, but needed for that
+    // table's "Hired" column, which is not itself scoped to the selected range - a hire
+    // still counts even if it happened outside the currently viewed window.
+    long countByJob_IdAndStatus(Long jobId, ApplicationStatus status);
 }

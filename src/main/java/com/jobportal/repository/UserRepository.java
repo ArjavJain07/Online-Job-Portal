@@ -41,4 +41,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Active users (7 days), admin engagement metric.
     long countByLastLoginAtGreaterThanEqual(LocalDateTime from);
+
+    // Denominators for the admin engagement ratios (Section 7.6): "enabled seekers" for
+    // seeker participation, and "all employers" (enabled or not - a deactivated employer
+    // still counts as an employer) for the employer posting rate. Not named as a
+    // repository query in Section 7.6's table, but needed to compute the ratios it does
+    // define; added here (AdminStatisticsService) rather than reusing the paginated
+    // search() method just to read its totalElements.
+    long countByRole(Role role);
+
+    long countByRoleAndEnabled(Role role, boolean enabled);
 }
