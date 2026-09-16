@@ -51,3 +51,7 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.named('jar') {
+    enabled = false   // build only the runnable Spring Boot jar (no confusing *-plain.jar)
+}
