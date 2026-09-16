@@ -12,9 +12,13 @@
       th:replace="~{layout/dashboard :: layout(title=${pageTitle}, content=~{::main}, scripts=~{::scripts})}">
 <body>
 <main>
-    <h1 class="h3 mb-1" th:text="${pageTitle}">Create user</h1>
-    <p class="text-muted mb-4" th:if="${userId == null}">Set up a new account and a temporary password.</p>
-    <p class="text-muted mb-4" th:if="${userId != null}">Update this account's details, role or password.</p>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1" th:text="${pageTitle}">Create user</h1>
+            <p th:if="${userId == null}">Set up a new account and a temporary password.</p>
+            <p th:if="${userId != null}">Update this account's details, role or password.</p>
+        </div>
+    </div>
 
     <div class="row">
         <div class="col-md-9 col-lg-7">

@@ -9,55 +9,65 @@
       th:replace="~{layout/dashboard :: layout(title='Company Profile', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="mb-3">
-        <h1 class="h3 mb-1">Company profile</h1>
-        <p class="text-muted mb-0">Shown to job seekers on every one of your job postings.</p>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Company profile</h1>
+            <p>Shown to job seekers on every one of your job postings.</p>
+        </div>
     </div>
 
-    <div class="card shadow-sm" style="max-width: 640px;">
-        <div class="card-body">
-            <form th:action="@{/employer/profile}" th:object="${employerProfileForm}" method="post">
+    <!-- Constrained to a form-width column (Section 7.1 UI pass), the same
+         ".col-md-9 col-lg-7" pattern admin/user-form.html and the auth registration pages
+         use for a single form card, instead of an inline max-width. -->
+    <div class="row">
+        <div class="col-md-9 col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header">Company details</div>
+                <div class="card-body">
+                    <form th:action="@{/employer/profile}" th:object="${employerProfileForm}" method="post">
 
-                <div class="mb-3">
-                    <label class="form-label required" for="fullName">Contact name</label>
-                    <input type="text" class="form-control" id="fullName" th:field="*{fullName}" maxlength="100"
-                           th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'">
-                    <div class="invalid-feedback" th:errors="*{fullName}">Name error.</div>
+                        <div class="mb-3">
+                            <label class="form-label required" for="fullName">Contact name</label>
+                            <input type="text" class="form-control" id="fullName" th:field="*{fullName}" maxlength="100"
+                                   th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{fullName}">Name error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required" for="email">Email</label>
+                            <input type="email" class="form-control" id="email" th:field="*{email}" maxlength="254"
+                                   th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{email}">Email error.</div>
+                            <div class="form-text">Changing this logs you out; you'll log back in with the new address.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required" for="companyName">Company name</label>
+                            <input type="text" class="form-control" id="companyName" th:field="*{companyName}" maxlength="120"
+                                   th:classappend="${#fields.hasErrors('companyName')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{companyName}">Company name error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="companyWebsite">Company website</label>
+                            <input type="text" class="form-control" id="companyWebsite" th:field="*{companyWebsite}"
+                                   maxlength="200" placeholder="https://example.com"
+                                   th:classappend="${#fields.hasErrors('companyWebsite')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{companyWebsite}">Website error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="companyDescription">Company description</label>
+                            <textarea class="form-control" id="companyDescription" th:field="*{companyDescription}" rows="5"
+                                      maxlength="1000" th:classappend="${#fields.hasErrors('companyDescription')} ? 'is-invalid'"></textarea>
+                            <div class="invalid-feedback" th:errors="*{companyDescription}">Description error.</div>
+                            <div class="form-text">Shown to job seekers on every job page. At most 1000 characters.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </form>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label required" for="email">Email</label>
-                    <input type="email" class="form-control" id="email" th:field="*{email}" maxlength="254"
-                           th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'">
-                    <div class="invalid-feedback" th:errors="*{email}">Email error.</div>
-                    <div class="form-text">Changing this logs you out; you'll log back in with the new address.</div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label required" for="companyName">Company name</label>
-                    <input type="text" class="form-control" id="companyName" th:field="*{companyName}" maxlength="120"
-                           th:classappend="${#fields.hasErrors('companyName')} ? 'is-invalid'">
-                    <div class="invalid-feedback" th:errors="*{companyName}">Company name error.</div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label" for="companyWebsite">Company website</label>
-                    <input type="text" class="form-control" id="companyWebsite" th:field="*{companyWebsite}"
-                           maxlength="200" placeholder="https://example.com"
-                           th:classappend="${#fields.hasErrors('companyWebsite')} ? 'is-invalid'">
-                    <div class="invalid-feedback" th:errors="*{companyWebsite}">Website error.</div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label" for="companyDescription">Company description</label>
-                    <textarea class="form-control" id="companyDescription" th:field="*{companyDescription}" rows="5"
-                              maxlength="1000" th:classappend="${#fields.hasErrors('companyDescription')} ? 'is-invalid'"></textarea>
-                    <div class="invalid-feedback" th:errors="*{companyDescription}">Description error.</div>
-                    <div class="form-text">Shown to job seekers on every job page. At most 1000 characters.</div>
-                </div>
-
-                <button type="submit" class="btn btn-primary">Save changes</button>
-            </form>
+            </div>
         </div>
     </div>
 </main>

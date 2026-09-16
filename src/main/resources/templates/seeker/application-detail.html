@@ -38,14 +38,16 @@
         You can track its status under <a th:href="@{/seeker/applications}">My Applications</a>.
     </div>
 
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence + the primary
+         action on the right. -->
+    <div class="jp-page-head">
         <div>
             <h1 class="h3 mb-1">
                 <span th:text="${jobApplication.job.title}">Job title</span>
                 <span class="text-muted fw-normal">at</span>
                 <span th:text="${jobApplication.job.employer.companyName}">Company</span>
             </h1>
-            <p class="text-muted mb-0">
+            <p>
                 Reference <span th:text="${jobApplication.reference}">APP-00001</span>
                 <span class="ms-2">&middot; Applied on
                     <span th:text="${#temporals.format(jobApplication.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
@@ -55,31 +57,42 @@
         <a th:href="@{/seeker/applications}" class="btn btn-outline-secondary">Back to applications</a>
     </div>
 
-    <p class="alert alert-warning mt-3" th:if="${notLiveMessage != null}" th:text="${notLiveMessage}">
+    <p class="alert alert-warning" th:if="${notLiveMessage != null}" th:text="${notLiveMessage}">
         This job is no longer open, but your application is still being processed.
     </p>
 
-    <div class="card shadow-sm mb-4 mt-3">
+    <!-- Horizontal status tracker (Section 6.4 S-F3). Each step carries a thin connector
+         line (Bootstrap border utilities, no new CSS) filled in primary blue up to the
+         seeker's current stage, with the status badge and word underneath it - colour is
+         never the only signal here (core rule 7). The two final states (Rejected,
+         Withdrawn) have no forward step, so trackerStepIndex is null and they fall back to
+         the plain status badge instead. -->
+    <div class="card shadow-sm mb-4">
         <div class="card-header">Status</div>
         <div class="card-body">
-            <div th:if="${trackerStepIndex != null}" class="d-flex flex-wrap gap-2 justify-content-between text-center">
-                <div class="flex-fill">
+            <div th:if="${trackerStepIndex != null}" class="d-flex flex-wrap gap-1 text-center">
+                <div class="flex-fill px-1">
+                    <div class="border-top border-3 border-primary mb-2"></div>
                     <span class="badge" th:classappend="${trackerStepIndex >= 0} ? 'app-applied' : 'bg-light text-muted border'">Applied</span>
                     <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 0}">Current</div>
                 </div>
-                <div class="flex-fill">
+                <div class="flex-fill px-1">
+                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 1} ? 'border-primary' : 'border-secondary-subtle'"></div>
                     <span class="badge" th:classappend="${trackerStepIndex >= 1} ? 'app-under-review' : 'bg-light text-muted border'">Under review</span>
                     <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 1}">Current</div>
                 </div>
-                <div class="flex-fill">
+                <div class="flex-fill px-1">
+                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 2} ? 'border-primary' : 'border-secondary-subtle'"></div>
                     <span class="badge" th:classappend="${trackerStepIndex >= 2} ? 'app-shortlisted' : 'bg-light text-muted border'">Shortlisted</span>
                     <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 2}">Current</div>
                 </div>
-                <div class="flex-fill">
+                <div class="flex-fill px-1">
+                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 3} ? 'border-primary' : 'border-secondary-subtle'"></div>
                     <span class="badge" th:classappend="${trackerStepIndex >= 3} ? 'app-interview' : 'bg-light text-muted border'">Interview</span>
                     <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 3}">Current</div>
                 </div>
-                <div class="flex-fill">
+                <div class="flex-fill px-1">
+                    <div class="border-top border-3 mb-2" th:classappend="${trackerStepIndex >= 4} ? 'border-primary' : 'border-secondary-subtle'"></div>
                     <span class="badge" th:classappend="${trackerStepIndex >= 4} ? 'app-hired' : 'bg-light text-muted border'">Hired</span>
                     <div class="small text-primary fw-bold mt-1" th:if="${trackerStepIndex == 4}">Current</div>
                 </div>

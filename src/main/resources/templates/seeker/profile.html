@@ -14,31 +14,59 @@
       th:replace="~{layout/dashboard :: layout(title='My Profile', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="mb-3">
-        <h1 class="h3 mb-1">My profile</h1>
-        <p class="text-muted mb-0">Keep your details and resume up to date so employers can reach you.</p>
+    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence. -->
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">My profile</h1>
+            <p>Keep your details and resume up to date so employers can reach you.</p>
+        </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
+    <!-- LinkedIn-shaped profile header: initials avatar, name, headline, location, then
+         the completeness meter underneath - every value here is read from the same
+         seekerProfileForm/completeness attributes the form below already binds, so it
+         previews what the form currently holds rather than adding a new lookup. -->
+    <div class="card shadow-sm mb-4"
+         th:with="initials=${seekerProfileForm.fullName != null and !seekerProfileForm.fullName.isEmpty()} ? ${seekerProfileForm.fullName.substring(0,1).toUpperCase()} : '?'">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="fw-bold">Profile completeness</span>
-                <span th:text="${completeness.percent} + '%'">60%</span>
+            <div class="d-flex gap-3 flex-wrap align-items-center">
+                <!-- Plain ".jp-avatar" (app.css has no larger variant, and this restyle
+                     does not add new CSS - Section 7.1 core rule 8) rather than an inline
+                     size override. -->
+                <span class="jp-avatar" aria-hidden="true" th:text="${initials}">U</span>
+                <div class="flex-grow-1">
+                    <h2 class="h5 mb-0" th:text="${seekerProfileForm.fullName}">Full name</h2>
+                    <p class="mb-0" th:if="${seekerProfileForm.headline != null and !seekerProfileForm.headline.isEmpty()}"
+                       th:text="${seekerProfileForm.headline}">Headline</p>
+                    <p class="text-muted small mb-0" th:if="${seekerProfileForm.location != null and !seekerProfileForm.location.isEmpty()}">
+                        <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                        <span th:text="${seekerProfileForm.location}">Location</span>
+                    </p>
+                </div>
             </div>
-            <div class="progress" style="height: 8px;">
+
+            <hr>
+
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="jp-eyebrow">Profile completeness</span>
+                <span class="fw-semibold" th:text="${completeness.percent} + '%'">60%</span>
+            </div>
+            <div class="progress jp-progress">
                 <div class="progress-bar" role="progressbar" th:style="'width: ' + ${completeness.percent} + '%'"
                      th:attr="aria-valuenow=${completeness.percent}" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
-            <p class="form-text mb-0" th:if="${completeness.hint != null}" th:text="${completeness.hint}">Add a headline so employers know what you do.</p>
+            <p class="form-text mb-0 mt-1" th:if="${completeness.hint != null}" th:text="${completeness.hint}">Add a headline so employers know what you do.</p>
         </div>
     </div>
 
     <div class="row g-4">
         <div class="col-lg-7">
-            <div class="card shadow-sm">
-                <div class="card-header">Personal information</div>
-                <div class="card-body">
-                    <form th:action="@{/seeker/profile}" th:object="${seekerProfileForm}" method="post">
+            <form th:action="@{/seeker/profile}" th:object="${seekerProfileForm}" method="post">
+
+                <!-- Details section -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">Personal information</div>
+                    <div class="card-body">
 
                         <div class="mb-3">
                             <label class="form-label required" for="fullName">Full name</label>
@@ -77,16 +105,6 @@
                             <div class="invalid-feedback" th:errors="*{headline}">Headline error.</div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label" for="skills">Skills</label>
-                            <input type="text" class="form-control" id="skills" th:field="*{skills}" maxlength="300"
-                                   placeholder="Comma-separated, e.g. java, spring boot, sql"
-                                   th:classappend="${#fields.hasErrors('skills') or #fields.hasErrors('skillsValid')} ? 'is-invalid'">
-                            <div class="form-text">Comma-separated, e.g. java, spring boot, sql. At most 30 skills.</div>
-                            <div class="invalid-feedback" th:errors="*{skills}">Skills error.</div>
-                            <div class="invalid-feedback" th:errors="*{skillsValid}">Skills count error.</div>
-                        </div>
-
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label required" for="experienceYears">Experience (years)</label>
@@ -110,17 +128,41 @@
                             <div class="invalid-feedback" th:errors="*{education}">Education error.</div>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="mb-0">
                             <label class="form-label" for="about">About</label>
                             <textarea class="form-control" id="about" th:field="*{about}" rows="4" maxlength="1000"
                                       th:classappend="${#fields.hasErrors('about')} ? 'is-invalid'"></textarea>
                             <div class="invalid-feedback" th:errors="*{about}">About error.</div>
                         </div>
-
-                        <button type="submit" class="btn btn-primary">Save changes</button>
-                    </form>
+                    </div>
                 </div>
-            </div>
+
+                <!-- Skills section: editable comma-separated field, with the currently
+                     saved skills previewed as chips (Section 7.1 core rule 6 chip style)
+                     underneath so the page reads like a real profile, not just a form. -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">Skills</div>
+                    <div class="card-body">
+                        <label class="form-label" for="skills">Skills</label>
+                        <input type="text" class="form-control" id="skills" th:field="*{skills}" maxlength="300"
+                               placeholder="Comma-separated, e.g. java, spring boot, sql"
+                               th:classappend="${#fields.hasErrors('skills') or #fields.hasErrors('skillsValid')} ? 'is-invalid'">
+                        <div class="form-text">Comma-separated, e.g. java, spring boot, sql. At most 30 skills.</div>
+                        <div class="invalid-feedback" th:errors="*{skills}">Skills error.</div>
+                        <div class="invalid-feedback" th:errors="*{skillsValid}">Skills count error.</div>
+
+                        <div class="mt-3" th:if="${profile.skills != null and !profile.skills.isEmpty()}">
+                            <span class="jp-eyebrow d-block mb-2">Current skills</span>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="jp-chip" th:each="skill : ${#strings.arraySplit(profile.skills, ',')}"
+                                      th:text="${#strings.trim(skill)}">Java</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save changes</button>
+            </form>
         </div>
 
         <div class="col-lg-5">

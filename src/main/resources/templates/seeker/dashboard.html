@@ -13,11 +13,17 @@
       th:replace="~{layout/dashboard :: layout(title='Job Seeker Dashboard', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Job Seeker Dashboard</h1>
-    <p class="text-muted mb-4">
-        Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Job Seeker</span>.
-        <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Job Seeker</span>
-    </p>
+    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence. No primary
+         action here - this placeholder has nothing to act on yet. -->
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Job Seeker Dashboard</h1>
+            <p>
+                Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Job Seeker</span>.
+                <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Job Seeker</span>
+            </p>
+        </div>
+    </div>
 
     <div class="card shadow-sm">
         <div class="card-body empty-state">

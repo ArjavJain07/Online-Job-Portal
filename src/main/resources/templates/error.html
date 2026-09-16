@@ -17,21 +17,28 @@
     <title>Something went wrong | JobPortal</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
-<body class="bg-light">
+<body>
 <div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-6 text-center">
-            <i class="bi bi-exclamation-circle text-secondary" style="font-size: 3.5rem;"></i>
-            <h1 class="h3 mt-3">
-                <span th:if="${status != null}" th:text="'Error ' + ${status}">Error</span>
-                <span th:unless="${status != null}">Error</span>
-            </h1>
-            <p class="text-muted" th:if="${error != null and !#strings.isEmpty(error)}" th:text="${error}">
-                An unexpected error occurred.
-            </p>
-            <a class="btn btn-primary" th:href="@{/dashboard}">Go to my dashboard</a>
-            <a class="btn btn-link" th:href="@{/}">Back to the home page</a>
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-body p-5">
+                    <i class="bi bi-exclamation-circle jp-icon-xl is-muted" aria-hidden="true"></i>
+                    <h1 class="h3 mt-3">
+                        <span th:if="${status != null}" th:text="'Error ' + ${status}">Error</span>
+                        <span th:unless="${status != null}">Error</span>
+                    </h1>
+                    <p class="text-muted" th:if="${error != null and !#strings.isEmpty(error)}" th:text="${error}">
+                        An unexpected error occurred.
+                    </p>
+                    <div class="d-flex justify-content-center flex-wrap gap-2 mt-3">
+                        <a class="btn btn-primary" th:href="@{/dashboard}">Go to my dashboard</a>
+                        <a class="btn btn-link" th:href="@{/}">Back to the home page</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

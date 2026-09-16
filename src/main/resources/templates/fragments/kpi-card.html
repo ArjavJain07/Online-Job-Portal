@@ -1,14 +1,21 @@
 <!DOCTYPE html>
 <!--
   Dashboard number card (Section 7.1): an icon, a big number and a label, linking to the
-  page that explains the number (for example "6 Live jobs" links to /admin/jobs). The
-  markup matches the .kpi-card / .icon / .content / .value / .label rules already in
-  app.css. "icon" is a Bootstrap Icons class such as "bi-people" (Section 7.1 icon list).
+  page that explains the number (for example "6 Live jobs" links to /admin/jobs). "icon" is
+  a Bootstrap Icons class such as "bi-people" (Section 7.1 icon list). Fragment name and
+  its four parameters (icon, value, label, link) are unchanged.
+
+  IMPORTANT - do not rename or reorder the two inner spans. AdminDashboardTest#assertKpi
+  greps the rendered page for the exact, adjacent pair
+  "<span class="value">N</span>" + (whitespace) + "<span class="label">Label</span>",
+  so the class names stay "value"/"label" (not "kpi-value"/"kpi-label" - app.css has no
+  rule for those two, only for ".kpi-card i" and the ".kpi-card" container itself, which
+  keep working with any inner markup) and the number always comes first.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<a th:fragment="card(icon, value, label, link)" th:href="${link}" class="card shadow-sm kpi-card text-decoration-none">
-    <i th:class="'bi ' + ${icon} + ' icon'"></i>
+<a th:fragment="card(icon, value, label, link)" th:href="${link}" class="kpi-card text-decoration-none d-block h-100">
+    <i th:class="'bi ' + ${icon}" aria-hidden="true"></i>
     <div class="content">
         <span class="value" th:text="${value}">0</span>
         <span class="label" th:text="${label}">Label</span>

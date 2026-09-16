@@ -12,12 +12,17 @@
       th:replace="~{layout/dashboard :: layout(title='Delete User', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Delete user</h1>
-    <p class="text-muted mb-4">This cannot be undone once the account has no related records left.</p>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Delete user</h1>
+            <p>This cannot be undone once the account has no related records left.</p>
+        </div>
+    </div>
 
     <div class="row">
         <div class="col-md-9 col-lg-7">
             <div class="card shadow-sm mb-3">
+                <div class="card-header">Account details</div>
                 <div class="card-body">
                     <dl class="row mb-0">
                         <dt class="col-sm-3">Name</dt>
@@ -33,12 +38,21 @@
             </div>
 
             <div class="card shadow-sm">
+                <div class="card-header">Related records</div>
                 <div class="card-body">
-                    <p class="mb-3">
-                        <strong>Jobs:</strong> <span th:text="${counts.jobs}">0</span>
-                        &middot; <strong>Applications:</strong> <span th:text="${counts.applications}">0</span>
-                        &middot; <strong>Messages:</strong> <span th:text="${counts.messages}">0</span>
-                    </p>
+                    <!-- Compact key numbers, same dl pattern as the card above, so a reader
+                         scans "Jobs / Applications / Messages" as a unit before the
+                         decision below (Section 5.8: all three must be zero to delete). -->
+                    <dl class="row small mb-3">
+                        <dt class="col-sm-4 col-lg-3">Jobs</dt>
+                        <dd class="col-sm-8 col-lg-9" th:text="${counts.jobs}">0</dd>
+
+                        <dt class="col-sm-4 col-lg-3">Applications</dt>
+                        <dd class="col-sm-8 col-lg-9" th:text="${counts.applications}">0</dd>
+
+                        <dt class="col-sm-4 col-lg-3">Messages</dt>
+                        <dd class="col-sm-8 col-lg-9 mb-0" th:text="${counts.messages}">0</dd>
+                    </dl>
 
                     <div class="alert alert-warning" th:if="${isSelf}">
                         You can't delete your own account.

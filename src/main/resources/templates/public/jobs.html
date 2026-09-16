@@ -1,37 +1,71 @@
 <!DOCTYPE html>
 <!--
   Public job search results (Section 6.1 P-2, 6.4 S-F1). JobBrowseController#search puts
-  the Spring Data Page under the model key "page" (read by both fragments/job-card's
-  loop and fragments/pagination) and the raw JobSearchCriteria under "criteria" (read by
+  the Spring Data Page under the model key "page" (read by both fragments/job-card's loop
+  and fragments/pagination) and the raw JobSearchCriteria under "criteria" (read by
   fragments/job-filters, which keeps every entered value - even an invalid one - in the
   form). "warning" is a plain model attribute, not a flash message, and is already rendered
   by layout/public.html's fragments/flash :: messages before this page's own content.
+
+  Classic job-site layout (Section 7.1 UI pass): filters in a left column at >= lg,
+  collapsed above the results on smaller screens. The panel is wrapped in Bootstrap's
+  ".collapse" so it toggles below lg, plus ".d-lg-block" so it is always open at lg+ - the
+  utility's "display: block !important" media rule always wins over ".collapse"'s plain
+  "display: none", which is exactly how Bootstrap's own ".navbar-collapse" does the same
+  trick. fragments/job-filters already carries its own "Sort by" field (Section 7.1 core
+  rule 6), so the line above the results is a plain result-count summary, not a second
+  "sort" control - adding one here would duplicate that form field. Every field id/name in
+  the filters fragment, and the "N jobs found" text JobSearchTest#keywordAndLocationReturnOnlyLiveMatches
+  and friends assert on, is unchanged from before the restyle.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/public :: layout(title='Find jobs', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Find jobs</h1>
-    <p class="text-muted mb-4"
-       th:text="|${page.totalElements} ${page.totalElements == 1 ? 'job found' : 'jobs found'}|">0 jobs found</p>
-
-    <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/jobs')}"></div>
-
-    <div th:if="${page.empty}" class="card shadow-sm">
-        <div class="card-body empty-state">
-            <i class="bi bi-search icon"></i>
-            <p class="message">No jobs match your search. Try removing some filters.</p>
-            <a th:href="@{/jobs}" class="btn btn-outline-primary action">Clear filters</a>
+    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence, matching
+         every other page. No right-hand action here - the filters below already do that job. -->
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Find jobs</h1>
+            <p>Search live openings from verified employers.</p>
         </div>
     </div>
 
-    <div th:unless="${page.empty}">
-        <div th:each="job : ${page.content}">
-            <div th:replace="~{fragments/job-card :: card(${job}, false)}"></div>
+    <div class="row g-4">
+        <!-- Filters: left column at >= lg; a collapsible panel above the results below it. -->
+        <div class="col-12 col-lg-3">
+            <button class="btn btn-outline-secondary w-100 d-lg-none mb-3" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#jobFiltersPanel"
+                    aria-expanded="false" aria-controls="jobFiltersPanel">
+                <i class="bi bi-funnel me-1" aria-hidden="true"></i>Filters
+            </button>
+            <div class="collapse d-lg-block" id="jobFiltersPanel">
+                <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/jobs')}"></div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="col-12 col-lg-9">
+            <p class="text-muted mb-3"
+               th:text="|${page.totalElements} ${page.totalElements == 1 ? 'job found' : 'jobs found'}|">0 jobs found</p>
+
+            <div th:if="${page.empty}" class="card shadow-sm">
+                <div class="card-body empty-state">
+                    <i class="bi bi-search icon" aria-hidden="true"></i>
+                    <p class="message">No jobs match your search. Try removing some filters.</p>
+                    <a th:href="@{/jobs}" class="btn btn-outline-primary action">Clear filters</a>
+                </div>
+            </div>
+
+            <div th:unless="${page.empty}">
+                <div th:each="job : ${page.content}">
+                    <div th:replace="~{fragments/job-card :: card(${job}, false)}"></div>
+                </div>
+            </div>
+
+            <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
         </div>
     </div>
-
-    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
 </main>
 </body>
 </html>

@@ -6,19 +6,22 @@
   logged-in visitor sees "Go to your dashboard" in place of the two registration cards
   instead of being redirected away - the currentUser check below is the same global
   attribute every page already gets from GlobalModelAttributes.
+
+  Search-first hero (Section 7.1 UI pass): heading, one sentence, keyword + location
+  inputs, a primary "Search jobs" button, then the live counts as small muted text below
+  the form - no large marketing hero or stock imagery, matching the quiet, professional
+  look of LinkedIn/Naukri. Every model attribute and condition below (liveJobCount,
+  employersHiringCount, seekerRegistrationOpen, employerRegistrationOpen, currentUser,
+  latestJobs) is unchanged from before the restyle - only layout and classes changed.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/public :: layout(title='Find your next job', content=~{::main}, scripts=~{})}">
 <body>
 <main>
 
-    <section class="text-center py-4 py-md-5 mb-4">
+    <section class="text-center py-4 py-md-5 mb-5">
         <h1 class="display-6 fw-bold mb-2">Find your next job</h1>
-        <p class="text-muted mb-4">
-            <span th:text="${liveJobCount}">6</span> live jobs
-            &middot;
-            <span th:text="${employersHiringCount}">2</span> companies hiring
-        </p>
+        <p class="text-muted mb-4">Search live openings from verified employers and apply in minutes.</p>
 
         <form method="get" th:action="@{/jobs}" class="row justify-content-center g-2">
             <div class="col-12 col-md-4">
@@ -33,10 +36,16 @@
             </div>
             <div class="col-12 col-md-auto">
                 <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-search"></i> Search jobs
+                    <i class="bi bi-search" aria-hidden="true"></i> Search jobs
                 </button>
             </div>
         </form>
+
+        <p class="text-muted small mt-3 mb-0">
+            <span th:text="${liveJobCount}">6</span> live jobs
+            &middot;
+            <span th:text="${employersHiringCount}">2</span> companies hiring
+        </p>
     </section>
 
     <section class="mb-5" th:if="${currentUser == null}">
@@ -44,7 +53,7 @@
             <div class="col-md-5" th:if="${seekerRegistrationOpen}">
                 <div class="card shadow-sm h-100 text-center">
                     <div class="card-body">
-                        <i class="bi bi-person-badge fs-1 text-primary mb-2 d-block"></i>
+                        <i class="bi bi-person-badge fs-1 text-primary mb-2 d-block" aria-hidden="true"></i>
                         <h2 class="h5">I'm looking for a job</h2>
                         <p class="text-muted">Create a free job seeker account and start applying.</p>
                         <a th:href="@{/register/seeker}" class="btn btn-outline-primary">Get started</a>
@@ -54,7 +63,7 @@
             <div class="col-md-5" th:if="${employerRegistrationOpen}">
                 <div class="card shadow-sm h-100 text-center">
                     <div class="card-body">
-                        <i class="bi bi-building fs-1 text-primary mb-2 d-block"></i>
+                        <i class="bi bi-building fs-1 text-primary mb-2 d-block" aria-hidden="true"></i>
                         <h2 class="h5">I'm hiring</h2>
                         <p class="text-muted">Post jobs and find the right candidates.</p>
                         <a th:href="@{/register/employer}" class="btn btn-outline-primary">Get started</a>
@@ -68,12 +77,12 @@
         <a th:href="@{/dashboard}" class="btn btn-primary btn-lg">Go to your dashboard</a>
     </section>
 
-    <section>
+    <section class="mb-5">
         <h2 class="h4 mb-3">Latest openings</h2>
 
         <div th:if="${#lists.isEmpty(latestJobs)}" class="card shadow-sm">
             <div class="card-body empty-state">
-                <i class="bi bi-briefcase icon"></i>
+                <i class="bi bi-briefcase icon" aria-hidden="true"></i>
                 <p class="message">No jobs are open right now. Please check back soon.</p>
             </div>
         </div>
@@ -84,6 +93,29 @@
 
         <div class="text-center mt-3" th:unless="${#lists.isEmpty(latestJobs)}">
             <a th:href="@{/jobs}" class="btn btn-outline-primary">See all jobs</a>
+        </div>
+    </section>
+
+    <!-- Short "how it works" row (Section 7.1: no giant marketing hero) - plain content, no
+         card shell, three steps with an icon each. New copy, asserted by no test. -->
+    <section>
+        <h2 class="h4 mb-4 text-center">How it works</h2>
+        <div class="row g-4 text-center">
+            <div class="col-md-4">
+                <i class="bi bi-search fs-3 text-primary mb-2 d-block" aria-hidden="true"></i>
+                <h3 class="h6 mb-1">Search</h3>
+                <p class="text-muted small mb-0">Browse live openings by keyword, location or job type.</p>
+            </div>
+            <div class="col-md-4">
+                <i class="bi bi-send fs-3 text-primary mb-2 d-block" aria-hidden="true"></i>
+                <h3 class="h6 mb-1">Apply</h3>
+                <p class="text-muted small mb-0">Submit your resume and cover letter in a few clicks.</p>
+            </div>
+            <div class="col-md-4">
+                <i class="bi bi-graph-up-arrow fs-3 text-primary mb-2 d-block" aria-hidden="true"></i>
+                <h3 class="h6 mb-1">Track</h3>
+                <p class="text-muted small mb-0">Follow every application's status from your dashboard.</p>
+            </div>
         </div>
     </section>
 

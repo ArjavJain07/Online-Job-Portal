@@ -22,14 +22,20 @@
       th:replace="~{layout/dashboard :: layout(title='Apply', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Apply for <span th:text="${job.title}">Job title</span></h1>
-    <p class="text-muted mb-4">
-        <span th:text="${job.employer.companyName}">Company</span>
-        &middot;
-        <span th:text="${job.location}">Location</span>
-        &middot;
-        Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
-    </p>
+    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence. No primary
+         action here - the primary action is the form's own submit button below. -->
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Apply for <span th:text="${job.title}">Job title</span></h1>
+            <p>
+                <span th:text="${job.employer.companyName}">Company</span>
+                &middot;
+                <span th:text="${job.location}">Location</span>
+                &middot;
+                Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
+            </p>
+        </div>
+    </div>
 
     <form method="post" enctype="multipart/form-data" th:object="${applicationForm}"
           th:action="@{/seeker/jobs/{jobId}/apply(jobId=${job.id}, _csrf=${_csrf.token})}" novalidate>

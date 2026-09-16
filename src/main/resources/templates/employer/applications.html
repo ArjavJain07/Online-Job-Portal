@@ -13,15 +13,20 @@
       th:replace="~{layout/dashboard :: layout(title='Applications', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="mb-3">
-        <h1 class="h3 mb-1">Applications</h1>
-        <p class="text-muted mb-0">Review and manage everyone who applied to your jobs.</p>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Applications</h1>
+            <p>Review and manage everyone who applied to your jobs.</p>
+        </div>
     </div>
 
-    <form method="get" th:action="@{/employer/applications}" class="card shadow-sm mb-4">
+    <form method="get" th:action="@{/employer/applications}" class="jp-filters card mb-4">
+        <div class="card-header">
+            <span><i class="bi bi-funnel me-2" aria-hidden="true"></i>Filter applications</span>
+        </div>
         <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-5">
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="filter-job">Job</label>
                     <select class="form-select" id="filter-job" name="jobId">
                         <option value="" th:selected="${jobId == null}">All jobs</option>
@@ -29,7 +34,7 @@
                                 th:selected="${jobId != null and jobId == j.id}">Job title</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="filter-status">Status</label>
                     <select class="form-select" id="filter-status" name="status">
                         <option value="ALL" th:selected="${status == 'ALL'}">Any</option>
@@ -38,13 +43,11 @@
                                 th:selected="${status == s.name()}">Status</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel"></i> Filter</button>
-                    <a th:href="@{/employer/applications}" class="btn btn-outline-secondary" title="Clear filters">
-                        <i class="bi bi-x-lg"></i>
-                    </a>
-                </div>
             </div>
+        </div>
+        <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> Filter</button>
+            <a th:href="@{/employer/applications}" class="btn btn-outline-secondary">Clear filters</a>
         </div>
     </form>
 
@@ -65,16 +68,27 @@
                     <th>Job</th>
                     <th>Applied on</th>
                     <th>Status</th>
-                    <th>Unread</th>
-                    <th></th>
+                    <th class="numeric">Unread</th>
+                    <th>Actions</th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="a : ${page.content}">
+                <!-- Compact row: an initials chip stands in for a photo next to the candidate's
+                     name (same ".jp-avatar" hook the navbar uses for the signed-in user), the
+                     status pill always carries its own word (never colour alone), and the row
+                     ends with the one quick action this list offers - the full review happens
+                     on the application detail page. -->
+                <tr th:each="a : ${page.content}"
+                    th:with="initials=${a.seeker.fullName != null and !a.seeker.fullName.isEmpty()} ? ${a.seeker.fullName.substring(0,1).toUpperCase()} : '?'">
                     <td th:text="${a.reference}">APP-00001</td>
                     <td>
-                        <span th:text="${a.seeker.fullName}">Candidate name</span>
-                        <span th:unless="${a.seeker.enabled}" class="badge text-bg-secondary ms-1">Account deactivated</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="jp-avatar" aria-hidden="true" th:text="${initials}">C</span>
+                            <span>
+                                <span th:text="${a.seeker.fullName}">Candidate name</span>
+                                <span th:unless="${a.seeker.enabled}" class="badge text-bg-secondary ms-1">Account deactivated</span>
+                            </span>
+                        </div>
                     </td>
                     <td>
                         <a th:href="@{/employer/jobs/{id}(id=${a.job.id})}" th:text="${a.job.title}">Job title</a>
@@ -90,7 +104,7 @@
                             <span th:replace="~{fragments/status-badge :: application(${a.status}, 'EMPLOYER')}"></span>
                         </th:block>
                     </td>
-                    <td>
+                    <td class="numeric">
                         <span th:if="${unreadCounts.get(a.id) != null}" class="badge bg-danger"
                               th:text="${unreadCounts.get(a.id)}">1</span>
                         <span th:unless="${unreadCounts.get(a.id) != null}" class="text-muted">-</span>

@@ -27,16 +27,19 @@
 
 <div class="container-fluid">
     <div class="row">
-        <!-- fragments/sidebar.html supplies its own <aside>; below the lg breakpoint it
-             turns into a Bootstrap "offcanvas" panel opened by the button below
-             (Section 7.1: "becomes an offcanvas menu below the lg breakpoint"). -->
+        <!-- fragments/sidebar.html supplies its own <aside>, already sized to match the
+             col-lg-9/col-xl-10 content column below; below the lg breakpoint it turns into
+             a Bootstrap "offcanvas" panel opened by the button below (Section 7.1: "becomes
+             an offcanvas menu below the lg breakpoint"). -->
         <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
 
-        <div class="col-lg-10 py-4">
-            <button class="btn btn-outline-secondary btn-sm d-lg-none mb-3" type="button"
-                    data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
-                <i class="bi bi-list"></i> Menu
-            </button>
+        <div class="col-lg-9 col-xl-10 py-4">
+            <div class="d-lg-none border-bottom bg-white py-2 mb-3">
+                <button class="btn btn-outline-secondary btn-sm" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu">
+                    <i class="bi bi-list" aria-hidden="true"></i> Menu
+                </button>
+            </div>
 
             <div th:replace="~{fragments/flash :: messages}"></div>
             <th:block th:replace="${content}"></th:block>

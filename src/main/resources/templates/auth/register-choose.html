@@ -2,7 +2,12 @@
 <!--
   Registration chooser (Section 6.1 P-3). Two cards, each hidden when that role's
   registration is closed (AuthController#chooseRole reads the setting) - the same rule
-  the landing page uses for its "I'm hiring" / "I'm looking for a job" cards (P-1).
+  the landing page uses for its "I'm hiring" / "I'm looking for a job" cards (P-1). The two
+  cards reuse the exact icon/heading pattern of the landing page's role cards (Section 7.1)
+  for a consistent look between the two entry points; the earlier version set the icon
+  colour with an inline "var(--color-primary)", a token that does not exist in app.css (the
+  design system's variable is "--jp-primary"), so every icon rendered black - fixed here by
+  using the same ".text-primary" utility the landing page already uses.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/public :: layout(title='Register', content=~{::main}, scripts=~{})}">
@@ -17,7 +22,7 @@
                 <div class="col-md-6" th:if="${seekerRegistrationOpen}">
                     <div class="card shadow-sm h-100">
                         <div class="card-body text-center d-flex flex-column">
-                            <i class="bi bi-person-workspace icon mb-2" style="font-size:2.5rem;color:var(--color-primary);"></i>
+                            <i class="bi bi-person-workspace fs-1 text-primary mb-2 d-block" aria-hidden="true"></i>
                             <h2 class="h5">I'm looking for a job</h2>
                             <p class="text-muted flex-grow-1">Search jobs, build a profile and track your applications.</p>
                             <a class="btn btn-primary" th:href="@{/register/seeker}">Register as a job seeker</a>
@@ -27,7 +32,7 @@
                 <div class="col-md-6" th:if="${employerRegistrationOpen}">
                     <div class="card shadow-sm h-100">
                         <div class="card-body text-center d-flex flex-column">
-                            <i class="bi bi-building icon mb-2" style="font-size:2.5rem;color:var(--color-primary);"></i>
+                            <i class="bi bi-building fs-1 text-primary mb-2 d-block" aria-hidden="true"></i>
                             <h2 class="h5">I'm hiring</h2>
                             <p class="text-muted flex-grow-1">Post jobs, review candidates and manage applications.</p>
                             <a class="btn btn-primary" th:href="@{/register/employer}">Register as an employer</a>

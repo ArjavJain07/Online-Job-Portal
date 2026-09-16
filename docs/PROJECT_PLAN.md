@@ -2112,6 +2112,8 @@ Literal paths such as `/employer/jobs/new`, `/employer/jobs/history` and `/seeke
 
 ### 7.1 UI layout and design system
 
+**Visual direction (added in the UI pass).** The portal follows the conventions of professional job sites such as LinkedIn and Naukri: a quiet grey canvas (`--jp-canvas #F3F5F7`), white cards held together by hairline borders rather than heavy shadows, one blue for actions (`--jp-primary #0A5EA8`), green reserved for apply/success, amber for pending and red for refusals, and compact tables so dashboards show data instead of padding. Headings are set in Lexend, body text in Source Sans 3, both **self-hosted** in `static/fonts/` (five `.woff2` files, 172 KB) so the demo looks identical with the network off. Every token, component class and the pre-delivery checklist live in `static/css/app.css` and `design-system/jobportal/MASTER.md`. Rules that hold everywhere: colour is never the only signal (each badge carries words), focus is always visible, touch targets are at least 44 px on phones, motion stays at 150-250 ms and is switched off under `prefers-reduced-motion`, and icons come from the Bootstrap Icons webjar - never emoji.
+
 **Two layouts, no layout dialect.** Thymeleaf 3 can pass markup into a fragment, so a page hands its `<main>` and optional scripts to a layout:
 
 ```html

@@ -13,11 +13,15 @@
       th:replace="~{layout/dashboard :: layout(title='Employer Dashboard', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Employer Dashboard</h1>
-    <p class="text-muted mb-4">
-        Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Employer</span>.
-        <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Employer</span>
-    </p>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Employer Dashboard</h1>
+            <p>
+                Welcome back, <span th:text="${currentUser != null ? currentUser.fullName : 'there'}">Employer</span>.
+                <span class="badge bg-secondary ms-1" th:if="${currentUser != null}" th:text="${currentUser.role.label}">Employer</span>
+            </p>
+        </div>
+    </div>
 
     <div class="card shadow-sm">
         <div class="card-body empty-state">

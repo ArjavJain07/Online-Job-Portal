@@ -4,7 +4,10 @@
   URL zone they tried to open (Spring Security's AccessDeniedException). Error pages use
   NO layout and NO model attributes from GlobalModelAttributes - that advice never runs
   for a request handled by Spring Boot's error machinery - so this page is entirely
-  self-contained: its own <head>, Bootstrap from the webjar, and a fixed site name.
+  self-contained: its own <head>, Bootstrap and app.css from their webjars/static folder
+  (app.css needs no model attributes, only CSS custom properties, so it is safe to reuse
+  here for the same quiet grey-canvas/white-card look as the rest of the app), and a fixed
+  site name.
 -->
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -13,16 +16,23 @@
     <title>Access denied | JobPortal</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.min.css}">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
-<body class="bg-light">
+<body>
 <div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-6 text-center">
-            <i class="bi bi-shield-lock text-danger" style="font-size: 3.5rem;"></i>
-            <h1 class="h3 mt-3">Access denied</h1>
-            <p class="text-muted">Access denied. You don't have permission to open this page.</p>
-            <a class="btn btn-primary" th:href="@{/dashboard}">Go to my dashboard</a>
-            <a class="btn btn-link" th:href="@{/}">Back to the home page</a>
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-body p-5">
+                    <i class="bi bi-shield-lock jp-icon-xl is-danger" aria-hidden="true"></i>
+                    <h1 class="h3 mt-3">Access denied</h1>
+                    <p class="text-muted">Access denied. You don't have permission to open this page.</p>
+                    <div class="d-flex justify-content-center flex-wrap gap-2 mt-3">
+                        <a class="btn btn-primary" th:href="@{/dashboard}">Go to my dashboard</a>
+                        <a class="btn btn-link" th:href="@{/}">Back to the home page</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

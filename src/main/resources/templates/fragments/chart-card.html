@@ -15,17 +15,20 @@
   "card(id, title, chart)" draws one ChartData series. "multi(id, title, charts)" draws
   several series that share the same labels (one extra table column per series), used for
   example by the E-D5 messages-sent-vs-replies chart.
+
+  The header/body split, "card-header" already lays itself out as a title on the left and
+  actions on the right (app.css Section 5), so no extra utility classes are needed there.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="card(id, title, chart)" class="card shadow-sm mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
+<div th:fragment="card(id, title, chart)" class="card mb-4">
+    <div class="card-header">
         <span th:text="${title}">Chart title</span>
         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
                 th:attr="data-bs-target=${'#' + id + '-table'}, aria-controls=${id + '-table'}"
                 aria-expanded="false">
-            <i class="bi bi-table"></i> View data
+            <i class="bi bi-table" aria-hidden="true"></i> View data
         </button>
     </div>
     <div class="card-body">
@@ -34,33 +37,37 @@
             <script type="application/json" th:inline="javascript">[[${chart}]]</script>
         </div>
         <div class="collapse" th:id="${id + '-table'}">
-            <table class="chart-data-table table table-sm" th:if="${chart != null and !#lists.isEmpty(chart.labels)}">
-                <caption class="visually-hidden" th:text="'Data for ' + ${title}">Data</caption>
-                <thead>
-                <tr>
-                    <th scope="col">Period</th>
-                    <th scope="col" th:text="${chart.label}">Value</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="rowLabel, iter : ${chart.labels}">
-                    <td th:text="${rowLabel}">Label</td>
-                    <td th:text="${chart.values.get(iter.index)}">0</td>
-                </tr>
-                </tbody>
-            </table>
+            <!-- Wrapped in table-responsive (Section 7.1 core rule 7) so a chart with many
+                 periods never forces the page to scroll sideways on a phone. -->
+            <div class="table-responsive" th:if="${chart != null and !#lists.isEmpty(chart.labels)}">
+                <table class="chart-data-table table table-sm">
+                    <caption class="visually-hidden" th:text="'Data for ' + ${title}">Data</caption>
+                    <thead>
+                    <tr>
+                        <th scope="col">Period</th>
+                        <th scope="col" th:text="${chart.label}">Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="rowLabel, iter : ${chart.labels}">
+                        <td th:text="${rowLabel}">Label</td>
+                        <td th:text="${chart.values.get(iter.index)}">0</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
             <p class="text-muted small mb-0" th:if="${chart == null or #lists.isEmpty(chart.labels)}">No data yet.</p>
         </div>
     </div>
 </div>
 
-<div th:fragment="multi(id, title, charts)" class="card shadow-sm mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
+<div th:fragment="multi(id, title, charts)" class="card mb-4">
+    <div class="card-header">
         <span th:text="${title}">Chart title</span>
         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
                 th:attr="data-bs-target=${'#' + id + '-table'}, aria-controls=${id + '-table'}"
                 aria-expanded="false">
-            <i class="bi bi-table"></i> View data
+            <i class="bi bi-table" aria-hidden="true"></i> View data
         </button>
     </div>
     <div class="card-body">
@@ -69,21 +76,25 @@
             <script type="application/json" th:inline="javascript">[[${charts}]]</script>
         </div>
         <div class="collapse" th:id="${id + '-table'}">
-            <table class="chart-data-table table table-sm" th:if="${charts != null and !#lists.isEmpty(charts)}">
-                <caption class="visually-hidden" th:text="'Data for ' + ${title}">Data</caption>
-                <thead>
-                <tr>
-                    <th scope="col">Period</th>
-                    <th scope="col" th:each="series : ${charts}" th:text="${series.label}">Series</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="rowLabel, iter : ${charts[0].labels}">
-                    <td th:text="${rowLabel}">Label</td>
-                    <td th:each="series : ${charts}" th:text="${series.values.get(iter.index)}">0</td>
-                </tr>
-                </tbody>
-            </table>
+            <!-- Wrapped in table-responsive (Section 7.1 core rule 7): "multi" adds one
+                 column per series, so this is the table most likely to overflow a phone. -->
+            <div class="table-responsive" th:if="${charts != null and !#lists.isEmpty(charts)}">
+                <table class="chart-data-table table table-sm">
+                    <caption class="visually-hidden" th:text="'Data for ' + ${title}">Data</caption>
+                    <thead>
+                    <tr>
+                        <th scope="col">Period</th>
+                        <th scope="col" th:each="series : ${charts}" th:text="${series.label}">Series</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="rowLabel, iter : ${charts[0].labels}">
+                        <td th:text="${rowLabel}">Label</td>
+                        <td th:each="series : ${charts}" th:text="${series.values.get(iter.index)}">0</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
             <p class="text-muted small mb-0" th:if="${charts == null or #lists.isEmpty(charts)}">No data yet.</p>
         </div>
     </div>

@@ -5,39 +5,51 @@
   - true only on /seeker/jobs (M5) for a job the current seeker has already applied to
   (any status, including withdrawn); the public pages in this milestone always pass false,
   so the "Applied" badge never shows there (Section 6.1 P-2: "no Applied badges").
+
+  Job-site convention (Section 7.1 core rule 6): a square ".jp-logo" mark with the
+  company's first initial, the title as a blue ".job-title" link, company then location on
+  their own lines, salary in bold, small ".jp-chip" pills for job type and work mode, and
+  posted-ago in muted text. Every value bound below (job.title, employer.companyName,
+  location, salaryRange, jobType/workMode label, ago, deadline, applied) is unchanged from
+  before the restyle - only the layout and classes changed.
+
+  IMPORTANT - the outer class string must keep the literal substring
+  "card shadow-sm mb-3" intact and in that order: JobSearchTest#assertAppliedBadge splits
+  the whole page on that exact text to isolate one job's card before checking whether it
+  contains "app-applied", so "job-card" is appended after it rather than replacing it.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="card(job, applied)" class="card shadow-sm mb-3">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-            <div>
+<div th:fragment="card(job, applied)" class="card shadow-sm mb-3 job-card">
+    <div class="d-flex gap-3">
+        <span class="jp-logo" aria-hidden="true"
+              th:text="${job.employer.companyName.substring(0,1).toUpperCase()}">C</span>
+
+        <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <h2 class="h5 mb-1">
-                    <a th:href="@{/jobs/{id}(id=${job.id})}" th:text="${job.title}"
-                       class="text-decoration-none">Job title</a>
+                    <a th:href="@{/jobs/{id}(id=${job.id})}" th:text="${job.title}" class="job-title">Job title</a>
                 </h2>
-                <p class="text-muted mb-0">
-                    <span th:text="${job.employer.companyName}">Company</span>
-                    &middot;
-                    <span th:text="${job.location}">Location</span>
-                </p>
+                <span class="badge app-applied" th:if="${applied}">Applied</span>
             </div>
-            <span class="badge app-applied" th:if="${applied}">Applied</span>
+
+            <p class="job-company mb-0" th:text="${job.employer.companyName}">Company</p>
+            <p class="job-meta mb-2" th:text="${job.location}">Location</p>
+
+            <p class="job-salary mb-2" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</p>
+
+            <div class="mb-2 d-flex flex-wrap gap-1">
+                <span class="jp-chip" th:text="${job.jobType.label}">Full-time</span>
+                <span class="jp-chip" th:text="${job.workMode.label}">Remote</span>
+            </div>
+
+            <p class="job-meta mb-0">
+                Posted <span th:text="${@fmt.ago(job.approvedAt)}">3 days ago</span>
+                &middot;
+                Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
+            </p>
         </div>
-
-        <div class="mb-2">
-            <span class="badge text-bg-light border me-1" th:text="${job.jobType.label}">Full-time</span>
-            <span class="badge text-bg-light border" th:text="${job.workMode.label}">Remote</span>
-        </div>
-
-        <p class="mb-1 fw-semibold" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</p>
-
-        <p class="text-muted small mb-0">
-            Posted <span th:text="${@fmt.ago(job.approvedAt)}">3 days ago</span>
-            &middot;
-            Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
-        </p>
     </div>
 </div>
 

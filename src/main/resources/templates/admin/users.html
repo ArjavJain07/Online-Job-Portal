@@ -11,15 +11,15 @@
       th:replace="~{layout/dashboard :: layout(title='Users', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <div class="jp-page-head">
         <div>
             <h1 class="h3 mb-1">Users</h1>
-            <p class="text-muted mb-0">Create, edit, deactivate or delete accounts of any role.</p>
+            <p>Create, edit, deactivate or delete accounts of any role.</p>
         </div>
         <a th:href="@{/admin/users/new}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Create user</a>
     </div>
 
-    <form method="get" th:action="@{/admin/users}" class="card shadow-sm mt-3 mb-4">
+    <form method="get" th:action="@{/admin/users}" class="card shadow-sm jp-filters mb-4">
         <div class="card-body">
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-md-4">
@@ -45,8 +45,11 @@
                 </div>
                 <div class="col-12 col-md-2 d-flex gap-2">
                     <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i> Search</button>
-                    <a th:href="@{/admin/users}" class="btn btn-outline-secondary" title="Clear filters">
-                        <i class="bi bi-x-lg"></i>
+                    <!-- Icon-only button (Section 7.1 accessibility rule): aria-label gives it a
+                         name since there is no visible text, and the icon itself is hidden from
+                         assistive tech so it is not announced a second time. -->
+                    <a th:href="@{/admin/users}" class="btn btn-outline-secondary" aria-label="Clear filters" title="Clear filters">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
                     </a>
                 </div>
             </div>

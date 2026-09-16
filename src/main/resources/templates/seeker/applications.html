@@ -16,10 +16,12 @@
       th:replace="~{layout/dashboard :: layout(title='My Applications', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <!-- Page head pattern (Section 7.1 core rule 5): h1 + one muted sentence + the primary
+         action on the right. -->
+    <div class="jp-page-head">
         <div>
             <h1 class="h3 mb-1">My applications</h1>
-            <p class="text-muted mb-0">Track the status of the jobs you've applied to.</p>
+            <p>Track the status of the jobs you've applied to.</p>
         </div>
         <a th:href="@{/seeker/applications/history}" class="btn btn-outline-secondary">View application history</a>
     </div>

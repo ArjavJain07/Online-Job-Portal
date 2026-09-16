@@ -11,8 +11,12 @@
       th:replace="~{layout/dashboard :: layout(title='Live Activity', content=~{::main}, scripts=~{::scripts})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Live activity</h1>
-    <p class="text-muted mb-4">Every recorded action across the site (Section 5.7).</p>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Live activity</h1>
+            <p>Every recorded action across the site (Section 5.7).</p>
+        </div>
+    </div>
 
     <div th:if="${liveView}" class="row g-4 mb-4">
         <div class="col-lg-8">
@@ -24,7 +28,7 @@
                     </span>
                     <span class="text-muted small"><span id="new-event-count">0</span> new events since you opened this page</span>
                 </div>
-                <div class="card-body p-0" style="max-height: 480px; overflow-y: auto;">
+                <div class="card-body p-0 jp-scroll-panel">
                     <div th:replace="~{fragments/activity-feed :: feed(${liveEvents}, ${liveEventsLastId}, ${feedIntervalMs})}"></div>
                 </div>
             </div>

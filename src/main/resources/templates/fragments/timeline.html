@@ -19,21 +19,24 @@
   "Thymeleaf 3.1" note in the project's build notes). Calling the same fragment directly
   with a literal audience, the way application-detail.html and applications.html both do
   for their own badges, is unaffected and stays a th:replace.
+
+  Markup uses the .timeline / .timeline-item rail from app.css (Section 12) plus its two
+  named hooks, ".timeline-when" (the date) and ".timeline-note" (the admin/employer's
+  free-text reason, shown only when one was given) - every value bound below
+  (timelineLabel, actorName, reason/noteToCandidate) is unchanged from before the restyle.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
 <ol th:fragment="jobTimeline(changes)" class="timeline">
     <li class="timeline-item" th:each="change : ${changes}" th:switch="${change.toStatus.name()}">
-        <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
-        <div class="content">
-            <span th:case="'APPROVED'"         class="status badge job-live"    th:text="${change.timelineLabel}">Approved</span>
-            <span th:case="'PENDING_APPROVAL'" class="status badge job-pending" th:text="${change.timelineLabel}">Pending approval</span>
-            <span th:case="'REJECTED'"         class="status badge job-rejected" th:text="${change.timelineLabel}">Rejected</span>
-            <span th:case="'CLOSED'"           class="status badge job-closed"  th:text="${change.timelineLabel}">Closed</span>
-            <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by Admin User</span>
-            <p class="note" th:if="${change.reason != null}" th:text="${change.reason}">Reason given by the admin.</p>
-        </div>
+        <span class="timeline-when d-block" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+        <span th:case="'APPROVED'"         class="badge job-live"    th:text="${change.timelineLabel}">Approved</span>
+        <span th:case="'PENDING_APPROVAL'" class="badge job-pending" th:text="${change.timelineLabel}">Pending approval</span>
+        <span th:case="'REJECTED'"         class="badge job-rejected" th:text="${change.timelineLabel}">Rejected</span>
+        <span th:case="'CLOSED'"           class="badge job-closed"  th:text="${change.timelineLabel}">Closed</span>
+        <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by Admin User</span>
+        <p class="timeline-note mb-0" th:if="${change.reason != null}" th:text="${change.reason}">Reason given by the admin.</p>
     </li>
 </ol>
 
@@ -41,18 +44,16 @@
     <li class="timeline-item" th:each="change : ${changes}"
         th:with="text=${audience == 'SEEKER'} ? ${change.toStatus.seekerLabel} : ${change.toStatus.label}"
         th:switch="${change.toStatus.name()}">
-        <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
-        <div class="content">
-            <span th:case="'APPLIED'"      class="status badge app-applied"      th:text="${text}">Applied</span>
-            <span th:case="'UNDER_REVIEW'" class="status badge app-under-review" th:text="${text}">Under review</span>
-            <span th:case="'SHORTLISTED'"  class="status badge app-shortlisted"  th:text="${text}">Shortlisted</span>
-            <span th:case="'INTERVIEW'"    class="status badge app-interview"    th:text="${text}">Interview</span>
-            <span th:case="'HIRED'"        class="status badge app-hired"        th:text="${text}">Hired</span>
-            <span th:case="'REJECTED'"     class="status badge app-rejected"     th:text="${text}">Not selected</span>
-            <span th:case="'WITHDRAWN'"    class="status badge app-withdrawn"    th:text="${text}">Withdrawn</span>
-            <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by HR Manager</span>
-            <p class="note" th:if="${change.noteToCandidate != null}" th:text="${change.noteToCandidate}">Note to the candidate.</p>
-        </div>
+        <span class="timeline-when d-block" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+        <span th:case="'APPLIED'"      class="badge app-applied"      th:text="${text}">Applied</span>
+        <span th:case="'UNDER_REVIEW'" class="badge app-under-review" th:text="${text}">Under review</span>
+        <span th:case="'SHORTLISTED'"  class="badge app-shortlisted"  th:text="${text}">Shortlisted</span>
+        <span th:case="'INTERVIEW'"    class="badge app-interview"    th:text="${text}">Interview</span>
+        <span th:case="'HIRED'"        class="badge app-hired"        th:text="${text}">Hired</span>
+        <span th:case="'REJECTED'"     class="badge app-rejected"     th:text="${text}">Not selected</span>
+        <span th:case="'WITHDRAWN'"    class="badge app-withdrawn"    th:text="${text}">Withdrawn</span>
+        <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by HR Manager</span>
+        <p class="timeline-note mb-0" th:if="${change.noteToCandidate != null}" th:text="${change.noteToCandidate}">Note to the candidate.</p>
     </li>
 </ol>
 

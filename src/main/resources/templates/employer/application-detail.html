@@ -17,18 +17,18 @@
       th:replace="~{layout/dashboard :: layout(title=${jobApplication.reference}, content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <div class="jp-page-head mb-1">
         <div>
             <h1 class="h3 mb-1">
                 <span th:text="${jobApplication.reference}">APP-00001</span>
                 &middot;
                 <span th:text="${candidate.fullName}">Candidate name</span>
             </h1>
-            <p class="text-muted mb-0">
+            <p>
                 <span th:replace="~{fragments/status-badge :: application(${jobApplication.status}, 'EMPLOYER')}"></span>
                 <span class="ms-2">Applied for</span>
                 <a th:href="@{/employer/jobs/{id}(id=${jobApplication.job.id})}" th:text="${jobApplication.job.title}">Job title</a>
-                <span class="ms-2 text-muted">on <span th:text="${#temporals.format(application.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span></span>
+                <span class="ms-2">on <span th:text="${#temporals.format(application.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span></span>
             </p>
         </div>
         <a th:href="@{/employer/applications}" class="btn btn-outline-secondary">Back to applications</a>
@@ -62,8 +62,8 @@
 
                     <th:block th:if="${!#lists.isEmpty(candidate.skills)}">
                         <h2 class="h6">Skills</h2>
-                        <p>
-                            <span class="badge text-bg-light border me-1" th:each="skill : ${candidate.skills}"
+                        <p class="d-flex flex-wrap gap-1">
+                            <span class="jp-chip" th:each="skill : ${candidate.skills}"
                                   th:text="${skill}">Skill</span>
                         </p>
                     </th:block>

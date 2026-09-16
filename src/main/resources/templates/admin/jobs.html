@@ -17,8 +17,12 @@
       th:replace="~{layout/dashboard :: layout(title='Job Approvals', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Job listings</h1>
-    <p class="text-muted mb-3">Review pending postings, and approve, reject or take down any job.</p>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Job listings</h1>
+            <p>Review pending postings, and approve, reject or take down any job.</p>
+        </div>
+    </div>
 
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
@@ -56,8 +60,11 @@
     <form method="get" th:action="@{/admin/jobs}" class="row g-2 mb-3">
         <input type="hidden" name="status" th:value="${activeTab}">
         <div class="col-12 col-md-5">
-            <input type="text" class="form-control" name="q" maxlength="100" placeholder="Search title or company"
-                   th:value="${q}">
+            <!-- Visible label (Section 7.1 accessibility rule: every input keeps one), kept
+                 small like the other inline search bars in the app. -->
+            <label class="form-label" for="admin-jobs-q">Search title or company</label>
+            <input type="text" class="form-control" id="admin-jobs-q" name="q" maxlength="100"
+                   placeholder="Search title or company" th:value="${q}">
         </div>
         <div class="col-auto">
             <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
@@ -88,7 +95,7 @@
                     <th>Submitted</th>
                     <th>Deadline</th>
                     <th>Status</th>
-                    <th>Applications</th>
+                    <th class="numeric">Applications</th>
                     <th>Actions</th>
                 </tr>
                 </thead>
@@ -104,7 +111,7 @@
                             <span class="badge text-bg-danger ms-1" th:if="${j.applicationDeadline.isBefore(today)}">Passed</span>
                         </td>
                         <td><span th:replace="~{fragments/status-badge :: job(${j})}"></span></td>
-                        <td th:text="${applicationCounts.get(j.id)}">0</td>
+                        <td class="numeric" th:text="${applicationCounts.get(j.id)}">0</td>
                         <td>
                             <div class="d-flex gap-1 flex-wrap">
                                 <a th:href="@{/admin/jobs/{id}(id=${j.id})}" class="btn btn-sm btn-outline-secondary">Review</a>

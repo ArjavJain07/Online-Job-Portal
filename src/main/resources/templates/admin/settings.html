@@ -10,15 +10,19 @@
       th:replace="~{layout/dashboard :: layout(title='Settings', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">System settings</h1>
-    <p class="text-muted mb-1">Changes apply immediately across the site.</p>
-    <p class="text-muted small mb-4">
-        <span th:if="${lastSavedAt != null}">
-            Last saved <span th:text="${#temporals.format(lastSavedAt, 'dd MMM yyyy HH:mm')}">16 Sep 2026 10:42</span>
-            by <span th:text="${lastSavedBy}">Site Admin</span>
-        </span>
-        <span th:if="${lastSavedAt == null}">Not saved yet - these are the default values.</span>
-    </p>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">System settings</h1>
+            <p class="mb-1">Changes apply immediately across the site.</p>
+            <p class="small mb-0">
+                <span th:if="${lastSavedAt != null}">
+                    Last saved <span th:text="${#temporals.format(lastSavedAt, 'dd MMM yyyy HH:mm')}">16 Sep 2026 10:42</span>
+                    by <span th:text="${lastSavedBy}">Site Admin</span>
+                </span>
+                <span th:if="${lastSavedAt == null}">Not saved yet - these are the default values.</span>
+            </p>
+        </div>
+    </div>
 
     <form th:action="@{/admin/settings}" th:object="${settingsForm}" method="post" novalidate>
 

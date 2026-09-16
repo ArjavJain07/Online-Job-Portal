@@ -6,34 +6,63 @@
   Post/Redirect/Get: "success" (green), "error" (red) and "warning" (yellow, a plain
   model attribute used for search warnings rather than a flash attribute). Any of the
   three may be absent, in which case Thymeleaf simply evaluates it to null and nothing
-  is shown - no controller has to set all three every time.
+  is shown - no controller has to set all three every time. Each alert repeats its
+  message with an icon (Section 7.1 accessibility rule: colour is never the only signal -
+  these already carry the word "Success"/"error" through screen-reader text via role="alert",
+  the icon is purely decorative, aria-hidden="true").
 
   "announcement" is the admin-configured banner (SystemSettings.announcement, Section
-  7.5) shown above the page content on every page when it is not blank.
+  7.5) shown above the page content on every page when it is not blank. It reuses the
+  exact .alert-warning colours from app.css (Section 10) so the banner and a "warning"
+  flash always look like the same colour, just flattened into a full-width strip
+  (border-top-0/border-start-0/border-end-0/rounded-0 strip the box shape Bootstrap gives
+  a normal alert, leaving only the bottom hairline).
+
+  Reusable empty-state pattern for page agents (Section 7.1 "Empty states": icon, message,
+  action). Every page that lists rows and can come back empty already follows this shape -
+  copy it rather than inventing a new one:
+
+      <div class="card shadow-sm">
+          <div class="card-body empty-state">
+              <i class="bi bi-inbox"></i>
+              <p class="message">No applications yet. Explore open roles and apply.</p>
+              <a th:href="@{/jobs}" class="btn btn-outline-primary action">Find jobs</a>
+          </div>
+      </div>
+
+  ".empty-state", ".empty-state i" and ".empty-state p" are already styled in app.css
+  (section 11); "icon"/"message"/"action" are optional hooks with no CSS of their own,
+  kept only so the markup reads clearly - the icon and the paragraph are picked up by
+  their tag, not by those class names. Add a second <p class="empty-title"> above the
+  sentence (styled by ".empty-state .empty-title") only when a page needs a short title
+  as well as the explanatory sentence.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
 <div th:fragment="messages">
-    <div class="alert alert-success alert-dismissible fade show" role="alert"
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-start gap-2" role="alert"
          data-auto-dismiss="true" th:if="${success != null}">
+        <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
         <span th:text="${success}">Success message.</span>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${error != null}">
+    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-start gap-2" role="alert" th:if="${error != null}">
+        <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
         <span th:text="${error}">Error message.</span>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-    <div class="alert alert-warning alert-dismissible fade show" role="alert" th:if="${warning != null}">
+    <div class="alert alert-warning alert-dismissible fade show d-flex align-items-start gap-2" role="alert" th:if="${warning != null}">
+        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
         <span th:text="${warning}">Warning message.</span>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 </div>
 
-<div th:fragment="announcement" class="bg-warning-subtle border-bottom"
+<div th:fragment="announcement" class="alert alert-warning border-top-0 border-start-0 border-end-0 rounded-0 mb-0"
      th:if="${announcement != null and !#strings.isEmpty(announcement)}">
-    <div class="container-fluid py-2 text-center small">
-        <i class="bi bi-megaphone me-1"></i>
+    <div class="container-fluid py-1 text-center small">
+        <i class="bi bi-megaphone-fill me-1" aria-hidden="true"></i>
         <span th:text="${announcement}">Announcement text.</span>
     </div>
 </div>

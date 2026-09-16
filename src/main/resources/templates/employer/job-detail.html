@@ -18,10 +18,10 @@
       th:replace="~{layout/dashboard :: layout(title=${job.title}, content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <div class="jp-page-head mb-1">
         <div>
             <h1 class="h3 mb-1" th:text="${job.title}">Job title</h1>
-            <p class="text-muted mb-0">
+            <p>
                 <span th:replace="~{fragments/status-badge :: job(${job})}"></span>
                 <span class="ms-2" th:text="${job.location}">Location</span>
                 -
@@ -41,10 +41,10 @@
         <div class="col-lg-8">
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <div class="mb-3">
-                        <span class="badge text-bg-light border me-1" th:text="${job.category.label}">Category</span>
-                        <span class="badge text-bg-light border me-1" th:text="${job.jobType.label}">Full-time</span>
-                        <span class="badge text-bg-light border" th:text="${job.workMode.label}">Remote</span>
+                    <div class="mb-3 d-flex flex-wrap gap-1">
+                        <span class="jp-chip" th:text="${job.category.label}">Category</span>
+                        <span class="jp-chip" th:text="${job.jobType.label}">Full-time</span>
+                        <span class="jp-chip" th:text="${job.workMode.label}">Remote</span>
                     </div>
 
                     <dl class="row small mb-0">
@@ -79,8 +79,8 @@
 
                     <th:block th:if="${!#lists.isEmpty(job.skillList())}">
                         <h2 class="h5">Skills</h2>
-                        <p>
-                            <span class="badge text-bg-light border me-1" th:each="skill : ${job.skillList()}"
+                        <p class="mb-0 d-flex flex-wrap gap-1">
+                            <span class="jp-chip" th:each="skill : ${job.skillList()}"
                                   th:text="${skill}">Skill</span>
                         </p>
                     </th:block>
@@ -106,8 +106,8 @@
                         <dt class="col-sm-6">Applications</dt>
                         <dd class="col-sm-6" th:text="${totalApplications}">0</dd>
                     </dl>
-                    <div th:unless="${#maps.isEmpty(applicationsByStatus)}">
-                        <span class="badge text-bg-light border me-1 mb-1" th:each="entry : ${applicationsByStatus}"
+                    <div th:unless="${#maps.isEmpty(applicationsByStatus)}" class="d-flex flex-wrap gap-1">
+                        <span class="jp-chip" th:each="entry : ${applicationsByStatus}"
                               th:text="${entry.key.label} + ': ' + ${entry.value}">Applied: 2</span>
                     </div>
                     <a th:href="@{/employer/applications(jobId=${job.id})}" class="btn btn-sm btn-outline-primary mt-2">

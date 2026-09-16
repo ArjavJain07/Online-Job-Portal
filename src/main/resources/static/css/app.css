@@ -1,688 +1,733 @@
-/* ============================================================================
-   Job Portal - Application Stylesheet
-   Extends Bootstrap 5.3 with project-specific styles.
-   ============================================================================ */
+/* ==========================================================================
+   JobPortal design system
+   --------------------------------------------------------------------------
+   One small stylesheet on top of Bootstrap 5.3. The look follows professional
+   job portals (LinkedIn, Naukri): a quiet grey canvas, white cards with
+   hairline borders instead of heavy shadows, one blue for actions, green kept
+   for "apply" and success, and compact tables so a lot of data stays readable.
+
+   Design system: design-system/jobportal/MASTER.md
+   Style: Minimalism / Swiss (flat, grid based, high contrast)
+   Type:  Lexend for headings, Source Sans 3 for text (self-hosted, so the
+          portal looks the same with no internet during a demo)
+   ========================================================================== */
+
+/* ---------- 1. Fonts (served from /fonts, never a CDN) ------------------- */
+
+@font-face {
+    font-family: 'Lexend';
+    src: url('/fonts/lexend-500.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Lexend';
+    src: url('/fonts/lexend-600.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Lexend';
+    src: url('/fonts/lexend-700.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    src: url('/fonts/source-sans-3-400.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Source Sans 3';
+    src: url('/fonts/source-sans-3-600.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ---------- 2. Design tokens -------------------------------------------- */
 
 :root {
-  --color-success: #198754;
-  --color-danger: #dc3545;
-  --color-warning: #ffc107;
-  --color-info: #0dcaf0;
-  --color-primary: #0d6efd;
-  --color-dark: #212529;
-  --color-secondary: #6c757d;
-  --color-light: #f8f9fa;
+    /* Brand and semantic colours. Every pair passes 4.5:1 contrast. */
+    --jp-primary: #0a5ea8;
+    --jp-primary-dark: #084c87;
+    --jp-primary-soft: #e8f1fa;
+    --jp-success: #15803d;
+    --jp-success-soft: #e7f5ec;
+    --jp-warning: #9a5b06;
+    --jp-warning-soft: #fdf2e2;
+    --jp-danger: #b42318;
+    --jp-danger-soft: #fbeceb;
+    --jp-info: #3730a3;
+    --jp-info-soft: #eceafa;
 
-  --sidebar-width: 180px;
+    /* Neutrals */
+    --jp-ink: #16212b;
+    --jp-body: #36434f;
+    --jp-muted: #63707c;
+    --jp-canvas: #f3f5f7;
+    --jp-surface: #ffffff;
+    --jp-surface-alt: #f7f9fa;
+    --jp-line: #dfe4e9;
+    --jp-line-strong: #c6ced6;
+
+    /* Shape and depth: borders carry the structure, shadows stay faint. */
+    --jp-radius: 8px;
+    --jp-radius-sm: 6px;
+    --jp-shadow: 0 1px 2px rgba(22, 33, 43, .06);
+    --jp-shadow-hover: 0 4px 12px rgba(22, 33, 43, .1);
+
+    /* Type */
+    --jp-font-heading: 'Lexend', 'Segoe UI', system-ui, sans-serif;
+    --jp-font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+
+    /* Bootstrap hooks: these change buttons, links, focus rings and radii
+       everywhere without overriding each component by hand. */
+    --bs-primary: #0a5ea8;
+    --bs-primary-rgb: 10, 94, 168;
+    --bs-link-color: #0a5ea8;
+    --bs-link-color-rgb: 10, 94, 168;
+    --bs-link-hover-color: #084c87;
+    --bs-border-color: #dfe4e9;
+    --bs-border-radius: 8px;
+    --bs-border-radius-sm: 6px;
+    --bs-body-color: #36434f;
+    --bs-body-bg: #f3f5f7;
+    --bs-secondary-color: #63707c;
+    /* The rest of Bootstrap's semantic colours, so stock badges and alerts
+       (unread counts, "Updated" flags, role tags) match our own shades. */
+    --bs-danger: #b42318;
+    --bs-danger-rgb: 180, 35, 24;
+    --bs-warning: #9a5b06;
+    --bs-warning-rgb: 154, 91, 6;
+    --bs-success: #15803d;
+    --bs-success-rgb: 21, 128, 61;
+    --bs-secondary: #63707c;
+    --bs-secondary-rgb: 99, 112, 124;
+    --bs-font-sans-serif: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* ============================================================================
-   Text & Typography
-   ============================================================================ */
+/* ---------- 3. Base ------------------------------------------------------ */
 
-/* Preserve line breaks in pre-formatted text (used in job descriptions) */
-.pre-line {
-  white-space: pre-line;
+body {
+    background-color: var(--jp-canvas);
+    color: var(--jp-body);
+    font-family: var(--jp-font-body);
+    font-size: 1rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* ============================================================================
-   Sidebar
-   ============================================================================ */
-
-aside {
-  min-width: var(--sidebar-width);
-  max-width: var(--sidebar-width);
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: var(--jp-font-heading);
+    color: var(--jp-ink);
+    font-weight: 600;
+    letter-spacing: -.01em;
 }
 
-aside .nav-link {
-  padding: 0.75rem 1rem;
-  color: #495057;
-  text-decoration: none;
-  border-left: 4px solid transparent;
+h1, .h1 { font-size: 1.75rem; }
+h2, .h2 { font-size: 1.375rem; }
+h3, .h3 { font-size: 1.125rem; }
+
+a { text-underline-offset: 2px; }
+
+/* One visible focus style for every control (accessibility priority 1). */
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.page-link:focus-visible {
+    outline: 2px solid var(--jp-primary);
+    outline-offset: 2px;
+    box-shadow: none;
 }
 
-aside .nav-link:hover {
-  background-color: var(--color-light);
-  color: var(--color-primary);
+/* Keeps line breaks typed by a user (cover letters, notes, descriptions). */
+.pre-line { white-space: pre-line; }
+
+.text-muted { color: var(--jp-muted) !important; }
+
+/* Small uppercase label used above values and table groups. */
+.jp-eyebrow {
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--jp-muted);
 }
 
-aside .nav-link.active {
-  border-left-color: var(--color-primary);
-  background-color: #f0f6ff;
-  color: var(--color-primary);
-  font-weight: 500;
+/* ---------- 4. Top bar and page shell ------------------------------------ */
+
+.navbar {
+    background-color: var(--jp-surface);
+    border-bottom: 1px solid var(--jp-line);
+    padding-block: .5rem;
 }
 
-/* Responsive: sidebar becomes offcanvas below lg breakpoint */
-@media (max-width: 991.98px) {
-  aside {
-    min-width: auto;
-    max-width: none;
-  }
+.navbar-brand {
+    font-family: var(--jp-font-heading);
+    font-weight: 700;
+    color: var(--jp-ink);
+    letter-spacing: -.02em;
 }
 
-/* ============================================================================
-   KPI Cards
-   ============================================================================ */
+.navbar-brand:hover { color: var(--jp-primary); }
 
+.navbar .nav-link {
+    color: var(--jp-muted);
+    font-weight: 600;
+    font-size: .9375rem;
+    padding-inline: .75rem;
+    border-radius: var(--jp-radius-sm);
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link:focus { color: var(--jp-primary); }
+
+.navbar .nav-link.active {
+    color: var(--jp-ink);
+    background-color: var(--jp-primary-soft);
+}
+
+/* Round initials chip that stands in for a profile photo. */
+.jp-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: var(--jp-primary-soft);
+    color: var(--jp-primary-dark);
+    font-weight: 600;
+    font-size: .8125rem;
+    flex: none;
+}
+
+/* Square company mark on job cards and listings. */
+.jp-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--jp-radius-sm);
+    background-color: var(--jp-primary-soft);
+    color: var(--jp-primary-dark);
+    font-family: var(--jp-font-heading);
+    font-weight: 600;
+    font-size: 1.125rem;
+    flex: none;
+}
+
+.jp-logo-sm { width: 2.25rem; height: 2.25rem; font-size: .875rem; }
+
+/* Role menu beside the dashboard content. */
+.jp-sidebar {
+    background-color: var(--jp-surface);
+    border: 1px solid var(--jp-line);
+    border-radius: var(--jp-radius);
+    padding: .5rem;
+}
+
+.jp-sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    color: var(--jp-body);
+    font-weight: 500;
+    font-size: .9375rem;
+    padding: .5rem .75rem;
+    border-radius: var(--jp-radius-sm);
+    border-left: 3px solid transparent;
+}
+
+.jp-sidebar .nav-link i { color: var(--jp-muted); font-size: 1rem; }
+
+.jp-sidebar .nav-link:hover {
+    background-color: var(--jp-surface-alt);
+    color: var(--jp-ink);
+}
+
+.jp-sidebar .nav-link.active {
+    background-color: var(--jp-primary-soft);
+    border-left-color: var(--jp-primary);
+    color: var(--jp-primary-dark);
+    font-weight: 600;
+}
+
+.jp-sidebar .nav-link.active i { color: var(--jp-primary); }
+
+.jp-sidebar-heading {
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--jp-muted);
+    padding: .75rem .75rem .25rem;
+}
+
+/* Page heading block above the content of every dashboard page. */
+.jp-page-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .75rem;
+    margin-bottom: 1.25rem;
+}
+
+.jp-page-head p { margin-bottom: 0; color: var(--jp-muted); }
+
+/* ---------- 5. Cards ----------------------------------------------------- */
+
+.card {
+    background-color: var(--jp-surface);
+    border: 1px solid var(--jp-line);
+    border-radius: var(--jp-radius);
+    box-shadow: var(--jp-shadow);
+}
+
+.card-header {
+    background-color: var(--jp-surface);
+    border-bottom: 1px solid var(--jp-line);
+    font-family: var(--jp-font-heading);
+    font-weight: 600;
+    font-size: .9375rem;
+    color: var(--jp-ink);
+    padding: .75rem 1.125rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.card-body { padding: 1.125rem; }
+.card-footer { background-color: var(--jp-surface-alt); border-top: 1px solid var(--jp-line); }
+
+/* Shadow utility is toned down: this design leans on borders. */
+.shadow-sm { box-shadow: var(--jp-shadow) !important; }
+
+/* Numbers strip at the top of a dashboard. Deliberately compact so the
+   real content below stays above the fold. */
 .kpi-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  text-decoration: none;
-  color: inherit;
-  transition: box-shadow 0.2s, transform 0.2s;
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    background-color: var(--jp-surface);
+    border: 1px solid var(--jp-line);
+    border-radius: var(--jp-radius);
+    padding: .875rem 1rem;
+    height: 100%;
+    color: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-.kpi-card:hover {
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+/* Most KPI cards link to the page that explains the number. */
+a.kpi-card:hover {
+    border-color: var(--jp-line-strong);
+    box-shadow: var(--jp-shadow-hover);
 }
 
-.kpi-card .icon {
-  font-size: 2rem;
-  color: var(--color-primary);
-  flex-shrink: 0;
+.kpi-card i { color: var(--jp-primary); font-size: 1.25rem; line-height: 1.6; }
+
+.kpi-card .content { display: flex; flex-direction: column; min-width: 0; }
+
+/* The fragment writes .value/.label; .kpi-value/.kpi-label are the same thing
+   spelled out, kept so either markup styles correctly. */
+.kpi-card .label,
+.kpi-card .kpi-label {
+    order: 2;
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--jp-muted);
 }
 
-.kpi-card .content {
-  flex: 1;
+.kpi-card .value,
+.kpi-card .kpi-value {
+    order: 1;
+    font-family: var(--jp-font-heading);
+    font-size: 1.625rem;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--jp-ink);
+    font-variant-numeric: tabular-nums;
 }
 
-.kpi-card .value {
-  display: block;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--color-dark);
+.kpi-card .kpi-meta { font-size: .8125rem; color: var(--jp-muted); }
+
+/* ---------- 6. Job cards ------------------------------------------------- */
+
+.job-card {
+    display: block;
+    background-color: var(--jp-surface);
+    border: 1px solid var(--jp-line);
+    border-radius: var(--jp-radius);
+    padding: 1rem 1.125rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-.kpi-card .label {
-  display: block;
-  font-size: 0.875rem;
-  color: #6c757d;
-  margin-top: 0.25rem;
+.job-card:hover {
+    border-color: var(--jp-line-strong);
+    box-shadow: var(--jp-shadow-hover);
 }
 
-/* ============================================================================
-   Status Badges
-   ============================================================================ */
+.job-card .job-title {
+    font-family: var(--jp-font-heading);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--jp-primary);
+    text-decoration: none;
+}
+
+.job-card .job-title:hover { text-decoration: underline; }
+.job-card .job-company { color: var(--jp-ink); font-weight: 600; font-size: .9375rem; }
+.job-card .job-meta { color: var(--jp-muted); font-size: .875rem; }
+.job-card .job-salary { color: var(--jp-ink); font-weight: 600; font-size: .9375rem; }
+
+/* Small outline chips for job type, work mode, skills. */
+.jp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    background-color: var(--jp-surface-alt);
+    border: 1px solid var(--jp-line);
+    border-radius: 999px;
+    color: var(--jp-body);
+    font-size: .8125rem;
+    padding: .125rem .625rem;
+    white-space: nowrap;
+}
+
+/* ---------- 7. Status badges --------------------------------------------- */
+/* Colour is never the only signal: every badge also carries its own words. */
 
 .badge {
-  font-size: 0.8rem;
-  font-weight: 500;
-  padding: 0.35rem 0.65rem;
-  border-radius: 0.25rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: .75rem;
+    letter-spacing: .01em;
+    padding: .25rem .625rem;
 }
 
-/* Job status colors (from JobDisplayStatus) */
-.badge.job-live {
-  background-color: var(--color-success);
-  color: white;
-}
+.job-live,
+.app-hired { background-color: var(--jp-success-soft); color: var(--jp-success); }
 
-.badge.job-expired,
-.badge.job-hidden {
-  background-color: var(--color-secondary);
-  color: white;
-}
+.job-pending,
+.app-under-review { background-color: var(--jp-warning-soft); color: var(--jp-warning); }
 
-.badge.job-pending {
-  background-color: var(--color-warning);
-  color: #000;
-}
+.job-rejected,
+.app-rejected { background-color: var(--jp-danger-soft); color: var(--jp-danger); }
 
-.badge.job-rejected {
-  background-color: var(--color-danger);
-  color: white;
-}
+.job-closed,
+.job-expired,
+.job-hidden,
+.app-withdrawn { background-color: var(--jp-surface-alt); color: var(--jp-muted); border: 1px solid var(--jp-line); }
 
-.badge.job-closed {
-  background-color: var(--color-dark);
-  color: white;
-}
+.app-applied { background-color: var(--jp-primary-soft); color: var(--jp-primary-dark); }
 
-/* Application status colors (from ApplicationStatus) */
-.badge.app-applied {
-  background-color: var(--color-primary);
-  color: white;
-}
+.app-shortlisted { background-color: #e6f4f6; color: #0f6674; }
 
-.badge.app-under-review {
-  background-color: var(--color-info);
-  color: #000;
-}
+.app-interview { background-color: var(--jp-info-soft); color: var(--jp-info); }
 
-.badge.app-shortlisted {
-  background-color: var(--color-warning);
-  color: #000;
-}
-
-.badge.app-interview {
-  background-color: var(--color-dark);
-  color: white;
-}
-
-.badge.app-hired {
-  background-color: var(--color-success);
-  color: white;
-}
-
-.badge.app-rejected {
-  background-color: var(--color-danger);
-  color: white;
-}
-
-.badge.app-withdrawn {
-  background-color: var(--color-secondary);
-  color: white;
-}
-
-/* ============================================================================
-   Tables
-   ============================================================================ */
+/* ---------- 8. Tables (dense, scannable) --------------------------------- */
 
 .table {
-  margin-bottom: 0;
-  font-size: 0.95rem;
+    --bs-table-bg: var(--jp-surface);
+    margin-bottom: 0;
+    font-size: .9375rem;
+    color: var(--jp-body);
 }
 
-.table th {
-  font-weight: 600;
-  background-color: #f8f9fa;
-  border-top-width: 1px;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  letter-spacing: 0.3px;
-  color: #495057;
-  padding: 0.75rem;
+.table > thead > tr > th {
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--jp-muted);
+    background-color: var(--jp-surface-alt);
+    border-bottom: 1px solid var(--jp-line);
+    padding: .625rem .875rem;
+    white-space: nowrap;
 }
 
-.table td {
-  padding: 0.75rem;
-  vertical-align: middle;
+.table > tbody > tr > td {
+    padding: .625rem .875rem;
+    border-bottom: 1px solid var(--jp-line);
+    vertical-align: middle;
 }
 
-.table-responsive {
-  border-radius: 0.25rem;
-  border: 1px solid #dee2e6;
+.table > tbody > tr:last-child > td { border-bottom: 0; }
+.table > tbody > tr:hover > td { background-color: var(--jp-surface-alt); }
+.table td .fw-semibold, .table td strong { color: var(--jp-ink); }
+.table .numeric { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* Wide tables scroll inside their own box instead of stretching the page. */
+.table-responsive { border-radius: var(--jp-radius); }
+
+/* ---------- 9. Buttons and forms ----------------------------------------- */
+
+.btn {
+    font-weight: 600;
+    font-size: .9375rem;
+    border-radius: var(--jp-radius-sm);
+    padding: .4375rem .875rem;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
 
-/* Small action buttons in tables */
-.table .btn-sm {
-  padding: 0.35rem 0.65rem;
-  font-size: 0.8rem;
+.btn-primary {
+    --bs-btn-bg: var(--jp-primary);
+    --bs-btn-border-color: var(--jp-primary);
+    --bs-btn-hover-bg: var(--jp-primary-dark);
+    --bs-btn-hover-border-color: var(--jp-primary-dark);
+    --bs-btn-active-bg: var(--jp-primary-dark);
+    --bs-btn-active-border-color: var(--jp-primary-dark);
+    --bs-btn-disabled-bg: var(--jp-primary);
+    --bs-btn-disabled-border-color: var(--jp-primary);
 }
 
-/* ============================================================================
-   Empty States
-   ============================================================================ */
-
-.empty-state {
-  text-align: center;
-  padding: 3rem 2rem;
-  color: #6c757d;
+/* "Apply" and other commit actions use green, the way job sites do. */
+.btn-success {
+    --bs-btn-bg: var(--jp-success);
+    --bs-btn-border-color: var(--jp-success);
+    --bs-btn-hover-bg: #126832;
+    --bs-btn-hover-border-color: #126832;
+    --bs-btn-active-bg: #126832;
+    --bs-btn-active-border-color: #126832;
 }
 
-.empty-state .icon {
-  font-size: 3rem;
-  color: #dee2e6;
-  margin-bottom: 1rem;
-  display: block;
+.btn-outline-secondary {
+    --bs-btn-color: var(--jp-body);
+    --bs-btn-border-color: var(--jp-line-strong);
+    --bs-btn-hover-bg: var(--jp-surface-alt);
+    --bs-btn-hover-border-color: var(--jp-line-strong);
+    --bs-btn-hover-color: var(--jp-ink);
+    --bs-btn-active-bg: var(--jp-surface-alt);
+    --bs-btn-active-color: var(--jp-ink);
 }
 
-.empty-state .message {
-  font-size: 1rem;
-  margin-bottom: 1.5rem;
-  color: #495057;
+.btn-link { font-weight: 600; text-decoration: none; }
+.btn-link:hover { text-decoration: underline; }
+
+/* Touch targets stay at least 44px on phones (accessibility priority 2). */
+@media (max-width: 767.98px) {
+    .btn, .navbar .nav-link, .jp-sidebar .nav-link { min-height: 44px; display: inline-flex; align-items: center; }
+    .btn-sm { min-height: 38px; }
 }
-
-.empty-state .action {
-  margin-top: 1.5rem;
-}
-
-/* ============================================================================
-   Timeline
-   ============================================================================ */
-
-.timeline {
-  list-style: none;
-  padding-left: 0;
-}
-
-.timeline-item {
-  display: flex;
-  margin-bottom: 1.5rem;
-  position: relative;
-  padding-left: 2rem;
-}
-
-.timeline-item:not(:last-child)::before {
-  content: '';
-  position: absolute;
-  left: 0.35rem;
-  top: 2rem;
-  height: calc(100% + 0.5rem);
-  width: 2px;
-  background-color: #dee2e6;
-}
-
-.timeline-item::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.25rem;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  background-color: var(--color-primary);
-  border: 2px solid white;
-  box-shadow: 0 0 0 2px #dee2e6;
-}
-
-.timeline-item.timeline-success::after {
-  background-color: var(--color-success);
-}
-
-.timeline-item.timeline-danger::after {
-  background-color: var(--color-danger);
-}
-
-.timeline-item.timeline-warning::after {
-  background-color: var(--color-warning);
-}
-
-.timeline-item.timeline-info::after {
-  background-color: var(--color-info);
-}
-
-.timeline-item .date {
-  font-size: 0.8rem;
-  color: #6c757d;
-  min-width: 80px;
-  font-weight: 500;
-}
-
-.timeline-item .content {
-  flex: 1;
-}
-
-.timeline-item .status {
-  display: inline-block;
-  margin-right: 0.5rem;
-}
-
-.timeline-item .note {
-  font-size: 0.9rem;
-  color: #495057;
-  margin-top: 0.25rem;
-  font-style: italic;
-}
-
-/* ============================================================================
-   Messages / Chat Bubbles
-   ============================================================================ */
-
-.message-thread {
-  list-style: none;
-  padding-left: 0;
-  margin-bottom: 0;
-}
-
-.message-item {
-  margin-bottom: 1rem;
-  display: flex;
-}
-
-.message-item.msg-own {
-  justify-content: flex-end;
-}
-
-.message-item.msg-other {
-  justify-content: flex-start;
-}
-
-.message-bubble {
-  max-width: 70%;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  word-wrap: break-word;
-  white-space: pre-line;
-}
-
-.msg-own .message-bubble {
-  background-color: var(--color-primary);
-  color: white;
-  border-bottom-right-radius: 0.1rem;
-}
-
-.msg-other .message-bubble {
-  background-color: #f8f9fa;
-  color: #212529;
-  border-bottom-left-radius: 0.1rem;
-  border: 1px solid #dee2e6;
-}
-
-.message-time {
-  font-size: 0.75rem;
-  color: #6c757d;
-  margin-top: 0.25rem;
-}
-
-/* ============================================================================
-   Feed / Activity List
-   ============================================================================ */
-
-#activity-feed,
-#latest-applications {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.feed-item {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #dee2e6;
-  font-size: 0.9rem;
-  color: #495057;
-}
-
-.feed-item:last-child {
-  border-bottom: none;
-}
-
-.feed-item a {
-  color: var(--color-primary);
-  text-decoration: none;
-}
-
-.feed-item a:hover {
-  text-decoration: underline;
-}
-
-/* Highlight animation for newly added feed items */
-.feed-item.feed-new {
-  animation: feed-highlight 1s ease-out forwards;
-}
-
-@keyframes feed-highlight {
-  0% {
-    background-color: #fff3cd;
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-#feed-status {
-  display: block;
-  padding: 0.5rem 1rem;
-  margin-top: 0.5rem;
-  font-style: italic;
-  color: #dc3545;
-}
-
-/* ============================================================================
-   Flash Messages / Alerts
-   ============================================================================ */
-
-.alert {
-  border-radius: 0.25rem;
-  border: none;
-  font-size: 0.95rem;
-}
-
-.alert.alert-success {
-  background-color: #d1e7dd;
-  color: #0f5132;
-}
-
-.alert.alert-danger {
-  background-color: #f8d7da;
-  color: #842029;
-}
-
-.alert.alert-warning {
-  background-color: #fff3cd;
-  color: #664d03;
-}
-
-.alert.alert-info {
-  background-color: #cfe2ff;
-  color: #084298;
-}
-
-.alert-dismissible .btn-close {
-  padding: 0.5rem;
-}
-
-/* Auto-dismiss timer (dismissal is handled by JS) */
-.alert[data-auto-dismiss="true"] {
-  animation: auto-dismiss 0s ease-out forwards;
-  animation-delay: 5s;
-}
-
-@keyframes auto-dismiss {
-  to {
-    opacity: 0;
-    visibility: hidden;
-  }
-}
-
-/* ============================================================================
-   Forms
-   ============================================================================ */
 
 .form-label {
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  color: #212529;
+    font-weight: 600;
+    font-size: .875rem;
+    color: var(--jp-ink);
+    margin-bottom: .25rem;
 }
 
+/* Required fields are marked in the label, not only by a red border. */
 .form-label.required::after {
-  content: ' *';
-  color: var(--color-danger);
+    content: " *";
+    color: var(--jp-danger);
+    font-weight: 700;
 }
 
 .form-control,
 .form-select {
-  border-radius: 0.25rem;
-  border: 1px solid #dee2e6;
+    border-color: var(--jp-line-strong);
+    border-radius: var(--jp-radius-sm);
+    color: var(--jp-ink);
+    font-size: .9375rem;
+    padding: .4375rem .75rem;
 }
+
+.form-control::placeholder { color: #93a0ab; }
 
 .form-control:focus,
 .form-select:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    border-color: var(--jp-primary);
+    box-shadow: 0 0 0 3px rgba(10, 94, 168, .15);
 }
 
-.form-control.is-invalid {
-  border-color: var(--color-danger);
+.form-control.is-invalid,
+.form-select.is-invalid { border-color: var(--jp-danger); }
+
+.invalid-feedback { color: var(--jp-danger); font-size: .8125rem; }
+.form-text { color: var(--jp-muted); font-size: .8125rem; }
+
+/* Live counter under long text areas, filled in by forms.js. */
+.char-counter { font-size: .8125rem; color: var(--jp-muted); }
+.char-counter.over-limit { color: var(--jp-danger); font-weight: 600; }
+
+.file-size-hint { font-size: .8125rem; color: var(--jp-muted); }
+
+/* Filter panel beside search results. */
+.jp-filters .form-label { font-size: .8125rem; }
+.jp-filters .card-body { padding: 1rem; }
+
+/* ---------- 10. Alerts and flash messages -------------------------------- */
+
+.alert {
+    border-radius: var(--jp-radius);
+    border-width: 1px;
+    font-size: .9375rem;
+    padding: .75rem 1rem;
 }
 
-.form-control.is-invalid:focus {
-  border-color: var(--color-danger);
-  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+.alert-success { background-color: var(--jp-success-soft); border-color: #bfe3cc; color: #0f5c2e; }
+.alert-danger { background-color: var(--jp-danger-soft); border-color: #f2c9c6; color: #8f1d14; }
+.alert-warning { background-color: var(--jp-warning-soft); border-color: #eed7b4; color: #7c4905; }
+.alert-info { background-color: var(--jp-primary-soft); border-color: #c3dcf1; color: var(--jp-primary-dark); }
+.alert-dismissible { padding-right: 3rem; }
+
+/* ---------- 11. Empty states --------------------------------------------- */
+
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--jp-muted);
 }
 
-.invalid-feedback {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--color-danger);
+.empty-state i {
+    font-size: 2rem;
+    color: var(--jp-line-strong);
+    display: block;
+    margin-bottom: .5rem;
 }
 
-.form-text {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.8rem;
-  color: #6c757d;
+.empty-state h2,
+.empty-state .empty-title {
+    font-family: var(--jp-font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--jp-ink);
+    margin-bottom: .25rem;
 }
 
-/* Character counter */
-.char-counter {
-  display: inline-block;
-  font-size: 0.8rem;
-  color: #6c757d;
-  margin-top: 0.25rem;
+.empty-state p { margin-bottom: 1rem; font-size: .9375rem; }
+
+/* Scrolling panel inside a card (the live feed lists). */
+.jp-scroll-panel { max-height: 24rem; overflow-y: auto; }
+.jp-scroll-panel-sm { max-height: 18rem; overflow-y: auto; }
+
+/* Large icon used at the top of an error page. */
+.jp-icon-xl { font-size: 3rem; line-height: 1; display: block; }
+.jp-icon-xl.is-danger { color: var(--jp-danger); }
+.jp-icon-xl.is-muted { color: var(--jp-muted); }
+
+/* Thin progress bar (profile completeness). */
+.progress.jp-progress { height: 8px; background-color: var(--jp-surface-alt); }
+.progress.jp-progress .progress-bar { background-color: var(--jp-primary); }
+
+/* ---------- 12. Timeline ------------------------------------------------- */
+
+.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 1.25rem;
+    border-left: 2px solid var(--jp-line);
 }
 
-.char-counter.warning {
-  color: #ff9800;
-  font-weight: 500;
+.timeline-item {
+    position: relative;
+    padding-bottom: 1rem;
+    font-size: .9375rem;
 }
 
-/* File size hint */
-.file-size-hint {
-  display: block;
-  font-size: 0.8rem;
-  color: #6c757d;
-  margin-top: 0.5rem;
+.timeline-item:last-child { padding-bottom: 0; }
+
+.timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -1.8125rem;
+    top: .4375rem;
+    width: .625rem;
+    height: .625rem;
+    border-radius: 50%;
+    background-color: var(--jp-primary);
+    border: 2px solid var(--jp-surface);
 }
 
-/* ============================================================================
-   Cards & Panels
-   ============================================================================ */
+.timeline-item .timeline-when { font-size: .8125rem; color: var(--jp-muted); }
+.timeline-item .timeline-note { color: var(--jp-body); }
 
-.card {
-  border: 1px solid #dee2e6;
-  border-radius: 0.25rem;
+/* ---------- 13. Live activity feed --------------------------------------- */
+
+.feed-item {
+    display: flex;
+    gap: .625rem;
+    align-items: baseline;
+    padding: .5rem .25rem;
+    border-bottom: 1px solid var(--jp-line);
+    font-size: .9375rem;
 }
 
-.card-header {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
-  font-weight: 600;
-  padding: 1rem;
+.feed-item:last-child { border-bottom: 0; }
+.feed-item .feed-time { color: var(--jp-muted); font-size: .8125rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* New rows arriving from the poll fade in once, then settle. */
+.feed-item.is-new { animation: jp-fade-in .4s ease-out; }
+
+@keyframes jp-fade-in {
+    from { background-color: var(--jp-primary-soft); opacity: .4; }
+    to { background-color: transparent; opacity: 1; }
 }
 
-.card-body {
-  padding: 1.5rem;
+/* ---------- 14. Messages ------------------------------------------------- */
+
+.message-thread { display: flex; flex-direction: column; gap: .75rem; }
+
+.message-item { display: flex; }
+.message-item.msg-own { justify-content: flex-end; }
+
+.message-bubble {
+    max-width: 80%;
+    padding: .625rem .875rem;
+    border-radius: var(--jp-radius);
+    font-size: .9375rem;
+    white-space: pre-line;
 }
 
-.card-footer {
-  background-color: #f8f9fa;
-  border-top: 1px solid #dee2e6;
-  padding: 1rem;
+.msg-own .message-bubble { background-color: var(--jp-primary); color: #fff; }
+.msg-other .message-bubble { background-color: var(--jp-surface-alt); border: 1px solid var(--jp-line); color: var(--jp-body); }
+
+.message-time { font-size: .75rem; color: var(--jp-muted); margin-top: .25rem; }
+.msg-own .message-time { text-align: right; }
+
+/* ---------- 15. Charts --------------------------------------------------- */
+
+.chart-container { position: relative; height: 260px; }
+
+/* Every chart is repeated as a table for screen readers and for anyone who
+   needs the exact numbers (charts guideline: never colour alone). */
+.chart-data-table { font-size: .875rem; }
+.chart-data-table caption { caption-side: top; font-size: .8125rem; color: var(--jp-muted); }
+
+/* ---------- 16. Pagination ----------------------------------------------- */
+
+.pagination { --bs-pagination-color: var(--jp-body); --bs-pagination-active-bg: var(--jp-primary); --bs-pagination-active-border-color: var(--jp-primary); }
+.page-link { border-color: var(--jp-line); font-size: .9375rem; }
+
+/* ---------- 17. Motion and print ----------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+    }
 }
-
-/* ============================================================================
-   Charts
-   ============================================================================ */
-
-.chart-container {
-  position: relative;
-  height: 300px;
-  margin-bottom: 1.5rem;
-}
-
-.chart-data-table {
-  width: 100%;
-  font-size: 0.85rem;
-  margin-top: 1rem;
-}
-
-.chart-data-table th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-  padding: 0.5rem;
-  text-align: left;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.chart-data-table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid #dee2e6;
-  text-align: right;
-}
-
-.chart-data-table td:first-child {
-  text-align: left;
-  font-weight: 500;
-}
-
-/* ============================================================================
-   Print Styles
-   ============================================================================ */
 
 @media print {
-  body {
-    font-size: 11pt;
-    color: #000;
-    background: white;
-  }
-
-  .navbar,
-  aside,
-  .btn,
-  .form-control,
-  .alert-dismissible,
-  [data-no-print],
-  .no-print {
-    display: none !important;
-  }
-
-  .card {
-    border: 1px solid #000;
-    page-break-inside: avoid;
-  }
-
-  .table {
-    border-collapse: collapse;
-  }
-
-  .table th,
-  .table td {
-    border: 1px solid #000;
-    padding: 4pt;
-  }
-
-  .timeline-item::before,
-  .timeline-item::after {
-    display: none;
-  }
-
-  a {
-    color: #000;
-    text-decoration: underline;
-  }
-}
-
-/* ============================================================================
-   Utilities & Helpers
-   ============================================================================ */
-
-.text-muted {
-  color: #6c757d !important;
-}
-
-.mt-4 {
-  margin-top: 1.5rem;
-}
-
-.mb-4 {
-  margin-bottom: 1.5rem;
-}
-
-.gap-2 {
-  gap: 0.5rem;
-}
-
-.shadow-sm {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-
-/* Responsive spacing */
-@media (max-width: 576px) {
-  .kpi-card {
-    padding: 1rem;
-  }
-
-  .timeline-item {
-    font-size: 0.85rem;
-  }
-
-  .message-bubble {
-    max-width: 90%;
-  }
+    .navbar, .jp-sidebar, .btn, .pagination, form { display: none !important; }
+    body { background: #fff; }
+    .card { border-color: #ccc; box-shadow: none; }
 }

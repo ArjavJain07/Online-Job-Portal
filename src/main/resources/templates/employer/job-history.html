@@ -18,8 +18,12 @@
       th:replace="~{layout/dashboard :: layout(title='Job Posting History', content=~{::main}, scripts=~{})}">
 <body>
 <main>
-    <h1 class="h3 mb-1">Job posting history</h1>
-    <p class="text-muted mb-3" th:text="${summary}">6 jobs posted: 4 live, 1 expired, 1 pending, 0 rejected, 0 closed</p>
+    <div class="jp-page-head mb-3">
+        <div>
+            <h1 class="h3 mb-1">Job posting history</h1>
+            <p th:text="${summary}">6 jobs posted: 4 live, 1 expired, 1 pending, 0 rejected, 0 closed</p>
+        </div>
+    </div>
 
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
@@ -66,8 +70,8 @@
                     <th>Submitted</th>
                     <th>Decision</th>
                     <th>Closed on</th>
-                    <th>Applications</th>
-                    <th>Hired</th>
+                    <th class="numeric">Applications</th>
+                    <th class="numeric">Hired</th>
                     <th>View</th>
                 </tr>
                 </thead>
@@ -82,8 +86,8 @@
                             <span th:if="${row.closedOnText != null}" th:text="${row.closedOnText}">16 Sep 2026</span>
                             <span th:unless="${row.closedOnText != null}">-</span>
                         </td>
-                        <td th:text="${row.applications}">0</td>
-                        <td th:text="${row.hired}">0</td>
+                        <td class="numeric" th:text="${row.applications}">0</td>
+                        <td class="numeric" th:text="${row.hired}">0</td>
                         <td>
                             <div class="d-flex gap-1 flex-wrap">
                                 <a th:href="@{/employer/jobs/{id}(id=${row.job.id})}" class="btn btn-sm btn-outline-secondary">View</a>

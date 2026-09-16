@@ -9,70 +9,86 @@
   Every date/number shown here that depends on "today" (the deadline countdown) was
   computed by the controller with the injected Clock, not with T(java.time.LocalDate).now()
   in the template - the fixed clock the tests use would otherwise be bypassed.
+
+  Layout (Section 7.1 UI pass): a header card (job-card's own logo/title/company/meta
+  language) plus a details card in the main column, and the banner/apply panel followed by
+  an "About the company" card in the sidebar - the same job-site convention as the job card
+  and job list. Every value bound below, and the banner/apply-panel button copy that
+  PublicPagesTest checks for, are unchanged from before the restyle - only structure and
+  classes changed. (Comment text is kept free of the exact apply-button wording so it is
+  never mistaken for it in the rendered response body.)
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/public :: layout(title=${job.title}, content=~{::main}, scripts=~{})}">
 <body>
 <main>
+    <p class="mb-3">
+        <a th:href="@{/jobs}" class="text-decoration-none">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to search results
+        </a>
+    </p>
+
     <div class="row g-4">
         <div class="col-lg-8">
-            <h1 class="h3 mb-1" th:text="${job.title}">Job title</h1>
-            <p class="text-muted mb-3">
-                <span th:text="${job.employer.companyName}">Company name</span>
-                &middot;
-                <span th:text="${job.location}">Location</span>
-            </p>
 
-            <div class="mb-3">
-                <span class="badge text-bg-light border me-1" th:text="${job.jobType.label}">Full-time</span>
-                <span class="badge text-bg-light border me-1" th:text="${job.workMode.label}">Remote</span>
-                <span class="badge text-bg-light border" th:text="${job.category.label}">Category</span>
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex gap-3 mb-3">
+                        <span class="jp-logo" aria-hidden="true"
+                              th:text="${job.employer.companyName.substring(0,1).toUpperCase()}">C</span>
+                        <div>
+                            <h1 class="h3 mb-1" th:text="${job.title}">Job title</h1>
+                            <p class="job-company mb-0" th:text="${job.employer.companyName}">Company name</p>
+                            <p class="job-meta mb-0" th:text="${job.location}">Location</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-flex flex-wrap gap-1">
+                        <span class="jp-chip" th:text="${job.jobType.label}">Full-time</span>
+                        <span class="jp-chip" th:text="${job.workMode.label}">Remote</span>
+                        <span class="jp-chip" th:text="${job.category.label}">Category</span>
+                    </div>
+
+                    <dl class="row small mb-0">
+                        <dt class="col-sm-4">Salary</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</dd>
+
+                        <dt class="col-sm-4">Experience needed</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.experience(job.minExperienceYears)}">Freshers welcome</dd>
+
+                        <dt class="col-sm-4">Openings</dt>
+                        <dd class="col-sm-8"
+                            th:text="|${job.openings} ${job.openings == 1 ? 'opening' : 'openings'}|">1 opening</dd>
+
+                        <dt class="col-sm-4">Deadline</dt>
+                        <dd class="col-sm-8" th:text="${deadlineInfo}">Apply by 11 Oct 2026, 25 days left</dd>
+
+                        <th:block th:if="${job.approvedAt != null}">
+                            <dt class="col-sm-4">Posted</dt>
+                            <dd class="col-sm-8" th:text="${@fmt.ago(job.approvedAt)}">19 days ago</dd>
+                        </th:block>
+                    </dl>
+                </div>
             </div>
 
-            <dl class="row small mb-4">
-                <dt class="col-sm-4">Salary</dt>
-                <dd class="col-sm-8" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</dd>
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5">Job description</h2>
+                    <p class="pre-line" th:text="${job.description}">Description</p>
 
-                <dt class="col-sm-4">Experience needed</dt>
-                <dd class="col-sm-8" th:text="${@fmt.experience(job.minExperienceYears)}">Freshers welcome</dd>
+                    <h2 class="h5">Requirements</h2>
+                    <p class="pre-line mb-0" th:text="${job.requirements}">Requirements</p>
 
-                <dt class="col-sm-4">Openings</dt>
-                <dd class="col-sm-8"
-                    th:text="|${job.openings} ${job.openings == 1 ? 'opening' : 'openings'}|">1 opening</dd>
+                    <th:block th:if="${!#lists.isEmpty(job.skillList())}">
+                        <h2 class="h5 mt-3">Skills</h2>
+                        <p class="mb-0">
+                            <span class="jp-chip me-1" th:each="skill : ${job.skillList()}"
+                                  th:text="${skill}">Skill</span>
+                        </p>
+                    </th:block>
+                </div>
+            </div>
 
-                <dt class="col-sm-4">Deadline</dt>
-                <dd class="col-sm-8" th:text="${deadlineInfo}">Apply by 11 Oct 2026, 25 days left</dd>
-
-                <th:block th:if="${job.approvedAt != null}">
-                    <dt class="col-sm-4">Posted</dt>
-                    <dd class="col-sm-8" th:text="${@fmt.ago(job.approvedAt)}">19 days ago</dd>
-                </th:block>
-            </dl>
-
-            <h2 class="h5">Job description</h2>
-            <p class="pre-line" th:text="${job.description}">Description</p>
-
-            <h2 class="h5">Requirements</h2>
-            <p class="pre-line" th:text="${job.requirements}">Requirements</p>
-
-            <th:block th:if="${!#lists.isEmpty(job.skillList())}">
-                <h2 class="h5">Skills</h2>
-                <p>
-                    <span class="badge text-bg-light border me-1" th:each="skill : ${job.skillList()}"
-                          th:text="${skill}">Skill</span>
-                </p>
-            </th:block>
-
-            <h2 class="h5">About the company</h2>
-            <p class="pre-line" th:if="${!#strings.isEmpty(job.employer.companyDescription)}"
-               th:text="${job.employer.companyDescription}">Company description</p>
-            <p th:if="${#strings.isEmpty(job.employer.companyDescription)}" class="text-muted">
-                No company description yet.
-            </p>
-            <p th:if="${!#strings.isEmpty(job.employer.companyWebsite)}">
-                <a th:href="${job.employer.companyWebsite}" th:text="${job.employer.companyWebsite}"
-                   target="_blank" rel="noopener">https://example.com</a>
-            </p>
         </div>
 
         <div class="col-lg-4">
@@ -82,7 +98,7 @@
                    class="btn btn-sm btn-outline-dark ms-2 mt-1">Review</a>
             </div>
 
-            <div th:if="${showApplyPanel}" class="card shadow-sm">
+            <div th:if="${showApplyPanel}" class="card shadow-sm mb-4">
                 <div class="card-body">
 
                     <div th:if="${existingApplication != null}">
@@ -105,6 +121,21 @@
                         <a th:href="@{/seeker/jobs/{id}/apply(id=${job.id})}" class="btn btn-primary w-100">Apply now</a>
                     </div>
 
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">About the company</div>
+                <div class="card-body">
+                    <p class="pre-line mb-2" th:if="${!#strings.isEmpty(job.employer.companyDescription)}"
+                       th:text="${job.employer.companyDescription}">Company description</p>
+                    <p th:if="${#strings.isEmpty(job.employer.companyDescription)}" class="text-muted mb-2">
+                        No company description yet.
+                    </p>
+                    <p class="mb-0" th:if="${!#strings.isEmpty(job.employer.companyWebsite)}">
+                        <a th:href="${job.employer.companyWebsite}" th:text="${job.employer.companyWebsite}"
+                           target="_blank" rel="noopener">https://example.com</a>
+                    </p>
                 </div>
             </div>
         </div>
