@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<!--
+  Job search form (Section 7.9, 6.4 S-F1): shared by the public job list (/jobs) and, from
+  M5, the seeker job list (/seeker/jobs). A plain GET form, so every search is a real URL
+  that can be bookmarked, shared or paged through (fragments/pagination keeps every one of
+  these parameters when it rewrites "page").
+
+  "criteria" is the raw, unvalidated JobSearchCriteria bound from the query string - using
+  the raw values (not the parsed ones) is what makes the form "keep the entered values"
+  even for a filter that turned out to be invalid and was ignored (Section 6.4 S-F1).
+  "action" is a plain path string such as '/jobs', used directly as th:action without an
+  extra @{...} wrapper (the same rule fragments/pagination follows for @pageLinks).
+
+  The option lists for category/type/mode/experience/posted-within are written out by hand
+  instead of looping over the enum's values(): Thymeleaf 3.1 runs T(...) in restricted mode
+  and only java.lang.Math and java.time.LocalDate are confirmed to work there, so an
+  application enum such as JobCategory cannot be referenced with T(...) from a template.
+  The values below must stay in sync with domain.enums.JobCategory/JobType/WorkMode.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<form th:fragment="filters(criteria, action)" method="get" th:action="${action}" class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="filter-q">Keyword</label>
+                <input type="text" class="form-control" id="filter-q" name="q" maxlength="100"
+                       placeholder="Job title, skill or company" th:value="${criteria.q}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="filter-location">Location</label>
+                <input type="text" class="form-control" id="filter-location" name="location" maxlength="100"
+                       placeholder="City or 'remote'" th:value="${criteria.location}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="filter-category">Category</label>
+                <select class="form-select" id="filter-category" name="category">
+                    <option value="" th:selected="${criteria.category == null or criteria.category == ''}">Any category</option>
+                    <option value="SOFTWARE_DEVELOPMENT" th:selected="${criteria.category == 'SOFTWARE_DEVELOPMENT'}">Software Development</option>
+                    <option value="DATA_ANALYTICS" th:selected="${criteria.category == 'DATA_ANALYTICS'}">Data &amp; Analytics</option>
+                    <option value="DESIGN" th:selected="${criteria.category == 'DESIGN'}">Design</option>
+                    <option value="MARKETING" th:selected="${criteria.category == 'MARKETING'}">Marketing</option>
+                    <option value="SALES" th:selected="${criteria.category == 'SALES'}">Sales</option>
+                    <option value="FINANCE" th:selected="${criteria.category == 'FINANCE'}">Finance &amp; Accounting</option>
+                    <option value="HUMAN_RESOURCES" th:selected="${criteria.category == 'HUMAN_RESOURCES'}">Human Resources</option>
+                    <option value="CUSTOMER_SUPPORT" th:selected="${criteria.category == 'CUSTOMER_SUPPORT'}">Customer Support</option>
+                    <option value="OPERATIONS" th:selected="${criteria.category == 'OPERATIONS'}">Operations</option>
+                    <option value="OTHER" th:selected="${criteria.category == 'OTHER'}">Other</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="filter-job-type">Job type</label>
+                <select class="form-select" id="filter-job-type" name="jobType">
+                    <option value="" th:selected="${criteria.jobType == null or criteria.jobType == ''}">Any type</option>
+                    <option value="FULL_TIME" th:selected="${criteria.jobType == 'FULL_TIME'}">Full-time</option>
+                    <option value="PART_TIME" th:selected="${criteria.jobType == 'PART_TIME'}">Part-time</option>
+                    <option value="INTERNSHIP" th:selected="${criteria.jobType == 'INTERNSHIP'}">Internship</option>
+                    <option value="CONTRACT" th:selected="${criteria.jobType == 'CONTRACT'}">Contract</option>
+                </select>
+            </div>
+
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="filter-work-mode">Work mode</label>
+                <select class="form-select" id="filter-work-mode" name="workMode">
+                    <option value="" th:selected="${criteria.workMode == null or criteria.workMode == ''}">Any mode</option>
+                    <option value="ONSITE" th:selected="${criteria.workMode == 'ONSITE'}">On-site</option>
+                    <option value="REMOTE" th:selected="${criteria.workMode == 'REMOTE'}">Remote</option>
+                    <option value="HYBRID" th:selected="${criteria.workMode == 'HYBRID'}">Hybrid</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="filter-min-salary">Min. salary (INR)</label>
+                <input type="number" class="form-control" id="filter-min-salary" name="minSalary" min="0"
+                       placeholder="e.g. 600000" th:value="${criteria.minSalary}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="filter-experience">Experience</label>
+                <select class="form-select" id="filter-experience" name="maxExperience">
+                    <option value="" th:selected="${criteria.maxExperience == null or criteria.maxExperience == ''}">Any experience</option>
+                    <option value="0" th:selected="${criteria.maxExperience == '0'}">Fresher</option>
+                    <option value="1" th:selected="${criteria.maxExperience == '1'}">Up to 1 year</option>
+                    <option value="3" th:selected="${criteria.maxExperience == '3'}">Up to 3 years</option>
+                    <option value="5" th:selected="${criteria.maxExperience == '5'}">Up to 5 years</option>
+                    <option value="10" th:selected="${criteria.maxExperience == '10'}">Up to 10 years</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="filter-posted-within">Posted within</label>
+                <select class="form-select" id="filter-posted-within" name="postedWithin">
+                    <option value="" th:selected="${criteria.postedWithin == null or criteria.postedWithin == ''}">Any time</option>
+                    <option value="1" th:selected="${criteria.postedWithin == '1'}">Last 24 hours</option>
+                    <option value="7" th:selected="${criteria.postedWithin == '7'}">Last 7 days</option>
+                    <option value="30" th:selected="${criteria.postedWithin == '30'}">Last 30 days</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="filter-sort">Sort by</label>
+                <select class="form-select" id="filter-sort" name="sort">
+                    <option value="newest" th:selected="${criteria.sort == null or criteria.sort == '' or criteria.sort == 'newest'}">Newest</option>
+                    <option value="salary" th:selected="${criteria.sort == 'salary'}">Salary: high to low</option>
+                    <option value="deadline" th:selected="${criteria.sort == 'deadline'}">Deadline: soonest</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a th:href="${action}" class="btn btn-outline-secondary">Clear filters</a>
+        </div>
+    </div>
+</form>
+
+</body>
+</html>

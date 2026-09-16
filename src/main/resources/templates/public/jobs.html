@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!--
+  Public job search results (Section 6.1 P-2, 6.4 S-F1). JobBrowseController#search puts
+  the Spring Data Page under the model key "page" (read by both fragments/job-card's
+  loop and fragments/pagination) and the raw JobSearchCriteria under "criteria" (read by
+  fragments/job-filters, which keeps every entered value - even an invalid one - in the
+  form). "warning" is a plain model attribute, not a flash message, and is already rendered
+  by layout/public.html's fragments/flash :: messages before this page's own content.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Find jobs', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Find jobs</h1>
+    <p class="text-muted mb-4"
+       th:text="|${page.totalElements} ${page.totalElements == 1 ? 'job found' : 'jobs found'}|">0 jobs found</p>
+
+    <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/jobs')}"></div>
+
+    <div th:if="${page.empty}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-search icon"></i>
+            <p class="message">No jobs match your search. Try removing some filters.</p>
+            <a th:href="@{/jobs}" class="btn btn-outline-primary action">Clear filters</a>
+        </div>
+    </div>
+
+    <div th:unless="${page.empty}">
+        <div th:each="job : ${page.content}">
+            <div th:replace="~{fragments/job-card :: card(${job}, false)}"></div>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>

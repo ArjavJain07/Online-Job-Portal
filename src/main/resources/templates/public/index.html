@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!--
+  Landing page (Section 6.1 P-1). HomeController#index supplies everything shown here from
+  live data: the newest Live jobs, the two counters and the two registration flags. It
+  renders for anyone (6.6 route summary marks GET / "Anyone", not "anonymous only"), so a
+  logged-in visitor sees "Go to your dashboard" in place of the two registration cards
+  instead of being redirected away - the currentUser check below is the same global
+  attribute every page already gets from GlobalModelAttributes.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Find your next job', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+
+    <section class="text-center py-4 py-md-5 mb-4">
+        <h1 class="display-6 fw-bold mb-2">Find your next job</h1>
+        <p class="text-muted mb-4">
+            <span th:text="${liveJobCount}">6</span> live jobs
+            &middot;
+            <span th:text="${employersHiringCount}">2</span> companies hiring
+        </p>
+
+        <form method="get" th:action="@{/jobs}" class="row justify-content-center g-2">
+            <div class="col-12 col-md-4">
+                <label class="visually-hidden" for="home-q">Job title, skill or company</label>
+                <input type="text" class="form-control" id="home-q" name="q" maxlength="100"
+                       placeholder="Job title, skill or company">
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="visually-hidden" for="home-location">Location</label>
+                <input type="text" class="form-control" id="home-location" name="location" maxlength="100"
+                       placeholder="Location">
+            </div>
+            <div class="col-12 col-md-auto">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Search jobs
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="mb-5" th:if="${currentUser == null}">
+        <div class="row g-3 justify-content-center">
+            <div class="col-md-5" th:if="${seekerRegistrationOpen}">
+                <div class="card shadow-sm h-100 text-center">
+                    <div class="card-body">
+                        <i class="bi bi-person-badge fs-1 text-primary mb-2 d-block"></i>
+                        <h2 class="h5">I'm looking for a job</h2>
+                        <p class="text-muted">Create a free job seeker account and start applying.</p>
+                        <a th:href="@{/register/seeker}" class="btn btn-outline-primary">Get started</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-5" th:if="${employerRegistrationOpen}">
+                <div class="card shadow-sm h-100 text-center">
+                    <div class="card-body">
+                        <i class="bi bi-building fs-1 text-primary mb-2 d-block"></i>
+                        <h2 class="h5">I'm hiring</h2>
+                        <p class="text-muted">Post jobs and find the right candidates.</p>
+                        <a th:href="@{/register/employer}" class="btn btn-outline-primary">Get started</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-5 text-center" th:if="${currentUser != null}">
+        <a th:href="@{/dashboard}" class="btn btn-primary btn-lg">Go to your dashboard</a>
+    </section>
+
+    <section>
+        <h2 class="h4 mb-3">Latest openings</h2>
+
+        <div th:if="${#lists.isEmpty(latestJobs)}" class="card shadow-sm">
+            <div class="card-body empty-state">
+                <i class="bi bi-briefcase icon"></i>
+                <p class="message">No jobs are open right now. Please check back soon.</p>
+            </div>
+        </div>
+
+        <div th:each="job : ${latestJobs}">
+            <div th:replace="~{fragments/job-card :: card(${job}, false)}"></div>
+        </div>
+
+        <div class="text-center mt-3" th:unless="${#lists.isEmpty(latestJobs)}">
+            <a th:href="@{/jobs}" class="btn btn-outline-primary">See all jobs</a>
+        </div>
+    </section>
+
+</main>
+</body>
+</html>
