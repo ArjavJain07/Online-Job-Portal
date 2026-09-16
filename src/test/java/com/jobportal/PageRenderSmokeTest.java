@@ -60,7 +60,18 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/admin/jobs", "admin@jobportal.local", "Job Approvals"),
                 new Page("/admin/jobs/8", "admin@jobportal.local", "Sales Intern"), // J8
                 new Page("/admin/settings", "admin@jobportal.local", "Settings"),
-                new Page("/admin/activity", "admin@jobportal.local", "Live Activity"));
+                new Page("/admin/activity", "admin@jobportal.local", "Live Activity"),
+                // Employer module (M4, Section 6.3). J1 Java Developer and A1 (Priya's
+                // application to it) are seed codes, which equal ids on a fresh database
+                // (Section 13.1), the same rule used above for the admin rows.
+                new Page("/employer/jobs", "hr@acme.local", "My jobs"),
+                new Page("/employer/jobs/new", "hr@acme.local", "Post a job"),
+                new Page("/employer/jobs/1/edit", "hr@acme.local", "Edit job"), // J1 Java Developer
+                new Page("/employer/jobs/1", "hr@acme.local", "Java Developer"),
+                new Page("/employer/jobs/history", "hr@acme.local", "Job posting history"),
+                new Page("/employer/applications", "hr@acme.local", "Applications"),
+                new Page("/employer/applications/1", "hr@acme.local", "APP-00001"), // A1 Priya/Java Developer
+                new Page("/employer/profile", "hr@acme.local", "Company profile"));
     }
 
     @ParameterizedTest(name = "GET {0} renders for {1}")

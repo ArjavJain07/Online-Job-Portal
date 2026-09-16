@@ -72,6 +72,11 @@ class AccessControlTest extends IntegrationTestBase {
     // AC-P6-1 (fourth clause): a bad job id and a non-numeric one both give 404, with the
     // "Page not found" text - both come from GlobalExceptionHandler, which renders the
     // page directly (Section 12.1), so the text can be checked here even from MockMvc.
+    //
+    // Employer ownership (M4, Section 4.5): a job, application or resume id belonging to
+    // a DIFFERENT employer is a 404 in both directions - Acme can't reach Globex's, and
+    // Globex can't reach Acme's - the same findByIdAndEmployer_Id/
+    // findByIdAndJob_Employer_Id rule the plan requires (11.3 contract item 3).
     @Test
     void foreignIdsReturn404() throws Exception {
         mockMvc.perform(get("/jobs/999999"))
@@ -81,6 +86,28 @@ class AccessControlTest extends IntegrationTestBase {
         mockMvc.perform(get("/jobs/abc"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(containsString("Page not found")));
+
+        UserDetails acme = userDetailsService.loadUserByUsername("hr@acme.local");
+        Long globexJobId = data.jobId("Data Analyst");
+        Long globexApplicationId = data.applicationId("arjun@demo.local", "Data Analyst");
+
+        mockMvc.perform(get("/employer/jobs/{id}", globexJobId).with(user(acme)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/employer/jobs/{id}/edit", globexJobId).with(user(acme)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/employer/applications/{id}", globexApplicationId).with(user(acme)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/employer/applications/{id}/resume", globexApplicationId).with(user(acme)))
+                .andExpect(status().isNotFound());
+
+        UserDetails globex = userDetailsService.loadUserByUsername("talent@globex.local");
+        Long acmeJobId = data.jobId("Java Developer");
+        Long acmeApplicationId = data.applicationId("priya@demo.local", "Java Developer");
+
+        mockMvc.perform(get("/employer/jobs/{id}", acmeJobId).with(user(globex)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/employer/applications/{id}", acmeApplicationId).with(user(globex)))
+                .andExpect(status().isNotFound());
     }
 
     // AC-A-D5-2 (Section 6.2 A-D5, 7.7): the live-feed script always adds
