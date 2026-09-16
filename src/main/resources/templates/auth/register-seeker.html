@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  Job seeker registration form (Section 6.1 P-3). On a failed POST, AuthController
+  re-renders this same template with the submitted values and field errors still in
+  place (Section 7.2 PRG rule: only a successful POST redirects).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Job Seeker Registration', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-1">Create your job seeker account</h1>
+                    <p class="text-muted mb-4">Search jobs and track your applications.</p>
+
+                    <form th:action="@{/register/seeker}" th:object="${registerSeekerForm}" method="post" novalidate>
+
+                        <div class="mb-3">
+                            <label for="fullName" class="form-label required">Full name</label>
+                            <input type="text" class="form-control" id="fullName" th:field="*{fullName}"
+                                   th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{fullName}">Full name error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label required">Email</label>
+                            <input type="email" class="form-control" id="email" th:field="*{email}"
+                                   th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{email}">Email error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label required">Password</label>
+                            <input type="password" class="form-control" id="password" th:field="*{password}"
+                                   th:classappend="${#fields.hasErrors('password')} ? 'is-invalid'">
+                            <div class="form-text">8-64 characters, at least one letter and one digit, no spaces.</div>
+                            <div class="invalid-feedback" th:errors="*{password}">Password error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label required">Confirm password</label>
+                            <input type="password" class="form-control" id="confirmPassword" th:field="*{confirmPassword}"
+                                   th:classappend="${#fields.hasErrors('passwordsMatching')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{passwordsMatching}">Passwords do not match.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">Create account</button>
+                    </form>
+
+                    <p class="text-center text-muted mt-3 mb-0">
+                        Already have an account? <a th:href="@{/login}">Log in</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

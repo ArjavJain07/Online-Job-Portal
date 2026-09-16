@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!--
+  Registration chooser (Section 6.1 P-3). Two cards, each hidden when that role's
+  registration is closed (AuthController#chooseRole reads the setting) - the same rule
+  the landing page uses for its "I'm hiring" / "I'm looking for a job" cards (P-1).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Register', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="h3 mb-1 text-center">Create an account</h1>
+            <p class="text-muted mb-4 text-center">Choose how you want to use <span th:text="${siteName}">JobPortal</span>.</p>
+
+            <div class="row g-3">
+                <div class="col-md-6" th:if="${seekerRegistrationOpen}">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center d-flex flex-column">
+                            <i class="bi bi-person-workspace icon mb-2" style="font-size:2.5rem;color:var(--color-primary);"></i>
+                            <h2 class="h5">I'm looking for a job</h2>
+                            <p class="text-muted flex-grow-1">Search jobs, build a profile and track your applications.</p>
+                            <a class="btn btn-primary" th:href="@{/register/seeker}">Register as a job seeker</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6" th:if="${employerRegistrationOpen}">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body text-center d-flex flex-column">
+                            <i class="bi bi-building icon mb-2" style="font-size:2.5rem;color:var(--color-primary);"></i>
+                            <h2 class="h5">I'm hiring</h2>
+                            <p class="text-muted flex-grow-1">Post jobs, review candidates and manage applications.</p>
+                            <a class="btn btn-primary" th:href="@{/register/employer}">Register as an employer</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-4" th:if="${!seekerRegistrationOpen and !employerRegistrationOpen}">
+                Registration is currently closed. Please check back later.
+            </div>
+
+            <p class="text-center text-muted mt-4 mb-0">
+                Already have an account? <a th:href="@{/login}">Log in</a>
+            </p>
+        </div>
+    </div>
+</main>
+</body>
+</html>

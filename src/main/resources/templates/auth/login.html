@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!--
+  Login page (Section 6.1 P-4). POST /login is handled by Spring Security itself, not a
+  controller method, so this form posts straight to /login with fields "email" and
+  "password" (SecurityConfig#filterChain: usernameParameter("email")).
+
+  The six query-parameter messages of Section 4.4 are read directly from ${param.*}
+  instead of through fragments/flash :: messages, because that shared fragment only knows
+  the three flash/model keys "success"/"error"/"warning" (Section 7.2) and has no "info"
+  style for ?emailChanged - so they are written out here, with the exact wording and
+  Bootstrap colour from the 4.4 table.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Log In', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+
+            <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${param.error}">
+                Invalid email or password.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${param.blocked}">
+                Your account has been deactivated. Please contact the administrator.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-warning alert-dismissible fade show" role="alert" th:if="${param.changed}">
+                Your account was updated by an administrator. Please log in again.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-info alert-dismissible fade show" role="alert" th:if="${param.emailChanged}">
+                Your email address was changed. Please log in again with your new email.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${param.logout}">
+                You have been logged out.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${param.registered}">
+                Account created. Please log in.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-1">Log in</h1>
+                    <p class="text-muted mb-4">Welcome back to <span th:text="${siteName}">JobPortal</span>.</p>
+
+                    <form th:action="@{/login}" method="post">
+                        <div class="mb-3">
+                            <label for="email" class="form-label required">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label required">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Log in</button>
+                    </form>
+
+                    <p class="text-center text-muted mt-3 mb-0">
+                        New here? <a th:href="@{/register}">Create an account</a>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Demo accounts (Section 13.2): only when app.demo.show-credentials=true
+                 (off in the test profile). Clicking a row fills the form above -
+                 forms.js reads data-fill-login="email|password". -->
+            <div class="card shadow-sm mt-3" th:if="${showDemoCredentials}">
+                <div class="card-header">
+                    <button class="btn btn-link p-0 text-decoration-none fw-semibold" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#demoAccounts" aria-expanded="false"
+                            aria-controls="demoAccounts">
+                        <i class="bi bi-people me-1"></i>Demo accounts
+                    </button>
+                </div>
+                <div class="collapse" id="demoAccounts">
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">Click an account to fill in the form above.</p>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle small mb-0">
+                                <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>Site Admin</td>
+                                    <td>admin@jobportal.local</td>
+                                    <td><span class="badge bg-secondary">Admin</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="admin@jobportal.local|Admin@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Anita Rao (Acme Technologies)</td>
+                                    <td>hr@acme.local</td>
+                                    <td><span class="badge bg-secondary">Employer</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="hr@acme.local|Employer@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Vikram Nair (Globex Retail)</td>
+                                    <td>talent@globex.local</td>
+                                    <td><span class="badge bg-secondary">Employer</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="talent@globex.local|Employer@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Suresh Pillai (QuickHire, deactivated)</td>
+                                    <td>jobs@quickhire.local</td>
+                                    <td><span class="badge bg-secondary">Employer</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="jobs@quickhire.local|Employer@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Priya Sharma</td>
+                                    <td>priya@demo.local</td>
+                                    <td><span class="badge bg-secondary">Job Seeker</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="priya@demo.local|Seeker@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Arjun Mehta</td>
+                                    <td>arjun@demo.local</td>
+                                    <td><span class="badge bg-secondary">Job Seeker</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="arjun@demo.local|Seeker@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Rohan Das</td>
+                                    <td>rohan@demo.local</td>
+                                    <td><span class="badge bg-secondary">Job Seeker</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="rohan@demo.local|Seeker@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Sneha Iyer</td>
+                                    <td>sneha@demo.local</td>
+                                    <td><span class="badge bg-secondary">Job Seeker</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="sneha@demo.local|Seeker@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Neha Verma</td>
+                                    <td>neha@demo.local</td>
+                                    <td><span class="badge bg-secondary">Job Seeker</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="neha@demo.local|Seeker@123">Use</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Karan Singh</td>
+                                    <td>karan@demo.local</td>
+                                    <td><span class="badge bg-secondary">Job Seeker</span></td>
+                                    <td><button type="button" class="btn btn-outline-primary btn-sm"
+                                                data-fill-login="karan@demo.local|Seeker@123">Use</button></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+</body>
+</html>
