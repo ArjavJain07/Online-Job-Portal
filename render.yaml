@@ -1,0 +1,65 @@
+# Render blueprint: one web service built from the Dockerfile, plus a Postgres
+# database. In Render, choose New > Blueprint and point it at this repository;
+# Render reads this file and creates both.
+#
+# Free tier notes (see docs/DEPLOY.md):
+#   - the web service sleeps after 15 minutes idle and takes about a minute to
+#     wake up on the next visit
+#   - the free database expires 30 days after it is created
+#   - there is no persistent disk, so uploaded resumes are lost on restart
+
+services:
+  - type: web
+    name: online-job-portal
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /login
+    autoDeployTrigger: commit
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Database connection, taken straight from the database defined below.
+      - key: DB_HOST
+        fromDatabase:
+          name: jobportal-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: jobportal-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: jobportal-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: jobportal-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: jobportal-db
+          property: password
+
+      # Admin password for the hosted copy. Render generates a random value on
+      # the first deploy; read it under the service's Environment tab.
+      - key: ADMIN_PASSWORD
+        generateValue: true
+
+      # Set to false if you would rather the hosted login page did not list the
+      # demo accounts.
+      - key: SHOW_DEMO_CREDENTIALS
+        value: "true"
+
+      # Keep the JVM inside the free instance's 512 MB.
+      - key: JAVA_OPTS
+        value: -XX:MaxRAMPercentage=70 -XX:+UseSerialGC
+
+databases:
+  - name: jobportal-db
+    plan: free
+    region: singapore
+    databaseName: jobportal
+    user: jobportal

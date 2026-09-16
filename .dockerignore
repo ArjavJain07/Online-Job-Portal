@@ -1,0 +1,12 @@
+.git
+.gradle
+build
+build-*
+data
+uploads
+docs
+design-system
+*.md
+*.bat
+.idea
+.vscode

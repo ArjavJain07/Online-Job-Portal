@@ -40,6 +40,7 @@ dependencies {
 
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'org.postgresql:postgresql'   // used by the hosted (Render) deployment
 
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 

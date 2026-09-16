@@ -39,7 +39,9 @@ Build a web-based job portal where **employers** post job listings and manage ap
 - Resume upload with type, size and content checks; a per-application copy of the resume
 - Seeded demo data, automated tests, README, report, demo script
 
-**Not built:** email, WebSockets/SSE, REST API beyond the one feed endpoint, notification centre, maintenance mode, Docker, and everything listed in Section 16.
+**Not built:** email, WebSockets/SSE, REST API beyond the one feed endpoint, notification centre, maintenance mode, and everything listed in Section 16.
+
+**Added after the plan was written:** an optional hosted copy on Render (`Dockerfile`, `render.yaml`, the `prod` profile on Postgres). It changes nothing about the local run, which is still H2 with one command. See `docs/DEPLOY.md`.
 
 ### 1.4 Glossary
 
@@ -3787,7 +3789,7 @@ Keep one screenshot per row in the backup deck.
 | Can someone find out which emails are registered from the login page? | Not for active accounts: an unknown email and a wrong password show the same "Invalid email or password." A deactivated account shows its own message even with a wrong password, because Spring checks `isEnabled` before the password. We accepted that so real users understand why they cannot log in; the stricter fix is a post-authentication enabled check. |
 | What if two users edit the same record at once? | The last save wins; optimistic locking with `@Version` is listed as future work. |
 | How does a user recover a forgotten password? | An admin sets a new password on the user edit page; email reset is future work. |
-| What are the main limitations? | No email, no push updates, rule-based matching, local file storage, no migrations tool, single-server deployment. |
+| What are the main limitations? | No email, no push updates, rule-based matching, local file storage (the hosted copy on Render has no permanent disk, so uploads there are temporary), no migrations tool, single-server deployment. |
 
 ---
 
@@ -3803,7 +3805,7 @@ None of the items below are built, and none of them appear in the routes (6.6) o
 | Real-time | WebSocket or SSE push for the feed and messages, typing indicators | Polling satisfies A-D5 (I-1). Future: STOMP over WebSocket. |
 | Search and matching | Full-text search engine, resume parsing to fill the profile, machine-learning matching, saved searches, job alerts, saved or bookmarked jobs | Keyword search and a transparent score are enough and explainable. |
 | Content | Company pages with reviews and logos, rich-text job descriptions, message attachments, resume builder, in-browser preview of DOC/DOCX | UI extras. |
-| Data and operations | Flyway or Liquibase migrations, production MySQL hardening, Docker, cloud deployment, HTTPS configuration, backups, virus scanning of uploads, CSV or PDF exports, bulk user import, activity log export, dated view analytics | Not needed for a local demo. Flyway is the first step towards production. |
+| Data and operations | Flyway or Liquibase migrations, production MySQL hardening, backups, virus scanning of uploads, CSV or PDF exports, bulk user import, activity log export, dated view analytics | Not needed for a local demo. Flyway is the first step towards production. **Docker and cloud deployment are now built** (Render blueprint on Postgres, `docs/DEPLOY.md`); HTTPS comes from Render's own proxy, which the `prod` profile trusts through `server.forward-headers-strategy`. |
 | Platform | Public REST API (the only JSON endpoint is the admin activity feed), single-page front end, mobile app, microservices, message brokers | Deliberately excluded to keep the project explainable. |
 | Admin settings | Maintenance mode, messaging on/off, withdraw on/off, configurable recommendation count, fine-grained admin permissions, editable email templates | Beyond A-F3's needs (D-10). |
 | UX | Dark mode, multiple languages, formal accessibility audit | Polish. |
