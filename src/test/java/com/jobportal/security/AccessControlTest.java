@@ -82,4 +82,16 @@ class AccessControlTest extends IntegrationTestBase {
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(containsString("Page not found")));
     }
+
+    // AC-A-D5-2 (Section 6.2 A-D5, 7.7): the live-feed script always adds
+    // X-Requested-With, so an anonymous call WITHOUT it (someone typing the feed URL
+    // directly, or a stale bookmark) must be treated like any other anonymous request into
+    // an admin URL - a redirect to /login, not the 401 an XHR call gets
+    // (ActivityFeedTest#unauthorizedForAnonymousAjax covers that case).
+    @Test
+    void feedRedirectsAnonymousNonAjax() throws Exception {
+        mockMvc.perform(get("/admin/activity/feed"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("http://localhost/login"));
+    }
 }

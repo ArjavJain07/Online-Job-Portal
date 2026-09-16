@@ -49,7 +49,18 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/register", null, "Create an account"),
                 new Page("/register/seeker", null, "Create your job seeker account"),
                 new Page("/register/employer", null, "Create your employer account"),
-                new Page("/account/password", "priya@demo.local", "Change password"));
+                new Page("/account/password", "priya@demo.local", "Change password"),
+                // Admin module (M3, Section 6.2). User/job ids below are seed codes, which
+                // equal ids on a fresh database (Section 13.1), the same rule already used
+                // for "/jobs/1" above.
+                new Page("/admin/users", "admin@jobportal.local", "Users"),
+                new Page("/admin/users/new", "admin@jobportal.local", "Create user"),
+                new Page("/admin/users/10/edit", "admin@jobportal.local", "Edit user"), // U10 Karan Singh
+                new Page("/admin/users/10/delete", "admin@jobportal.local", "Delete User"),
+                new Page("/admin/jobs", "admin@jobportal.local", "Job Approvals"),
+                new Page("/admin/jobs/8", "admin@jobportal.local", "Sales Intern"), // J8
+                new Page("/admin/settings", "admin@jobportal.local", "Settings"),
+                new Page("/admin/activity", "admin@jobportal.local", "Live Activity"));
     }
 
     @ParameterizedTest(name = "GET {0} renders for {1}")
