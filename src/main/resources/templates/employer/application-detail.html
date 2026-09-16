@@ -14,31 +14,20 @@
   on it.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{layout/dashboard :: layout(title=${applicationReference}, content=~{::main}, scripts=~{})}">
+      th:replace="~{layout/dashboard :: layout(title=${jobApplication.reference}, content=~{::main}, scripts=~{})}">
 <body>
 <main>
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
         <div>
             <h1 class="h3 mb-1">
-                <span th:text="${applicationReference}">APP-00001</span>
+                <span th:text="${jobApplication.reference}">APP-00001</span>
                 &middot;
                 <span th:text="${candidate.fullName}">Candidate name</span>
             </h1>
             <p class="text-muted mb-0">
-                <!-- statusName/statusLabel/jobId/jobTitle come from the controller
-                     instead of application.status/application.job - see the comment
-                     there for why. -->
-                <span th:switch="${statusName}">
-                    <span th:case="'APPLIED'"      class="badge app-applied"      th:text="${statusLabel}">Applied</span>
-                    <span th:case="'UNDER_REVIEW'" class="badge app-under-review" th:text="${statusLabel}">Under review</span>
-                    <span th:case="'SHORTLISTED'"  class="badge app-shortlisted"  th:text="${statusLabel}">Shortlisted</span>
-                    <span th:case="'INTERVIEW'"    class="badge app-interview"    th:text="${statusLabel}">Interview</span>
-                    <span th:case="'HIRED'"        class="badge app-hired"        th:text="${statusLabel}">Hired</span>
-                    <span th:case="'REJECTED'"     class="badge app-rejected"     th:text="${statusLabel}">Not selected</span>
-                    <span th:case="'WITHDRAWN'"    class="badge app-withdrawn"    th:text="${statusLabel}">Withdrawn</span>
-                </span>
+                <span th:replace="~{fragments/status-badge :: application(${jobApplication.status}, 'EMPLOYER')}"></span>
                 <span class="ms-2">Applied for</span>
-                <a th:href="@{/employer/jobs/{id}(id=${jobId})}" th:text="${jobTitle}">Job title</a>
+                <a th:href="@{/employer/jobs/{id}(id=${jobApplication.job.id})}" th:text="${jobApplication.job.title}">Job title</a>
                 <span class="ms-2 text-muted">on <span th:text="${#temporals.format(application.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</span></span>
             </p>
         </div>
@@ -89,18 +78,18 @@
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Cover letter</div>
                 <div class="card-body">
-                    <p th:if="${application.coverLetter != null}" class="pre-line mb-0" th:text="${application.coverLetter}">Cover letter.</p>
-                    <p th:if="${application.coverLetter == null}" class="text-muted mb-0">No cover letter provided.</p>
+                    <p th:if="${jobApplication.coverLetter != null}" class="pre-line mb-0" th:text="${jobApplication.coverLetter}">Cover letter.</p>
+                    <p th:if="${jobApplication.coverLetter == null}" class="text-muted mb-0">No cover letter provided.</p>
                 </div>
             </div>
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Resume</div>
                 <div class="card-body">
-                    <a th:href="@{/employer/applications/{id}/resume(id=${applicationId})}" target="_blank" rel="noopener">
+                    <a th:href="@{/employer/applications/{id}/resume(id=${jobApplication.id})}" target="_blank" rel="noopener">
                         <i class="bi bi-file-earmark-pdf me-1"></i>View resume
-                        (<span th:text="${application.resumeOriginalName}">resume.pdf</span>,
-                        <span th:text="${resumeSizeText}">180 KB</span>)
+                        (<span th:text="${jobApplication.resumeOriginalName}">resume.pdf</span>,
+                        <span th:text="${@fmt.fileSize(jobApplication.resumeSizeBytes)}">180 KB</span>)
                     </a>
                     <p class="form-text mb-0">The copy submitted with this application only.</p>
                 </div>
@@ -119,9 +108,7 @@
 
             <div class="card shadow-sm mb-4">
                 <div class="card-header">Change status</div>
-                <!-- statusName again, not application.status.name() - see the comment
-                     on the badge above and in EmployerApplicationController. -->
-                <div class="card-body" th:switch="${statusName}">
+                <div class="card-body" th:switch="${jobApplication.status.name()}">
 
                     <p th:case="'WITHDRAWN'" class="text-muted mb-0">
                         The candidate withdrew on
@@ -130,7 +117,7 @@
                     <p th:case="'HIRED'" class="text-muted mb-0">This application is final (Hired).</p>
                     <p th:case="'REJECTED'" class="text-muted mb-0">This application is final (Rejected).</p>
 
-                    <form th:case="*" th:action="@{/employer/applications/{id}/status(id=${applicationId})}"
+                    <form th:case="*" th:action="@{/employer/applications/{id}/status(id=${jobApplication.id})}"
                           th:object="${statusForm}" method="post">
                         <div class="mb-2">
                             <label class="form-label required" for="status">New status</label>
@@ -157,7 +144,7 @@
             <div class="card shadow-sm">
                 <div class="card-header">Private note</div>
                 <div class="card-body">
-                    <form th:action="@{/employer/applications/{id}/internal-note(id=${applicationId})}"
+                    <form th:action="@{/employer/applications/{id}/internal-note(id=${jobApplication.id})}"
                           th:object="${noteForm}" method="post">
                         <label class="form-label" for="internalNote">Private note (only your company sees this)</label>
                         <textarea class="form-control mb-2" id="internalNote" th:field="*{internalNote}" rows="4"

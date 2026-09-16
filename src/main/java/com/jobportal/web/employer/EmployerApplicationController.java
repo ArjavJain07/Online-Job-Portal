@@ -10,7 +10,6 @@ import com.jobportal.service.JobApplicationService;
 import com.jobportal.web.form.ApplicationStatusForm;
 import com.jobportal.web.form.InternalNoteForm;
 import com.jobportal.web.support.FileResponses;
-import com.jobportal.web.support.Formats;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -40,13 +39,11 @@ public class EmployerApplicationController {
 
     private final JobApplicationService jobApplicationService;
     private final FileStorageService fileStorageService;
-    private final Formats formats;
 
     public EmployerApplicationController(JobApplicationService jobApplicationService,
-            FileStorageService fileStorageService, Formats formats) {
+            FileStorageService fileStorageService) {
         this.jobApplicationService = jobApplicationService;
         this.fileStorageService = fileStorageService;
-        this.formats = formats;
     }
 
     // GET /employer/applications?jobId=&status=&page= (E-D2). jobId/status/page are left
@@ -141,37 +138,17 @@ public class EmployerApplicationController {
     // @ModelAttribute/BindingResult and is left untouched here (Section 7.2).
     private void addDetailModel(Long id, Long employerId, Model model) {
         JobApplication application = jobApplicationService.getForEmployer(id, employerId);
-        model.addAttribute("application", application);
+        // Named "jobApplication", never "application": Thymeleaf reserves the name
+        // "application" for the servlet context attributes, so a model attribute called
+        // "application" is shadowed and every ${application.x} silently reads as null.
+        model.addAttribute("jobApplication", application);
         model.addAttribute("candidate", jobApplicationService.candidateProfile(application));
         model.addAttribute("applicationStatusChanges", jobApplicationService.timeline(id));
 
-        // application.id and application.reference (used as the page <title> and the
-        // three @{...(id=...)} form/link targets) hit the exact same Thymeleaf 3.1 issue
-        // the comment below explains - built here too instead.
-        model.addAttribute("applicationId", id);
-        model.addAttribute("applicationReference", application.getReference());
-
-        // Built here, not read from application.status in the template: this Thymeleaf
-        // version leaves a property or method call on an ApplicationStatus value null
-        // whenever that value did not come straight from a th:each loop variable (a
-        // fragment parameter, a th:with variable and a direct multi-step chain like
-        // application.status.name() all hit it) - the plan's own "Thymeleaf 3.1" note
-        // says to build objects in the controller and pass them to the view instead.
-        ApplicationStatus status = application.getStatus();
-        model.addAttribute("statusName", status.name());
-        model.addAttribute("statusLabel", status.getLabel());
-        // Same reason as statusName/statusLabel above: application.job.id/.title (a
-        // two-step chain) inside an @{...} link left "id" null in this Thymeleaf
-        // version, even with application.job pulled out to its own th:with variable
-        // first.
-        model.addAttribute("jobId", application.getJob().getId());
-        model.addAttribute("jobTitle", application.getJob().getTitle());
-        // Same reason again: @fmt.fileSize(application.resumeSizeBytes) - a bean call
-        // with a computed argument - is exactly the case the plan's own Thymeleaf 3.1
-        // note calls out; formatted here instead.
-        model.addAttribute("resumeSizeText", formats.fileSize(application.getResumeSizeBytes()));
+        // The statuses this application may move to next (Section 5.6), built here so the
+        // template only loops over ready-made options.
         List<ApplicationStatusOption> statusOptions = new ArrayList<>();
-        for (ApplicationStatus option : status.employerOptions()) {
+        for (ApplicationStatus option : application.getStatus().employerOptions()) {
             statusOptions.add(new ApplicationStatusOption(option.name(), option.getLabel()));
         }
         model.addAttribute("statusOptions", statusOptions);
