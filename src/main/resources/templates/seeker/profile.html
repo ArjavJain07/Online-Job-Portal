@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!--
+  Seeker profile (Section 6.4 S-F4/S-D3). SeekerProfileController#form puts the profile
+  form under "seekerProfileForm", a separate resume-upload form under "resumeForm" (Section
+  6.4 S-F4 "Resume card" note: kept apart so a profile validation error never discards a
+  chosen file), the SeekerProfile row itself under "profile" (for the resume card's file
+  name/size/date), the completeness bar under "completeness" (ProfileCompleteness: percent
+  + hint, hint null at 100%), the preferredJobType options under "jobTypes" (Section 7.1
+  note: an enum is resolved once in the controller, not looped with T(...) here) and the
+  file input's accept attribute/help text under "resumeAccept"/"resumeHint" (built from the
+  current settings, Section 7.4/7.5).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='My Profile', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="mb-3">
+        <h1 class="h3 mb-1">My profile</h1>
+        <p class="text-muted mb-0">Keep your details and resume up to date so employers can reach you.</p>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-bold">Profile completeness</span>
+                <span th:text="${completeness.percent} + '%'">60%</span>
+            </div>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar" role="progressbar" th:style="'width: ' + ${completeness.percent} + '%'"
+                     th:attr="aria-valuenow=${completeness.percent}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <p class="form-text mb-0" th:if="${completeness.hint != null}" th:text="${completeness.hint}">Add a headline so employers know what you do.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header">Personal information</div>
+                <div class="card-body">
+                    <form th:action="@{/seeker/profile}" th:object="${seekerProfileForm}" method="post">
+
+                        <div class="mb-3">
+                            <label class="form-label required" for="fullName">Full name</label>
+                            <input type="text" class="form-control" id="fullName" th:field="*{fullName}" maxlength="100"
+                                   th:classappend="${#fields.hasErrors('fullName')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{fullName}">Name error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required" for="email">Email</label>
+                            <input type="email" class="form-control" id="email" th:field="*{email}" maxlength="254"
+                                   th:classappend="${#fields.hasErrors('email')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{email}">Email error.</div>
+                            <div class="form-text">Changing this logs you out; you'll log back in with the new address.</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="phone">Phone</label>
+                                <input type="text" class="form-control" id="phone" th:field="*{phone}" maxlength="15"
+                                       placeholder="9876543210" th:classappend="${#fields.hasErrors('phone')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{phone}">Phone error.</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="location">Location</label>
+                                <input type="text" class="form-control" id="location" th:field="*{location}" maxlength="100"
+                                       placeholder="Pune, India" th:classappend="${#fields.hasErrors('location')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{location}">Location error.</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="headline">Headline</label>
+                            <input type="text" class="form-control" id="headline" th:field="*{headline}" maxlength="120"
+                                   placeholder="Final-year B.Tech CSE student" th:classappend="${#fields.hasErrors('headline')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{headline}">Headline error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="skills">Skills</label>
+                            <input type="text" class="form-control" id="skills" th:field="*{skills}" maxlength="300"
+                                   placeholder="Comma-separated, e.g. java, spring boot, sql"
+                                   th:classappend="${#fields.hasErrors('skills') or #fields.hasErrors('skillsValid')} ? 'is-invalid'">
+                            <div class="form-text">Comma-separated, e.g. java, spring boot, sql. At most 30 skills.</div>
+                            <div class="invalid-feedback" th:errors="*{skills}">Skills error.</div>
+                            <div class="invalid-feedback" th:errors="*{skillsValid}">Skills count error.</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required" for="experienceYears">Experience (years)</label>
+                                <input type="number" class="form-control" id="experienceYears" th:field="*{experienceYears}"
+                                       min="0" max="50" th:classappend="${#fields.hasErrors('experienceYears')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{experienceYears}">Experience error.</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" for="preferredJobType">Preferred job type</label>
+                                <select class="form-select" id="preferredJobType" th:field="*{preferredJobType}">
+                                    <option value="">No preference</option>
+                                    <option th:each="t : ${jobTypes}" th:value="${t}" th:text="${t.label}">Full-time</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="education">Education</label>
+                            <input type="text" class="form-control" id="education" th:field="*{education}" maxlength="200"
+                                   placeholder="B.Tech Computer Science, 2026" th:classappend="${#fields.hasErrors('education')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{education}">Education error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="about">About</label>
+                            <textarea class="form-control" id="about" th:field="*{about}" rows="4" maxlength="1000"
+                                      th:classappend="${#fields.hasErrors('about')} ? 'is-invalid'"></textarea>
+                            <div class="invalid-feedback" th:errors="*{about}">About error.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-header">Resume</div>
+                <div class="card-body">
+                    <div th:if="${profile.resumeStoredName != null}" class="mb-3">
+                        <p class="mb-1">
+                            <i class="bi bi-file-earmark-pdf me-1"></i>
+                            <span th:text="${profile.resumeOriginalName}">Priya_Sharma_Resume.pdf</span>
+                        </p>
+                        <p class="text-muted small mb-2">
+                            <span th:text="${@fmt.fileSize(profile.resumeSizeBytes)}">180 KB</span>
+                            &middot; uploaded <span th:text="${#temporals.format(profile.resumeUploadedAt, 'dd MMM yyyy')}">01 Sep 2026</span>
+                        </p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a th:href="@{/seeker/profile/resume}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">View</a>
+                            <form th:action="@{/seeker/profile/resume/delete}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        data-confirm="Remove your resume? You'll need to upload one when applying for jobs.">
+                                    Remove
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <p th:unless="${profile.resumeStoredName != null}" class="text-muted">No resume in your profile yet.</p>
+
+                    <hr th:if="${profile.resumeStoredName != null}">
+
+                    <form th:action="@{/seeker/profile/resume(_csrf=${_csrf.token})}" th:object="${resumeForm}"
+                          method="post" enctype="multipart/form-data">
+                        <label class="form-label" for="resumeFile" th:text="${profile.resumeStoredName != null} ? 'Replace resume' : 'Upload resume'">Upload resume</label>
+                        <input type="file" class="form-control" id="resumeFile" th:field="*{resumeFile}"
+                               th:attr="accept=${resumeAccept}"
+                               th:classappend="${#fields.hasErrors('resumeFile')} ? 'is-invalid'">
+                        <div class="invalid-feedback" th:errors="*{resumeFile}">Resume error.</div>
+                        <div class="form-text" th:text="${resumeHint}">PDF, DOC or DOCX, max 2 MB</div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Upload</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>
