@@ -27,10 +27,10 @@
 
 <div th:replace="~{fragments/flash :: announcement}"></div>
 
-<main class="jp-page px-3 flex-grow-1">
+<div class="jp-page px-3 flex-grow-1">
     <div th:replace="~{fragments/flash :: messages}"></div>
     <th:block th:replace="${content}"></th:block>
-</main>
+</div>
 
 <footer class="border-top bg-white py-4 mt-auto">
     <div class="jp-page px-3 py-0 text-center text-muted small">

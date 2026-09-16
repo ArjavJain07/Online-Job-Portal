@@ -193,6 +193,26 @@
     if (passwordInput && creds[1]) {
       passwordInput.value = creds[1];
     }
+
+    // Say what happened. Filling two fields further up the page is easy to miss,
+    // especially once the demo list is scrolled into view.
+    const status = document.getElementById('demo-fill-status');
+    if (status) {
+      const who = button.getAttribute('data-fill-name') || creds[0];
+      status.textContent = 'Filled in ' + who + '. Press Log in to continue.';
+      status.hidden = false;
+    }
+
+    // Close the demo list again and put the cursor on the button they need next.
+    const panel = document.getElementById('demoAccounts');
+    if (panel && window.bootstrap && window.bootstrap.Collapse) {
+      window.bootstrap.Collapse.getOrCreateInstance(panel).hide();
+    }
+    const submit = document.querySelector('form[action$="/login"] button[type="submit"]');
+    if (submit) {
+      submit.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      submit.focus();
+    }
   });
 
   /* ========================================================================

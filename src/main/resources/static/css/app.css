@@ -274,6 +274,10 @@ button:focus-visible,
 /* ---------- 5. Page shell: rail + main column ---------------------------- */
 
 .jp-page {
+    /* width:100% matters: body is a column flex container, and an auto side margin on a
+       flex item cancels the default stretch, which would shrink this column to the width
+       of its own content. */
+    width: 100%;
     max-width: var(--jp-page-width);
     margin-inline: auto;
     padding-block: 1.5rem;
