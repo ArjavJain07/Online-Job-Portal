@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!--
+  Employer job detail (Section 6.3 E-D1/E-D4). EmployerJobController#detail hands over the
+  job itself (already ownership-checked - a foreign job id is a 404, Section 4.5), its full
+  status history ("jobStatusChanges", oldest first - same model attribute and fragment
+  signature as the admin review page, Section 6.3 note), "applicationsByStatus" and
+  "totalApplications" for the quick-stats card, and "today".
+
+  Actions mirror employer/jobs.html exactly: Edit and Close are hidden once the job is
+  CLOSED, Delete is a live button only when totalApplications is 0 (otherwise a disabled
+  one with the "Close instead" tooltip - the plan's own note on why the refusal message in
+  JobService.delete is only reachable from a stale page), and a closed job gets a plain
+  Reopen form with a new deadline instead (Section 6.3 E-D4 "Reopen form"; the range check
+  needs "today" from the Clock, so it is validated by JobService.reopen, not by a static
+  annotation the template could enforce, Section 6.3 field table note on applicationDeadline).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${job.title}, content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+        <div>
+            <h1 class="h3 mb-1" th:text="${job.title}">Job title</h1>
+            <p class="text-muted mb-0">
+                <span th:replace="~{fragments/status-badge :: job(${job})}"></span>
+                <span class="ms-2" th:text="${job.location}">Location</span>
+                -
+                <span th:text="${job.jobType.label}">Full-time</span>
+                -
+                <span th:text="${job.workMode.label}">Remote</span>
+            </p>
+        </div>
+        <a th:href="@{/employer/jobs}" class="btn btn-outline-secondary">Back to my jobs</a>
+    </div>
+
+    <div class="alert alert-danger mt-3" th:if="${job.status.name() == 'REJECTED' and job.rejectionReason != null}">
+        <strong>Rejected:</strong> <span th:text="${job.rejectionReason}">Reason</span>
+    </div>
+
+    <div class="row g-4 mt-1">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <span class="badge text-bg-light border me-1" th:text="${job.category.label}">Category</span>
+                        <span class="badge text-bg-light border me-1" th:text="${job.jobType.label}">Full-time</span>
+                        <span class="badge text-bg-light border" th:text="${job.workMode.label}">Remote</span>
+                    </div>
+
+                    <dl class="row small mb-0">
+                        <dt class="col-sm-4">Salary</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</dd>
+
+                        <dt class="col-sm-4">Experience needed</dt>
+                        <dd class="col-sm-8" th:text="${@fmt.experience(job.minExperienceYears)}">Freshers welcome</dd>
+
+                        <dt class="col-sm-4">Openings</dt>
+                        <dd class="col-sm-8" th:text="${job.openings}">1</dd>
+
+                        <dt class="col-sm-4">Submitted</dt>
+                        <dd class="col-sm-8" th:text="${#temporals.format(job.createdAt, 'dd MMM yyyy')}">16 Sep 2026</dd>
+
+                        <dt class="col-sm-4">Deadline</dt>
+                        <dd class="col-sm-8">
+                            <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">30 Sep 2026</span>
+                            <span class="badge text-bg-danger ms-1" th:if="${job.applicationDeadline.isBefore(today)}">Passed</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h2 class="h5">Job description</h2>
+                    <p class="pre-line" th:text="${job.description}">Description</p>
+
+                    <h2 class="h5">Requirements</h2>
+                    <p class="pre-line" th:text="${job.requirements}">Requirements</p>
+
+                    <th:block th:if="${!#lists.isEmpty(job.skillList())}">
+                        <h2 class="h5">Skills</h2>
+                        <p>
+                            <span class="badge text-bg-light border me-1" th:each="skill : ${job.skillList()}"
+                                  th:text="${skill}">Skill</span>
+                        </p>
+                    </th:block>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">Status history</div>
+                <div class="card-body">
+                    <div th:replace="~{fragments/timeline :: jobTimeline(${jobStatusChanges})}"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Quick stats</div>
+                <div class="card-body">
+                    <dl class="row small mb-2">
+                        <dt class="col-sm-6">Views</dt>
+                        <dd class="col-sm-6" th:text="${job.viewCount}">0</dd>
+
+                        <dt class="col-sm-6">Applications</dt>
+                        <dd class="col-sm-6" th:text="${totalApplications}">0</dd>
+                    </dl>
+                    <div th:unless="${#maps.isEmpty(applicationsByStatus)}">
+                        <span class="badge text-bg-light border me-1 mb-1" th:each="entry : ${applicationsByStatus}"
+                              th:text="${entry.key.label} + ': ' + ${entry.value}">Applied: 2</span>
+                    </div>
+                    <a th:href="@{/employer/applications(jobId=${job.id})}" class="btn btn-sm btn-outline-primary mt-2">
+                        View applications
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">Actions</div>
+                <div class="card-body d-grid gap-2">
+                    <a th:if="${job.status.name() != 'CLOSED'}" th:href="@{/employer/jobs/{id}/edit(id=${job.id})}"
+                       class="btn btn-outline-secondary">Edit</a>
+
+                    <form th:if="${job.status.name() != 'CLOSED'}" th:action="@{/employer/jobs/{id}/close(id=${job.id})}" method="post">
+                        <button type="submit" class="btn btn-outline-warning w-100"
+                                data-confirm="Close this job? It will stop accepting applications.">Close</button>
+                    </form>
+
+                    <form th:if="${totalApplications == 0}" th:action="@{/employer/jobs/{id}/delete(id=${job.id})}" method="post">
+                        <button type="submit" class="btn btn-outline-danger w-100"
+                                data-confirm="Delete this job? This can't be undone.">Delete</button>
+                    </form>
+                    <button th:unless="${totalApplications == 0}" type="button" class="btn btn-outline-danger w-100"
+                            disabled title="Close instead">Delete</button>
+
+                    <div th:if="${job.status.name() == 'CLOSED'}" class="border-top pt-3 mt-1">
+                        <form th:action="@{/employer/jobs/{id}/reopen(id=${job.id})}" method="post">
+                            <label class="form-label required" for="newDeadline">Reopen with a new deadline</label>
+                            <input type="date" class="form-control mb-2" id="newDeadline" name="newDeadline" required>
+                            <button type="submit" class="btn btn-success w-100">Reopen</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

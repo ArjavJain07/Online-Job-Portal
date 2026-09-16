@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!--
+  Employer job posting form (Section 6.3 E-F1/E-D1). One template for both GET
+  /employer/jobs/new and GET /employer/jobs/{id}/edit - EmployerJobController passes
+  "jobId" (null on create), "formAction"/"pageTitle" built once in the controller (not a
+  template-side ternary, same reasoning as admin/user-form.html) and "formOptions" (the
+  three enum value arrays: Section 7.1 note, an enum can't be looped with T(...) here).
+
+  Field-level errors use th:errors on the matching JobForm property; the two class-level
+  @AssertTrue checks (isSalaryRangeValid, isSkillsValid) are attached to their own
+  synthetic properties "salaryRangeValid" and "skillsValid" (Section 6.3 template tip), so
+  each is shown next to the field it is really about (salaryMax, skills) instead of at the
+  top of the form. Any other refusal (the active-job limit, the deadline range on create,
+  or an edit of a job that is no longer editable) arrives as a global error from
+  result.reject("businessRule", ...) (Section 7.2) and is shown in the alert at the top.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title=${pageTitle}, content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1" th:text="${pageTitle}">Post a job</h1>
+    <p class="text-muted mb-4" th:if="${jobId == null}">Fill in the details below. New postings need admin approval unless the site has turned that off.</p>
+    <p class="text-muted mb-4" th:if="${jobId != null}">Changing the title, description, requirements, skills, category, job type, work mode, location, salary or experience on a live job sends it back for re-approval.</p>
+
+    <div class="row">
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <form th:action="@{${formAction}}" th:object="${jobForm}" method="post" novalidate>
+
+                        <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}">
+                            <span th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error message.</span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="title" class="form-label required">Job title</label>
+                            <input type="text" class="form-control" id="title" th:field="*{title}" maxlength="120"
+                                   th:classappend="${#fields.hasErrors('title')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{title}">Title error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label required">Description</label>
+                            <textarea class="form-control" id="description" th:field="*{description}" rows="6"
+                                      maxlength="4000" data-maxlength="4000" data-counter="descriptionCounter"
+                                      th:classappend="${#fields.hasErrors('description')} ? 'is-invalid'"></textarea>
+                            <span id="descriptionCounter" class="char-counter">0 / 4000</span>
+                            <div class="invalid-feedback" th:errors="*{description}">Description error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="requirements" class="form-label required">Requirements</label>
+                            <textarea class="form-control" id="requirements" th:field="*{requirements}" rows="4"
+                                      maxlength="2000" data-maxlength="2000" data-counter="requirementsCounter"
+                                      th:classappend="${#fields.hasErrors('requirements')} ? 'is-invalid'"></textarea>
+                            <span id="requirementsCounter" class="char-counter">0 / 2000</span>
+                            <div class="invalid-feedback" th:errors="*{requirements}">Requirements error.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="skills" class="form-label required">Skills</label>
+                            <input type="text" class="form-control" id="skills" th:field="*{skills}" maxlength="300"
+                                   placeholder="Comma-separated, e.g. java, spring boot, sql"
+                                   th:classappend="${#fields.hasErrors('skills') or #fields.hasErrors('skillsValid')} ? 'is-invalid'">
+                            <div class="form-text">Comma-separated, e.g. java, spring boot, sql. At most 30 skills.</div>
+                            <div class="invalid-feedback" th:errors="*{skills}">Skills error.</div>
+                            <div class="invalid-feedback" th:errors="*{skillsValid}">Skills count error.</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="category" class="form-label required">Category</label>
+                                <select id="category" class="form-select" th:field="*{category}"
+                                        th:classappend="${#fields.hasErrors('category')} ? 'is-invalid'">
+                                    <option value="">Choose a category</option>
+                                    <option th:each="c : ${formOptions.categories}" th:value="${c}" th:text="${c.label}">Category</option>
+                                </select>
+                                <div class="invalid-feedback" th:errors="*{category}">Category error.</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="jobType" class="form-label required">Job type</label>
+                                <select id="jobType" class="form-select" th:field="*{jobType}"
+                                        th:classappend="${#fields.hasErrors('jobType')} ? 'is-invalid'">
+                                    <option value="">Choose a job type</option>
+                                    <option th:each="t : ${formOptions.jobTypes}" th:value="${t}" th:text="${t.label}">Job type</option>
+                                </select>
+                                <div class="invalid-feedback" th:errors="*{jobType}">Job type error.</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="workMode" class="form-label required">Work mode</label>
+                                <select id="workMode" class="form-select" th:field="*{workMode}"
+                                        th:classappend="${#fields.hasErrors('workMode')} ? 'is-invalid'">
+                                    <option value="">Choose a work mode</option>
+                                    <option th:each="w : ${formOptions.workModes}" th:value="${w}" th:text="${w.label}">Work mode</option>
+                                </select>
+                                <div class="invalid-feedback" th:errors="*{workMode}">Work mode error.</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="location" class="form-label required">Location</label>
+                            <input type="text" class="form-control" id="location" th:field="*{location}" maxlength="100"
+                                   placeholder="City, or &quot;Remote&quot;"
+                                   th:classappend="${#fields.hasErrors('location')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:errors="*{location}">Location error.</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="salaryMin" class="form-label required">Minimum salary (INR per year)</label>
+                                <input type="number" class="form-control" id="salaryMin" th:field="*{salaryMin}"
+                                       min="0" max="100000000"
+                                       th:classappend="${#fields.hasErrors('salaryMin')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{salaryMin}">Salary error.</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="salaryMax" class="form-label required">Maximum salary (INR per year)</label>
+                                <input type="number" class="form-control" id="salaryMax" th:field="*{salaryMax}"
+                                       min="0" max="100000000"
+                                       th:classappend="${#fields.hasErrors('salaryMax') or #fields.hasErrors('salaryRangeValid')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{salaryMax}">Salary error.</div>
+                                <div class="invalid-feedback" th:errors="*{salaryRangeValid}">Range error.</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="minExperienceYears" class="form-label required">Minimum experience (years)</label>
+                                <input type="number" class="form-control" id="minExperienceYears" th:field="*{minExperienceYears}"
+                                       min="0" max="30"
+                                       th:classappend="${#fields.hasErrors('minExperienceYears')} ? 'is-invalid'">
+                                <div class="form-text">0 means freshers welcome.</div>
+                                <div class="invalid-feedback" th:errors="*{minExperienceYears}">Experience error.</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="openings" class="form-label required">Openings</label>
+                                <input type="number" class="form-control" id="openings" th:field="*{openings}"
+                                       min="1" max="1000"
+                                       th:classappend="${#fields.hasErrors('openings')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{openings}">Openings error.</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="applicationDeadline" class="form-label required">Application deadline</label>
+                                <input type="date" class="form-control" id="applicationDeadline" th:field="*{applicationDeadline}"
+                                       th:classappend="${#fields.hasErrors('applicationDeadline')} ? 'is-invalid'">
+                                <div class="form-text">Up to 180 days from today.</div>
+                                <div class="invalid-feedback" th:errors="*{applicationDeadline}">Deadline error.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="submit" class="btn btn-primary" th:text="${jobId == null} ? 'Post job' : 'Save changes'">Save</button>
+                            <a th:href="@{/employer/jobs}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

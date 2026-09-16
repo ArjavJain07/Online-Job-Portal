@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!--
+  Employer's current jobs (Section 6.3 E-D1). EmployerJobController#list puts the plain
+  list under "jobs" (pending, live/expired/hidden and rejected - closed jobs live only in
+  history, E-D4), "activeCount"/"maxActiveJobs" for the header counter, "applicationCounts"
+  (keyed by job id, same one-small-query-per-row pattern as admin/jobs.html) and "today"
+  (from the injected Clock). Not paginated (Section 6.0/7.9: bounded by
+  maxActiveJobsPerEmployer, at most 100 rows).
+
+  The Delete button is only ever a live link when a job has 0 applications; otherwise it
+  is rendered disabled with the "Close instead" tooltip right here, so the refusal message
+  in JobService.delete is only reachable from a stale page or a hand-crafted request (the
+  plan's own note on this).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='My Jobs', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="h3 mb-1">My jobs</h1>
+            <p class="text-muted mb-0">
+                Active jobs: <span th:text="${activeCount}">6</span> of <span th:text="${maxActiveJobs}">20</span>
+            </p>
+        </div>
+        <a th:href="@{/employer/jobs/new}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Post a job</a>
+    </div>
+
+    <div th:if="${#lists.isEmpty(jobs)}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-briefcase icon"></i>
+            <p class="message">You haven't posted any jobs yet. Post your first job.</p>
+            <a th:href="@{/employer/jobs/new}" class="btn btn-primary action">Post a job</a>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(jobs)}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th>Live since</th>
+                    <th>Deadline</th>
+                    <th>Applications</th>
+                    <th>Views</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="j : ${jobs}">
+                    <td><a th:href="@{/employer/jobs/{id}(id=${j.id})}" th:text="${j.title}">Job title</a></td>
+                    <td>
+                        <span th:replace="~{fragments/status-badge :: job(${j})}"></span>
+                        <div class="small text-danger mt-1" th:if="${j.status.name() == 'REJECTED' and j.rejectionReason != null}"
+                             th:text="${j.rejectionReason}">Rejection reason</div>
+                    </td>
+                    <td th:text="${#temporals.format(j.createdAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                    <td>
+                        <span th:if="${j.approvedAt != null}" th:text="${#temporals.format(j.approvedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
+                        <span th:unless="${j.approvedAt != null}">-</span>
+                    </td>
+                    <td th:text="${#temporals.format(j.applicationDeadline, 'dd MMM yyyy')}">30 Sep 2026</td>
+                    <td>
+                        <a th:href="@{/employer/applications(jobId=${j.id})}" th:text="${applicationCounts.get(j.id)}">0</a>
+                    </td>
+                    <td th:text="${j.viewCount}">0</td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a th:href="@{/employer/jobs/{id}/edit(id=${j.id})}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            <form th:action="@{/employer/jobs/{id}/close(id=${j.id})}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-warning"
+                                        data-confirm="Close this job? It will stop accepting applications.">Close</button>
+                            </form>
+                            <form th:if="${applicationCounts.get(j.id) == 0}" th:action="@{/employer/jobs/{id}/delete(id=${j.id})}"
+                                  method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        data-confirm="Delete this job? This can't be undone.">Delete</button>
+                            </form>
+                            <button th:unless="${applicationCounts.get(j.id) == 0}" type="button"
+                                    class="btn btn-sm btn-outline-danger" disabled title="Close instead">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

@@ -2,13 +2,23 @@
 <!--
   Status history timelines (Section 7.1, entities in Section 5.5/5.6).
 
-  "jobTimeline(changes)" renders a list of JobStatusChange, oldest problem first: each
-  entry is coloured by the status it moved TO and shows who made the change and, if the
-  admin gave one, the reason.
+  "jobTimeline(changes)" renders a list of JobStatusChange, oldest first: each entry is
+  coloured by the status it moved TO, labelled with change.timelineLabel (Section 5.5
+  "Timeline label" column - "Posted", "Resubmitted", "Reopened, awaiting approval" and so
+  on, not the plain toStatus badge text) and shows who made the change and, if the admin
+  gave one, the reason.
 
   "applicationTimeline(changes, audience)" renders a list of ApplicationStatusChange the
-  same way, reusing fragments/status-badge :: application so the colour and wording match
-  every other place a status is shown to this audience (employer/admin vs seeker).
+  same way, coloured and worded exactly like fragments/status-badge :: application for
+  this audience (employer/admin vs seeker). The badge markup is repeated here rather than
+  delegated to that fragment with a th:replace, the same choice jobTimeline already makes
+  for fragments/status-badge :: job: a th:each row calling INTO another fragment with a
+  parameter forwarded from ITS OWN fragment parameter (here, audience) leaves that
+  parameter null inside the callee, so "audience == 'seeker'" always reads a null - a
+  known Thymeleaf 3.1 limitation on nested, parameterised fragment calls (see the
+  "Thymeleaf 3.1" note in the project's build notes). Calling the same fragment directly
+  with a literal audience, the way application-detail.html and applications.html both do
+  for their own badges, is unaffected and stays a th:replace.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
@@ -17,10 +27,10 @@
     <li class="timeline-item" th:each="change : ${changes}" th:switch="${change.toStatus.name()}">
         <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
         <div class="content">
-            <span th:case="'APPROVED'"         class="status badge job-live"    th:text="${change.toStatus.label}">Approved</span>
-            <span th:case="'PENDING_APPROVAL'" class="status badge job-pending" th:text="${change.toStatus.label}">Pending approval</span>
-            <span th:case="'REJECTED'"         class="status badge job-rejected" th:text="${change.toStatus.label}">Rejected</span>
-            <span th:case="'CLOSED'"           class="status badge job-closed"  th:text="${change.toStatus.label}">Closed</span>
+            <span th:case="'APPROVED'"         class="status badge job-live"    th:text="${change.timelineLabel}">Approved</span>
+            <span th:case="'PENDING_APPROVAL'" class="status badge job-pending" th:text="${change.timelineLabel}">Pending approval</span>
+            <span th:case="'REJECTED'"         class="status badge job-rejected" th:text="${change.timelineLabel}">Rejected</span>
+            <span th:case="'CLOSED'"           class="status badge job-closed"  th:text="${change.timelineLabel}">Closed</span>
             <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by Admin User</span>
             <p class="note" th:if="${change.reason != null}" th:text="${change.reason}">Reason given by the admin.</p>
         </div>
@@ -28,10 +38,18 @@
 </ol>
 
 <ol th:fragment="applicationTimeline(changes, audience)" class="timeline">
-    <li class="timeline-item" th:each="change : ${changes}">
+    <li class="timeline-item" th:each="change : ${changes}"
+        th:with="text=${audience == 'seeker'} ? ${change.toStatus.seekerLabel} : ${change.toStatus.label}"
+        th:switch="${change.toStatus.name()}">
         <span class="date" th:text="${#temporals.format(change.changedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
         <div class="content">
-            <span class="status" th:replace="~{fragments/status-badge :: application(${change.toStatus}, ${audience})}"></span>
+            <span th:case="'APPLIED'"      class="status badge app-applied"      th:text="${text}">Applied</span>
+            <span th:case="'UNDER_REVIEW'" class="status badge app-under-review" th:text="${text}">Under review</span>
+            <span th:case="'SHORTLISTED'"  class="status badge app-shortlisted"  th:text="${text}">Shortlisted</span>
+            <span th:case="'INTERVIEW'"    class="status badge app-interview"    th:text="${text}">Interview</span>
+            <span th:case="'HIRED'"        class="status badge app-hired"        th:text="${text}">Hired</span>
+            <span th:case="'REJECTED'"     class="status badge app-rejected"     th:text="${text}">Not selected</span>
+            <span th:case="'WITHDRAWN'"    class="status badge app-withdrawn"    th:text="${text}">Withdrawn</span>
             <span class="text-muted small ms-1" th:text="'by ' + ${change.actorName}">by HR Manager</span>
             <p class="note" th:if="${change.noteToCandidate != null}" th:text="${change.noteToCandidate}">Note to the candidate.</p>
         </div>

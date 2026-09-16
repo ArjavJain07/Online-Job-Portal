@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<!--
+  Employer job posting history (Section 6.3 E-D4). EmployerJobController#history puts a
+  real Spring Data Page<Job> under "page" (pagination only, Section 7.9), the same rows in
+  the order the page returned them under "rows" (each one an EmployerJobHistoryRow -
+  job plus the pre-formatted decision/closed-on text and the applications/hired counts,
+  built in JobService so this template only has to th:text them, never format a date or
+  branch on job.status itself), "activeTab" for the filter tabs, "summary" (the "N jobs
+  posted: ..." line, always over every status regardless of the filter) and "today".
+
+  Live and Expired are computed labels (Section 5.5), so their filter tabs are built with
+  JobSpecifications in the service, not in Java here - see JobService.employerJobHistory.
+  Reopening a closed row uses the same collapsible inline form admin/jobs.html uses for
+  its reject reason, one per row (ids keyed by job id) so several closed rows can each
+  have their own date without clashing.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Job Posting History', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <h1 class="h3 mb-1">Job posting history</h1>
+    <p class="text-muted mb-3" th:text="${summary}">6 jobs posted: 4 live, 1 expired, 1 pending, 0 rejected, 0 closed</p>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'ALL'} ? 'active'"
+               th:href="@{/employer/jobs/history(status='ALL')}">All</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'LIVE'} ? 'active'"
+               th:href="@{/employer/jobs/history(status='LIVE')}">Live</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'EXPIRED'} ? 'active'"
+               th:href="@{/employer/jobs/history(status='EXPIRED')}">Expired</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'PENDING_APPROVAL'} ? 'active'"
+               th:href="@{/employer/jobs/history(status='PENDING_APPROVAL')}">Pending approval</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'REJECTED'} ? 'active'"
+               th:href="@{/employer/jobs/history(status='REJECTED')}">Rejected</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeTab == 'CLOSED'} ? 'active'"
+               th:href="@{/employer/jobs/history(status='CLOSED')}">Closed</a>
+        </li>
+    </ul>
+
+    <div th:if="${#lists.isEmpty(rows)}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-clock-history icon"></i>
+            <p class="message">No jobs match this filter. Post a job to get started.</p>
+            <a th:href="@{/employer/jobs/new}" class="btn btn-primary action">Post a job</a>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(rows)}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th>Decision</th>
+                    <th>Closed on</th>
+                    <th>Applications</th>
+                    <th>Hired</th>
+                    <th>View</th>
+                </tr>
+                </thead>
+                <tbody>
+                <th:block th:each="row : ${rows}">
+                    <tr>
+                        <td><a th:href="@{/employer/jobs/{id}(id=${row.job.id})}" th:text="${row.job.title}">Job title</a></td>
+                        <td><span th:replace="~{fragments/status-badge :: job(${row.job})}"></span></td>
+                        <td th:text="${#temporals.format(row.job.createdAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                        <td th:text="${row.decisionText}">Approved 28 Aug 2026</td>
+                        <td>
+                            <span th:if="${row.closedOnText != null}" th:text="${row.closedOnText}">16 Sep 2026</span>
+                            <span th:unless="${row.closedOnText != null}">-</span>
+                        </td>
+                        <td th:text="${row.applications}">0</td>
+                        <td th:text="${row.hired}">0</td>
+                        <td>
+                            <div class="d-flex gap-1 flex-wrap">
+                                <a th:href="@{/employer/jobs/{id}(id=${row.job.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                                <button th:if="${row.job.status.name() == 'CLOSED'}" type="button"
+                                        class="btn btn-sm btn-outline-success" data-bs-toggle="collapse"
+                                        th:attr="data-bs-target=${'#reopen-' + row.job.id}, aria-controls=${'reopen-' + row.job.id}"
+                                        aria-expanded="false">
+                                    Reopen
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:if="${row.job.status.name() == 'CLOSED'}">
+                        <td colspan="8" class="p-0 border-0">
+                            <div class="collapse" th:id="${'reopen-' + row.job.id}">
+                                <form th:action="@{/employer/jobs/{id}/reopen(id=${row.job.id})}" method="post"
+                                      class="p-3 bg-light border-top d-flex gap-2 align-items-end flex-wrap">
+                                    <div>
+                                        <label class="form-label" th:for="${'deadline-' + row.job.id}">New deadline</label>
+                                        <input type="date" class="form-control" th:id="${'deadline-' + row.job.id}"
+                                               name="newDeadline" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-success">Reopen</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                </th:block>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>

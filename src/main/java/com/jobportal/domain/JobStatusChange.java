@@ -59,6 +59,28 @@ public class JobStatusChange {
         }
     }
 
+    // The label shown on the timeline (Section 5.5 "Timeline label" column) - distinct
+    // from the plain toStatus badge fragments/status-badge already renders on jobs.html/
+    // job-history.html, because several different (fromStatus, toStatus) pairs share the
+    // same toStatus but mean different things to the reader: "Posted" vs "Resubmitted" vs
+    // "Reopened, awaiting approval" are all a move INTO PENDING_APPROVAL, and "Approved"
+    // vs "Reopened" are both a move into APPROVED. Every pair in the 5.5 transition table
+    // maps to exactly one label, so this needs only fromStatus and toStatus.
+    public String getTimelineLabel() {
+        if (fromStatus == null) {
+            return toStatus == JobStatus.APPROVED ? "Posted and auto-approved" : "Posted";
+        }
+        if (toStatus == JobStatus.CLOSED) {
+            return "Closed";
+        }
+        return switch (fromStatus) {
+            case PENDING_APPROVAL -> toStatus == JobStatus.APPROVED ? "Approved" : "Rejected";
+            case APPROVED -> toStatus == JobStatus.REJECTED ? "Taken down" : "Edited, awaiting re-approval";
+            case REJECTED -> "Resubmitted";
+            case CLOSED -> toStatus == JobStatus.APPROVED ? "Reopened" : "Reopened, awaiting approval";
+        };
+    }
+
     public Long getId() {
         return id;
     }
