@@ -50,17 +50,19 @@ public class JobModerationService {
     private final UserRepository userRepository;
     private final JobService jobService;
     private final SettingsService settingsService;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public JobModerationService(JobRepository jobRepository, JobStatusChangeRepository jobStatusChangeRepository,
             JobApplicationRepository jobApplicationRepository, UserRepository userRepository, JobService jobService,
-            SettingsService settingsService, Clock clock) {
+            SettingsService settingsService, NotificationService notificationService, Clock clock) {
         this.jobRepository = jobRepository;
         this.jobStatusChangeRepository = jobStatusChangeRepository;
         this.jobApplicationRepository = jobApplicationRepository;
         this.userRepository = userRepository;
         this.jobService = jobService;
         this.settingsService = settingsService;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -139,6 +141,11 @@ public class JobModerationService {
 
         String description = admin.getFullName() + " approved " + job.getTitle() + " (" + job.getEmployer().getCompanyName() + ")";
         jobService.recordStatusChange(job, JobStatus.APPROVED, null, admin, ActivityType.JOB_APPROVED, description);
+
+        // Section 16 #1 trigger 3 of 3: "a job is approved or rejected by an admin." Last
+        // statement on purpose (NotificationService's class comment explains why).
+        notificationService.notifyJobDecision(job.getEmployer().getEmail(), job.getEmployer().getFullName(),
+                job.getTitle(), true, null);
         return job;
     }
 
@@ -153,6 +160,14 @@ public class JobModerationService {
 
         String description = admin.getFullName() + " rejected " + job.getTitle() + " (" + job.getEmployer().getCompanyName() + ")";
         jobService.recordStatusChange(job, JobStatus.REJECTED, form.getReason(), admin, ActivityType.JOB_REJECTED, description);
+
+        // Section 16 #1 trigger 3 of 3, the rejected half. NOT sent by takeDown() below,
+        // even though it reuses the same REJECTED status internally (5.5) - the task's
+        // list of triggers names only "approved or rejected", and a take-down already has
+        // its own, separate "your live job was removed" context that this wording would
+        // misstate.
+        notificationService.notifyJobDecision(job.getEmployer().getEmail(), job.getEmployer().getFullName(),
+                job.getTitle(), false, form.getReason());
         return job;
     }
 

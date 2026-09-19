@@ -32,6 +32,13 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
 
+    // ---------- Outgoing email (Section 16 #1) ----------
+    // Brings JavaMailSender and its auto-configuration, which only ever creates a real
+    // JavaMailSenderImpl bean once spring.mail.host is set (see application-prod.properties).
+    // SmtpMailService is the only class that depends on JavaMailSender directly; every other
+    // class depends on this project's own MailService interface (hard requirement 2).
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
     // ---------- Schema migrations (Section 10.7) ----------
     // Flyway replaces spring.jpa.hibernate.ddl-auto=update as the thing that owns the
     // schema. Versions come from the Spring Boot BOM, so they stay in step with Boot.
