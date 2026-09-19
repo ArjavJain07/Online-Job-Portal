@@ -20,6 +20,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 // Public job search and job detail (Section 6.1 P-2, 6.4 S-F1, 6.6 route summary): the
@@ -74,12 +75,12 @@ public class JobBrowseController {
     // application types in the template (see the note on Thymeleaf 3.1's restricted mode).
     @GetMapping("/jobs/{id}")
     public String detail(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails me, HttpSession session,
-            Model model) {
+            @RequestHeader(value = "User-Agent", required = false) String userAgent, Model model) {
         Long viewerId = me == null ? null : me.getId();
         Role viewerRole = me == null ? null : me.getRole();
 
         Job job = jobSearchService.findForDetail(id, viewerId, viewerRole);
-        jobSearchService.recordView(job, session, viewerId, viewerRole);
+        jobSearchService.recordView(job, session, viewerId, viewerRole, userAgent);
 
         LocalDate today = LocalDate.now(clock);
         boolean live = job.isLive(today);

@@ -7,13 +7,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jobportal.domain.Job;
+import com.jobportal.domain.JobView;
 import com.jobportal.dto.ChartData;
 import com.jobportal.dto.EmployerStatistics;
 import com.jobportal.dto.EngagementMetric;
 import com.jobportal.dto.JobStatsRow;
 import com.jobportal.dto.KpiValue;
+import com.jobportal.repository.JobViewRepository;
 import com.jobportal.service.EmployerStatisticsService;
 import com.jobportal.support.IntegrationTestBase;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,6 +35,10 @@ class EmployerStatisticsTest extends IntegrationTestBase {
     private EmployerStatisticsService employerStatisticsService;
     @Autowired
     private UserDetailsService userDetailsService;
+    @Autowired
+    private JobViewRepository jobViewRepository;
+    @Autowired
+    private Clock clock;
 
     // AC-E-D5-1: Acme's 30-day KPIs (Total 8, Awaiting review 1, In progress 3, Hired 1,
     // Rejected 2, Withdrawn 1) never include Globex's applications; Globex totals 5 for 30
@@ -124,6 +133,58 @@ class EmployerStatisticsTest extends IntegrationTestBase {
         EmployerStatistics scoped = employerStatisticsService.getStatistics(acmeId, "30", frontendDeveloperId.toString());
         assertThat(sum(scoped.messagesOverTime().get(0))).isEqualTo(1);
         assertThat(sum(scoped.messagesOverTime().get(1))).isEqualTo(1);
+    }
+
+    // Dated view analytics (JobView, not Job.viewCount - see JobView's class comment):
+    // viewsOverTime buckets JobView rows the same way applicationsOverTime buckets
+    // JobApplication rows, and the funnel pairs the range's view total with the range's
+    // application total (the same "Total applications" KPI kpisScopedToOwnJobs already
+    // proves). DataSeeder does not backfill historical JobView rows (Section 13 seed data
+    // predates this feature), so this test creates its own.
+    @Test
+    void viewsOverTimeAndFunnelScopedToRange() {
+        Long acmeId = data.userId("hr@acme.local");
+        Job javaJob = data.job("Java Developer");
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        saveView(javaJob, now.minusDays(2));
+        saveView(javaJob, now.minusDays(2));
+        saveView(javaJob, now.minusDays(40)); // outside the default 30-day window
+
+        EmployerStatistics stats = employerStatisticsService.getStatistics(acmeId, "30", null);
+
+        assertThat(stats.viewsOverTime().label()).isEqualTo("Views");
+        assertThat(sum(stats.viewsOverTime())).isEqualTo(2);
+
+        assertThat(stats.viewToApplicationFunnel().labels()).containsExactly("Views", "Applications");
+        assertThat(stats.viewToApplicationFunnel().values().get(0)).isEqualTo(2L);
+        assertThat(stats.viewToApplicationFunnel().values().get(1))
+                .isEqualTo(Long.parseLong(kpi(stats, "Total applications")));
+    }
+
+    // jobId narrows viewsOverTime exactly like it narrows applicationsOverTime
+    // (foreignJobIdIgnored above covers the "unknown employer's job" case; this covers a
+    // real own-job narrowing).
+    @Test
+    void viewsOverTimeNarrowsByJobId() {
+        Long acmeId = data.userId("hr@acme.local");
+        Job javaJob = data.job("Java Developer");
+        Job frontendJob = data.job("Frontend Developer");
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        saveView(javaJob, now.minusDays(1));
+        saveView(frontendJob, now.minusDays(1));
+
+        EmployerStatistics scoped = employerStatisticsService.getStatistics(acmeId, "30", javaJob.getId().toString());
+
+        assertThat(sum(scoped.viewsOverTime())).isEqualTo(1);
+    }
+
+    private void saveView(Job job, LocalDateTime viewedAt) {
+        JobView view = new JobView();
+        view.setJob(job);
+        view.setViewedAt(viewedAt);
+        jobViewRepository.save(view);
     }
 
     private long sum(ChartData chart) {
