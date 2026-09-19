@@ -145,4 +145,53 @@ class JobTest {
         job.assignSkills(List.of());
         assertThat(job.legacySkillsCsv()).isEmpty();
     }
+
+    // The search index columns (Section 10.9, V7) are written by the same setters that
+    // write the text they describe, and for the same reason the rollback column above has
+    // a test: nothing in a unit test reads them, so without this the setters could quietly
+    // stop maintaining them and the only symptom would be a production search that misses
+    // every job edited since.
+    //
+    // The stored form is SearchIndex.of(text) - normalised, then padded with one space at
+    // each end - which is what lets a single "% word %" LIKE mean "contains this whole
+    // word" with no special case for the first or last word in the value.
+    @Test
+    void settingTitleAndDescriptionWritesTheSearchIndex() {
+        Job job = job(JobStatus.APPROVED, TODAY, true);
+
+        job.setTitle("Senior Node.js Developer");
+        job.setDescription("Build  APIs, ship them.");
+
+        assertThat(job.searchTitleIndex()).isEqualTo(" senior node js developer ");
+        assertThat(job.searchDescriptionIndex()).isEqualTo(" build apis ship them ");
+        assertThat(job.needsSearchIndex()).isFalse();
+    }
+
+    // An edit has to move the index with it. This is the case @PreUpdate would have got
+    // wrong (Hibernate decides which properties are dirty before invoking it), and it is
+    // why the assignment lives in the setter.
+    @Test
+    void editingTheTitleRebuildsItsSearchIndex() {
+        Job job = job(JobStatus.APPROVED, TODAY, true);
+        job.setTitle("Java Developer");
+        assertThat(job.searchTitleIndex()).isEqualTo(" java developer ");
+
+        job.setTitle("Python Developer");
+        assertThat(job.searchTitleIndex()).isEqualTo(" python developer ");
+    }
+
+    // A job that has never been through the setters carries SearchIndex.UNINDEXED, which is
+    // what V7 puts in the column and what SearchIndexService looks for. It has to be
+    // distinguishable from a genuinely empty index (" ", from a title of pure punctuation),
+    // or the backfill would rewrite that row on every start-up for ever.
+    @Test
+    void anUnindexedJobIsTellableFromAJobWhoseTextNormalisesToNothing() {
+        assertThat(new Job().needsSearchIndex()).isTrue();
+
+        Job job = job(JobStatus.APPROVED, TODAY, true);
+        job.setTitle("---");
+        job.setDescription("!!!");
+        assertThat(job.searchTitleIndex()).isEqualTo("  ");
+        assertThat(job.needsSearchIndex()).isFalse();
+    }
 }
