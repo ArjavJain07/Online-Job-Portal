@@ -115,6 +115,7 @@ The three drafts disagreed on several points. These are the final decisions. Lat
 | D-25 | Misc. config | Session timeout 60 min; upload property `app.upload-dir`; H2 URL without `AUTO_SERVER` | 30 min; `app.upload.dir`; `AUTO_SERVER=TRUE` |
 | D-26 | Constraint errors | Check first, then `saveAndFlush` inside try/catch at known points; one logged fallback handler | Relying on translation at commit time |
 | D-27 | Employer notes | `noteToCandidate` on each status change (visible to the seeker) and a separate private `internalNote` (never rendered on seeker pages) | One ambiguous note field |
+| D-28 | Automatic close sweep (7.11) | `@Scheduled` interval as a plain property, `app.job-sweep.*` in `application.properties`, not a `SystemSettings` field; closing still goes through `JobStatus.CLOSED` via the existing `JobService.recordStatusChange`, never a new stored status | A `SystemSettings` field: every one of the existing 10 is read fresh per request (`SettingsService.get()`), but a `@Scheduled` interval is fixed when the trigger is registered, so making it truly live would need a `SchedulingConfigurer`/dynamic `Trigger` re-reading the row on every tick - more machinery than this warrants; a *stored* `EXPIRED` status (already rejected once, D-3) |
 
 ---
 
@@ -173,7 +174,7 @@ The baseline stack is already scaffolded and compiles on the target machine. It 
 ```
 com.jobportal
 ├── JobPortalApplication        entry point
-├── config                      SecurityConfig, WebMvcConfig, ClockConfig, AppProperties
+├── config                      SecurityConfig, WebMvcConfig, ClockConfig, AppProperties, SchedulingConfig
 ├── security                    AppUserDetails, AppUserDetailsService, success/failure handlers, CurrentUserInterceptor
 ├── domain                      entities (User, SeekerProfile, Job, JobStatusChange, JobApplication,
 │   └── enums                   ApplicationStatusChange, Message, ActivityLog, SystemSettings) and enums
@@ -943,6 +944,7 @@ stateDiagram-v2
     REJECTED --> CLOSED: employer closes
     CLOSED --> APPROVED: employer reopens (was APPROVED before closing)
     CLOSED --> PENDING_APPROVAL: employer reopens (was PENDING_APPROVAL or REJECTED)
+    APPROVED --> CLOSED: sweep closes (deadline passed or openings filled, 7.11)
 ```
 
 | From | To | Who / route | Conditions | Side effects | Timeline label |
@@ -957,16 +959,18 @@ stateDiagram-v2
 | `PENDING_APPROVAL`, `APPROVED`, `REJECTED` | `CLOSED` | Employer, `POST /employer/jobs/{id}/close` | | `closedAt = now` | Closed |
 | `CLOSED` | `APPROVED` | Employer, `POST /employer/jobs/{id}/reopen` | New deadline today to today + 180; below limit; the latest change into `CLOSED` came from `APPROVED` | `approvedAt = now`, `closedAt = null` | Reopened |
 | `CLOSED` | `PENDING_APPROVAL` | Employer, reopen | Same, but the job was closed from `PENDING_APPROVAL` or `REJECTED` (whatever `jobApprovalRequired` says) | `closedAt = null` | Reopened, awaiting approval |
+| `APPROVED` | `CLOSED` | System, scheduled sweep (`JobSweepService`, 7.11) | `applicationDeadline` before today | `closedAt = now` | Closed |
+| `APPROVED` | `CLOSED` | System, scheduled sweep (`JobSweepService`, 7.11) | `HIRED` application count reaches `openings` | `closedAt = now` | Closed |
 
 Rules that are not transitions:
 - **`jobApprovalRequired` affects only two things:** whether a new job starts as `PENDING_APPROVAL` or `APPROVED`, and whether a content edit of an `APPROVED` job sends it back to `PENDING_APPROVAL`. It never affects resubmit or reopen. So with approval off an employer still cannot undo an admin rejection or take-down, either by editing or by closing and reopening.
 - **Content fields** (a change triggers re-approval): title, description, requirements, skills, category, jobType, workMode, location, salaryMin, salaryMax, minExperienceYears. Changing only `applicationDeadline` or `openings` keeps an approved job `APPROVED` (activity `JOB_UPDATED`, no status row).
-- **Expired jobs:** an `APPROVED` job whose deadline has passed stays `APPROVED`. Editing it with a new deadline (today to today + 180) keeps it `APPROVED` and makes it Live again; no reopen is needed. On edit the deadline range is checked only when the value changes, so an unchanged past deadline does not block other edits.
+- **Expired jobs, until swept:** an `APPROVED` job whose deadline has passed stays `APPROVED` until the next sweep run (below). Editing it with a new deadline (today to today + 180) keeps it `APPROVED` and makes it Live again; no reopen is needed. On edit the deadline range is checked only when the value changes, so an unchanged past deadline does not block other edits.
 - Editing a `PENDING_APPROVAL` job keeps it pending (activity `JOB_UPDATED`, no status row).
 - A `CLOSED` job cannot be edited: "Closed jobs can't be edited. Reopen the job first."
 - Reopen returns a job to the state it was closed from, except that a job closed from `REJECTED` goes to `PENDING_APPROVAL`. Closing and reopening can therefore never skip admin review of a rejected or taken-down job.
 - **Delete** is allowed in any status only when the job has 0 applications (5.8).
-- There is no scheduler. Expiry is computed.
+- **The scheduled sweep (7.11) is the one exception to "there is no scheduler; expiry is computed"** (D-3's rejected alternative was a *stored* `EXPIRED` status plus a nightly scheduler, not this): the Live/Expired/Hidden label is still always computed, never stored (`Job.displayStatus`, unchanged by 7.11). What 7.11 adds is narrower - on its own interval, an `APPROVED` job already displaying as Expired, or whose `openings` are already filled, is moved on to `CLOSED`, through the same `recordStatusChange` every other transition in this table uses, with actor "System" (the same convention as the `(new) -> APPROVED` row above). Until the next run, a freshly-expired or freshly-filled job is still `APPROVED`, exactly as before 7.11.
 
 **`JobDisplayStatus`** (computed by `Job.displayStatus(today)`):
 
@@ -1083,7 +1087,7 @@ That is 14 legal pairs out of 49. `ApplicationStatusTest` is a parameterised tes
 | `JOB_APPROVED` | `JobModerationService.approve` | "Site Admin approved Sales Intern (Globex Retail)" | JOB |
 | `JOB_REJECTED` | `JobModerationService.reject` | "Site Admin rejected DevOps Engineer (Acme Technologies)" | JOB |
 | `JOB_TAKEN_DOWN` | `JobModerationService.takeDown` | "Site Admin took down Marketing Executive" | JOB |
-| `JOB_CLOSED` | `JobService.close` | "Acme Technologies closed QA Engineer" | JOB |
+| `JOB_CLOSED` | `JobService.close`; `JobSweepService` (System, 7.11) | "Acme Technologies closed QA Engineer"; sweep: "System closed Data Analyst (deadline passed)" / "(openings filled)" | JOB |
 | `JOB_REOPENED` | `JobService.reopen` | "Acme Technologies reopened QA Engineer" | JOB |
 | `JOB_DELETED` | `JobService.delete` | "Acme Technologies deleted QA Engineer" | none |
 | `APPLICATION_SUBMITTED` | `JobApplicationService.apply` | "Priya Sharma applied for Spring Boot Intern at Acme Technologies (APP-00016)" | APPLICATION |
@@ -2752,6 +2756,24 @@ Specifications are chained with `spec.and(...)` starting from `live(today)`; `Sp
 - **Values already in the model are stale after such an update.** `@ModelAttribute` methods of `GlobalModelAttributes` run **before** the handler, so `unreadMessageCount` is computed before `markThreadRead` runs. The four handlers that mark a thread read (`/seeker/messages/{id}`, `/employer/messages/{id}`, and both application detail pages) therefore recount after the bulk update and overwrite the attribute in the model, so the navbar badge matches the page the viewer is reading (6.5.1, 7.1). Any future pre-handler model attribute that a handler invalidates follows the same rule: overwrite it, do not wait for the next request.
 - `spring.jpa.open-in-view=true` is set explicitly (D-2). Services still fetch what list pages need with `@EntityGraph` or grouped queries, and M8 includes one SQL-log review per dashboard.
 
+### 7.11 Scheduled job sweep: auto-closing expired and filled jobs
+
+**The gap this closes.** Before this, nothing ever moved a job off `APPROVED` except an employer's own "Close" click or an admin take-down (5.5). `Job.applicationDeadline` was filtering-only (`JobSpecifications.deadlineOnOrAfter`/`deadlineBefore`, `JobRepository.countDistinctEmployersWithLiveJobs`), so a job whose deadline had passed stayed `APPROVED` forever and still listed on the employer's own `/employer/jobs` page (E-D1's "current jobs" table shows `PENDING_APPROVAL`/`APPROVED`/`REJECTED` with no deadline filter). `Job.openings` was stored but never read anywhere except the form, and was explicitly excluded from `JobService.contentFieldsChanged`'s re-approval check.
+
+**What sweeps.** `JobSweepService.sweep()` loads every currently `APPROVED` job (`JobSpecifications.hasStatus(APPROVED)`) and closes it, through the same `JobService.recordStatusChange` every other transition in 5.5's table uses, when either:
+- its `applicationDeadline` is before today, or
+- its `HIRED` application count (`JobApplicationRepository.countByJob_IdAndStatus`) has reached its `openings`.
+
+A job matching both is closed once, for the deadline (5.5's table). Actor is `null`, which `JobService.actorDisplayName` already turns into `"System"` on the `JobStatusChange` row - the same convention the one other system-driven transition uses (`(new) -> APPROVED` when `jobApprovalRequired` is off). The activity type is the existing `JOB_CLOSED` (5.7); no new `ActivityType` was needed. Idempotent by construction: only `APPROVED` jobs are candidates, and closing one immediately takes it out of that set, so a second run in the same instant has nothing left to do.
+
+**Testability (why the trigger is a separate, near-empty class).** `JobSweepService.sweep()` is a plain `@Transactional` method with no timer anywhere in it - `JobSweepServiceTest` calls it directly with the fixed test `Clock` (this section), the same way every other service test does, so its assertions are exactly as deterministic as any other and nothing ever waits on a clock tick. `JobSweepScheduler` is a one-method `@Component` whose only job is to call that method on a schedule; `JobSweepSchedulerTest` builds it by hand with a mocked `JobSweepService` (`FileStorageServiceTest`'s shape, not `IntegrationTestBase`'s) and calls the trigger method directly, proving the wiring without ever touching Spring's `TaskScheduler`.
+
+**Why it is excluded from every test context, not just left idle.** `IntegrationTestBase` caches one Spring context across dozens of test classes (12.1); if `JobSweepScheduler` were an ordinary bean, its timer would run inside that shared, long-lived context and could tick between two unrelated tests' assertions. Concretely, at the fixed clock's "today" the seed data already contains a job each rule would close - Python Backend Developer (deadline passed, 13.4) and Frontend Developer (its one opening filled by the seeded hire, 13.5 A6) - both relied on by name, as still `APPROVED`, by several other tests' ACs. `JobSweepScheduler` carries `@ConditionalOnProperty(prefix = "app.job-sweep", name = "enabled", ...)`, and `application-test.properties` sets `app.job-sweep.enabled=false`, so the bean - and its timer - simply does not exist anywhere in the test context. `JobSweepServiceTest` still exercises the real thing, against the real seed data, by calling `sweep()` itself.
+
+**Configuration: a plain property, not a `SystemSettings` field (D-28, 1.6).** All 10 existing settings are read fresh on every use (`SettingsService.get()` is never cached, 7.5), so an admin's change takes effect on the very next request with no extra plumbing. A `@Scheduled` interval is different: `fixedDelayString`/`initialDelayString` are resolved once, when Spring registers the trigger, not re-read on every tick. Making the interval *live*-editable from the settings page would need a `SchedulingConfigurer` with a custom `Trigger` that recomputes the next run from the database each time - real machinery for a value nobody needs to change without a restart. `app.job-sweep.enabled` and `app.job-sweep.interval-ms` live in `application.properties` (10.1) instead, next to `app.upload-dir` and the seed/demo flags: deployment-time configuration, the same category as those, not a business policy an admin tunes through the UI.
+
+**Why the first run waits a full interval.** `initialDelayString` is set to the same value as the interval, not 0. `reset-demo.bat` re-seeds Python Backend Developer already Expired specifically so the badge, the E-D4 Expired tab and the dashboard's "Needs attention" row have something to show (13.4, 15.5); a sweep firing the instant the app starts would race that against the demo or the 30-minute pre-demo checklist (15.4) and could close it before anyone gets to see it as Expired.
+
 ---
 
 ## 8. Requirements Traceability Matrix
@@ -2836,6 +2858,7 @@ Online Job Portal/
     │   │   │   ├── AppProperties.java            @ConfigurationProperties("app"): uploadDir, seed, demo
     │   │   │   ├── ClockConfig.java              Clock bean
     │   │   │   ├── LockoutProperties.java        @ConfigurationProperties("app.lockout"): maxAttempts, cooldownMinutes (4.10)
+    │   │   │   ├── SchedulingConfig.java         @EnableScheduling for JobSweepScheduler (7.11)
     │   │   │   ├── SecurityConfig.java
     │   │   │   └── WebMvcConfig.java             registers CurrentUserInterceptor
     │   │   ├── security/
@@ -2888,6 +2911,8 @@ Online Job Portal/
     │   │   │   ├── JobModerationService.java
     │   │   │   ├── JobSearchService.java
     │   │   │   ├── JobService.java
+    │   │   │   ├── JobSweepScheduler.java        thin @Scheduled trigger over JobSweepService (7.11)
+    │   │   │   ├── JobSweepService.java           closes expired/filled jobs (7.11)
     │   │   │   ├── MessageService.java
     │   │   │   ├── RecommendationScorer.java     pure class, no Spring annotations
     │   │   │   ├── RecommendationService.java
@@ -3007,6 +3032,8 @@ Online Job Portal/
         │   │   └── UserRepositoryTest.java             @DataJpaTest
         │   ├── service/
         │   │   ├── FileStorageServiceTest.java  RecommendationScorerTest.java  RecommendationServiceTest.java
+        │   │   ├── JobSweepServiceTest.java     against IntegrationTestBase, plus throwaway fixtures (7.11)
+        │   │   └── JobSweepSchedulerTest.java   plain unit test, mocked JobSweepService, no Spring context
         │   ├── seed/
         │   │   └── DataSeederTest.java
         │   ├── security/
@@ -3080,6 +3107,13 @@ app.seed.admin-email=admin@jobportal.local
 app.seed.admin-password=Admin@123
 app.demo.show-credentials=true
 
+# ---------- Scheduled job sweep: auto-close expired/filled jobs (Section 7.11) ----------
+# interval-ms also sets the delay before the FIRST run (JobSweepScheduler), so a freshly
+# reset-demo.bat'd app has time to show its seeded Expired/Hidden jobs before the sweep
+# can close any of them.
+app.job-sweep.enabled=true
+app.job-sweep.interval-ms=3600000
+
 # ---------- Logging ----------
 logging.level.com.jobportal=INFO
 ```
@@ -3125,10 +3159,11 @@ spring.h2.console.enabled=false
 app.upload-dir=build/test-uploads
 app.seed.demo-data=true
 app.demo.show-credentials=false
+app.job-sweep.enabled=false
 logging.level.com.jobportal=WARN
 ```
 
-Tests never touch `./data` or `./uploads`, so they are safe to run while the app is running. Demo seeding stays on because tests log in as seeded users.
+Tests never touch `./data` or `./uploads`, so they are safe to run while the app is running. Demo seeding stays on because tests log in as seeded users. `app.job-sweep.enabled=false` excludes `JobSweepScheduler` from the test context entirely (7.11): `IntegrationTestBase` caches one shared, long-lived context, and a real background tick landing between two unrelated tests could close a seeded job (Python Backend Developer, Frontend Developer) out from under an assertion that never called the sweep itself. `JobSweepServiceTest` calls `JobSweepService#sweep()` directly instead.
 
 ### 10.4 How to switch and run
 
@@ -3379,6 +3414,7 @@ class JobApplicationTest extends IntegrationTestBase {
 | `FormatsTest` | Unit | `inr(600000)` is "6,00,000", `inr(100000000)` is "10,00,00,000"; `ago`; `fileSize`; `experience` | P-2 |
 | `RecommendationScorerTest` | Unit | Cases E1 to E8 (Section 7.8) | S-D5 |
 | `FileStorageServiceTest` | Unit (`@TempDir`) | `#rejectsWrongExtension`, `#rejectsFakeContent`, `#rejectsEmpty`, `#rejectsTooLarge`, `#storesUnderUuidName`, `#copyCreatesIndependentFile`, `#deleteAfterCommitRunsOnlyOnCommit`, `#pathTraversalBlocked` | G-8, S-F2, S-F4 |
+| `JobSweepSchedulerTest` | Unit (mocked `JobSweepService`) | `#triggerDelegatesToSweepServiceAndNothingElse`: the `@Scheduled` method calls `sweep()` and nothing else, checked without a Spring context or a timer | 7.11 |
 | `GlobalExceptionHandlerTest` | Unit | `#adviceIsUnscoped`: the `@ControllerAdvice` annotation on `GlobalExceptionHandler` has empty `basePackages`, `annotations` and `assignableTypes`, so `MaxUploadSizeExceededException` (resolved with `handler == null`) still reaches it (7.3). The real oversize upload stays manual UP-1. | G-8 |
 | `JobApplicationRepositoryTest` | `@DataJpaTest` | `#uniqueJobSeekerConstraint` (second `saveAndFlush` throws) | S-F2 |
 | `UserRepositoryTest` | `@DataJpaTest` | `#uniqueEmail`; `#currentUserProjection` | P-3, A-F1 |
@@ -3411,6 +3447,7 @@ class JobApplicationTest extends IntegrationTestBase {
 | `ApplicationHistoryTest` | Integration | `#rejectedShownAsNotSelectedInHistoryOnly`, `#summaryCountsMatch`, `#allViewListsEverything` | S-D4 |
 | `SeekerProfileTest` | Integration | `#profileUpdateConfirmed`, `#resumeUploadValidatedAndOldKeptOnError`, `#emailChangeForcesRelogin`, `#completenessComputed` | S-F4, S-D3 |
 | `RecommendationServiceTest` | Integration | `#priyaGetsSeededRecommendations`, `#appliedAndNonLiveJobsExcluded`, `#emptyProfileGetsLatestJobsFallback` | S-D5 |
+| `JobSweepServiceTest` | Integration | `#sweepAgainstSeedData` (against Section 13: closes Python Backend Developer and Frontend Developer, leaves every other Live job and the already-closed Customer Support Associate alone), `#closesJobPastDeadlineAndRecordsReasonActorAndActivity`, `#deadlineEqualToTodayIsNotClosed`, `#closesJobWhenHiredCountReachesOpenings`, `#openingsNotYetFilledStaysApproved`, `#deadlineReasonWinsWhenBothConditionsAreTrue`, `#secondSweepMakesNoFurtherChangeToAnAlreadyClosedJob`, `#otherStatusesNeverTouchedEvenWhenTheyWouldOtherwiseQualify` | 7.11 |
 | `MessagingTest` | Integration | `#employerMessageDeliveredUnreadThenRead`, `#seekerCanReplyOnlyAfterEmployer`, `#withdrawnOrDeactivatedBlocksMessaging`, `#cannotMessageOtherEmployersApplicant`, `#blankBodyRejected`, `#inboxOrderedWithUnreadCounts`, `#composeListsOwnActiveApplicants` | E-F3, E-D3 |
 | `ResumeFileTest` | Integration | `#rejectsWrongTypeEmptyAndFakeContent`, `#applicationKeepsCopyAfterProfileReplace`, `#downloadsCheckOwnership`, `#missingFileShowsFlash` | G-8 |
 | `PageRenderSmokeTest` | Integration (parameterised) | Every GET page in 6.6 for its role returns 200 and contains its page heading (about 45 cases) | X-2, all dashboards |
