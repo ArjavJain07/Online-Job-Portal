@@ -32,6 +32,19 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
 
+    // ---------- Schema migrations (Section 10.7) ----------
+    // Flyway replaces spring.jpa.hibernate.ddl-auto=update as the thing that owns the
+    // schema. Versions come from the Spring Boot BOM, so they stay in step with Boot.
+    //
+    // Two artefacts, not one. Since Flyway 10 the core jar only carries the databases
+    // Flyway calls "built in"; H2 is one of them, PostgreSQL is not. Without
+    // flyway-database-postgresql, Flyway starts happily on H2 and then fails on the
+    // production Render database with "Unsupported Database: PostgreSQL" - a failure that
+    // would only ever appear in production, which is exactly the class of bug Section 10.7
+    // is trying to remove. It is runtimeOnly because no Java code imports it.
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
     // Front-end libraries packaged as jars so the app works offline (no CDN needed)
     implementation 'org.webjars:webjars-locator-lite'
     implementation 'org.webjars:bootstrap:5.3.3'

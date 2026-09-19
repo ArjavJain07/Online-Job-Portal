@@ -142,7 +142,9 @@ The baseline stack is already scaffolded and compiles on the target machine. It 
 | Dev tooling | Spring Boot DevTools | Automatic restart, template cache off during `bootRun` |
 | Testing | JUnit 5, Spring Boot Test, MockMvc, `spring-security-test`, AssertJ, Mockito | Test controllers with real security and a real (in-memory) database |
 
-**Libraries deliberately not added:** Lombok (hides getters and setters the student must explain), MapStruct, Thymeleaf Layout Dialect (native fragment parameters are enough), Flyway (see Section 10), any JavaScript framework.
+**Libraries deliberately not added:** Lombok (hides getters and setters the student must explain), MapStruct, Thymeleaf Layout Dialect (native fragment parameters are enough), any JavaScript framework.
+
+**Flyway was added later** (10.7), replacing `ddl-auto=update` once the project had a hosted database with real rows in it. It was left out of the original stack on the grounds that a local demo does not need migrations, which stopped being true the moment the schema existed in two places at once.
 
 ### 2.2 Alternatives considered
 
@@ -924,7 +926,9 @@ Every enum has a `getLabel()` used by templates, so the database value (`FULL_TI
 | `TargetType` | `USER`, `JOB`, `APPLICATION`, `SETTINGS` |
 | `JobDisplayStatus` (not stored) | `LIVE` (Live), `EXPIRED` (Expired), `HIDDEN` ("Hidden (employer deactivated)"), `PENDING_APPROVAL` (Pending approval), `REJECTED` (Rejected), `CLOSED` (Closed) |
 
-**Enums are frozen at the `foundation-v1` tag** (Milestone M1). With `ddl-auto=update`, Hibernate creates a CHECK constraint (H2) or native `enum` column (MySQL) listing the values, and it does not update it when a value is added. Adding a value later requires deleting `./data` (run `reset-demo.bat`).
+**Enums are frozen at the `foundation-v1` tag** (Milestone M1). The reason was that `ddl-auto=update` creates a constraint listing the accepted values and never updates it, so adding a value later broke inserts on any database that already existed, and the only fix was deleting `./data` (`reset-demo.bat`) — impossible once a hosted database held real rows.
+
+Since 10.7 the constraints are written out in `db/migration` instead, so adding a value is an ordinary migration that drops and recreates the check constraint, keeps every existing row, and shows up in a diff. The freeze is now a review convention rather than a technical dead end.
 
 ### 5.5 `JobStatus` lifecycle
 
@@ -2975,6 +2979,10 @@ Online Job Portal/
     │   └── resources/
     │       ├── application.properties
     │       ├── application-mysql.properties
+    │       ├── application-prod.properties
+    │       ├── db/
+    │       │   └── migration/
+    │       │       └── V1__baseline_schema.sql   Flyway owns the schema from here on (10.7)
     │       ├── demo/
     │       │   └── sample-resume.pdf             real one-page PDF (a few KB), printed to PDF by the student
     │       ├── static/
@@ -3026,6 +3034,8 @@ Online Job Portal/
         │   │   ├── ApplicationStatusTest.java  JobApplicationRulesTest.java  JobTest.java
         │   ├── util/
         │   │   ├── DateBucketsTest.java  FileNamesTest.java  SkillParserTest.java  TextMatcherTest.java
+        │   ├── db/
+        │   │   └── BaselineSchemaTest.java      db/migration vs Hibernate's own DDL (10.7)
         │   ├── repository/
         │   │   ├── JobApplicationRepositoryTest.java   @DataJpaTest
         │   │   ├── JobSpecificationsTest.java
@@ -3077,8 +3087,15 @@ spring.h2.console.enabled=true
 spring.h2.console.path=/h2-console
 spring.h2.console.settings.web-allow-others=false
 
+# ---------- Schema migrations: Flyway owns the schema (Section 10.7) ----------
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+spring.flyway.baseline-on-migrate=true
+spring.flyway.baseline-version=1
+spring.flyway.baseline-description=Schema as built by ddl-auto=update
+
 # ---------- JPA / Hibernate ----------
-spring.jpa.hibernate.ddl-auto=update
+spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.open-in-view=true
 spring.jpa.show-sql=false
 # SQL review (M8): logging.level.org.hibernate.SQL=DEBUG
@@ -3122,7 +3139,8 @@ logging.level.com.jobportal=INFO
 |---|---|
 | `server.port=${PORT:8080}` | `run.bat 9090` or `set PORT=9090` works when 8080 is busy |
 | H2 URL without `AUTO_SERVER` | No extra TCP listener (no firewall prompt); a second app instance fails fast with "Database may be already in use" instead of silently sharing data |
-| `ddl-auto=update` | See 10.4 |
+| `ddl-auto=validate` | Flyway creates the schema; Hibernate only checks it still matches the entities and refuses to start if not. See 10.4 and 10.7 |
+| `spring.flyway.baseline-on-migrate=true` | Lets Flyway adopt the databases `ddl-auto=update` already built, instead of trying to recreate tables that hold real rows. See 10.7 |
 | `open-in-view=true` | Stated explicitly (also silences Boot's startup warning); see D-2 and 7.10 |
 | `max-swallow-size=-1` | Tomcat reads the whole oversized request, so the browser gets the friendly page instead of a reset connection |
 | `spring.thymeleaf.cache` not set | DevTools turns caching off during `bootRun`; the packaged jar keeps caching on |
@@ -3150,11 +3168,13 @@ spring.h2.console.enabled=false
 
 Only the properties that differ are listed; everything else comes from `application.properties`. The MySQL driver (`mysql-connector-j`) is already a runtime dependency.
 
+> **This profile no longer starts.** Since 10.7 the schema comes from Flyway, and Flyway 10+ needs a module per database; only `flyway-database-postgresql` was added, so MySQL fails with *"Unsupported Database: MySQL"*. Reviving the profile needs `org.flywaydb:flyway-mysql` **and** a MySQL-specific migration set, because MySQL has no standard identity columns. Nothing in the project exercises this profile and it was always optional; 10.7 has the detail.
+
 ### 10.3 Test profile: `src/test/resources/application-test.properties`
 
 ```properties
 spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
-spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.hibernate.ddl-auto=validate
 spring.h2.console.enabled=false
 app.upload-dir=build/test-uploads
 app.seed.demo-data=true
@@ -3162,6 +3182,8 @@ app.demo.show-credentials=false
 app.job-sweep.enabled=false
 logging.level.com.jobportal=WARN
 ```
+
+`validate`, not `create-drop`: the tests build their schema from the same `db/migration` files the real databases use, and then have Hibernate check the entity mappings against it (10.7). That is deliberate — a migration that only ever runs in production is a migration nobody has tested, and with `create-drop` here Hibernate would quietly build its own schema and the migrations would rot unread. Flyway needs no extra test property: it is on by default once `flyway-core` is on the classpath.
 
 Tests never touch `./data` or `./uploads`, so they are safe to run while the app is running. Demo seeding stays on because tests log in as seeded users. `app.job-sweep.enabled=false` excludes `JobSweepScheduler` from the test context entirely (7.11): `IntegrationTestBase` caches one shared, long-lived context, and a real background tick landing between two unrelated tests could close a seeded job (Python Backend Developer, Frontend Developer) out from under an assertion that never called the sweep itself. `JobSweepServiceTest` calls `JobSweepService#sweep()` directly instead.
 
@@ -3179,13 +3201,13 @@ Tests never touch `./data` or `./uploads`, so they are safe to run while the app
 | Tests | `gradlew.bat test`; report at `build\reports\tests\test\index.html` |
 | H2 console | Log in as admin, open http://localhost:8080/h2-console, JDBC URL `jdbc:h2:file:./data/jobportal`, user `sa`, empty password |
 
-**`ddl-auto` trade-offs**
+**`ddl-auto` trade-offs** *(superseded — kept because it records why the project moved; see 10.7)*
 
 | Option | Behaviour | Verdict |
 |---|---|---|
-| `create` / `create-drop` | Recreates tables on every start, losing data | Only for tests |
-| **`update`** (chosen) | Creates missing tables and columns and keeps data | Never drops or renames columns and does not update enum constraints. Fix after a model change: `reset-demo.bat`. Entities are frozen at M1 to avoid this. |
-| `validate` + Flyway migrations | Versioned SQL scripts; production practice | More to learn and maintain; listed as future work |
+| `create` / `create-drop` | Recreates tables on every start, losing data | Never; not even for tests any more, since the tests are now what proves the migrations work (10.3) |
+| `update` (chosen up to `A-D6`) | Creates missing tables and columns and keeps data | Never drops or renames columns and does not update enum constraints, and Hibernate only *logs* a schema change it could not make — so the app starts happily on a database that is missing a column and fails later, at the first query. This is what 10.7 replaces. |
+| **`validate` + Flyway migrations** (chosen) | Versioned SQL in `db/migration`; Hibernate checks and never changes | The schema is now a reviewed file in the repository rather than a side effect of start-up, and a mismatch stops the app immediately instead of corrupting a query hours later. See 10.7. |
 
 ### 10.5 Webjar URLs (no version numbers thanks to webjars-locator-lite)
 
@@ -3209,6 +3231,107 @@ tasks.named('jar') {
 ```
 
 Everything else in the existing `build.gradle` stays as scaffolded.
+
+### 10.7 Schema migrations with Flyway
+
+Section 16 lists Flyway as "the first step towards production". This is that step. `spring.jpa.hibernate.ddl-auto=update` is gone; the schema is now a set of numbered SQL files in the repository, applied by Flyway before Hibernate starts, and Hibernate's only remaining job is to `validate` that what it finds matches the entity mappings.
+
+The reason is the middle row of 10.4's table. `update` never drops a column, never renames one, never updates an enum's check constraint — and when it *cannot* make a change it only writes a line to the log. An app whose schema is a side effect of start-up therefore starts perfectly well on a database that is missing a column, and fails hours later inside a query, on the hosted copy, with no obvious cause.
+
+**Where the files live**
+
+```
+src/main/resources/db/migration/
+    V1__baseline_schema.sql       the schema as ddl-auto=update left it
+```
+
+Flyway picks up `classpath:db/migration` and runs anything it has not run before, in version order, recording each one in a `flyway_schema_history` table it creates itself. Naming is Flyway's convention and is not optional: `V<version>__<description>.sql`, **two** underscores, description in `snake_case`.
+
+**One directory, two databases**
+
+The project runs on H2 locally and in tests, and on PostgreSQL 14 on Render (10.1, `docs/DEPLOY.md`). Migrations are SQL, and the two disagree about plenty in general — so before writing V1, Hibernate was asked to generate its DDL for both dialects and the two outputs were compared. They differed in exactly one respect:
+
+| | H2 | PostgreSQL 14 |
+|---|---|---|
+| `@Enumerated(EnumType.STRING)` column | `role enum ('ADMIN','EMPLOYER','JOB_SEEKER')` | `role varchar(20) check (role in ('ADMIN','EMPLOYER','JOB_SEEKER'))` |
+| everything else | *identical* | *identical* |
+
+Identity columns (`bigint generated by default as identity`), `varchar(n)`, `integer`, `boolean`, `timestamp(6)`, `date`, and every primary key, unique and foreign key clause came out byte-for-byte the same, because both databases implement the same SQL standard spelling of each.
+
+So V1 uses the PostgreSQL form for enums everywhere. It is ordinary SQL:2003 that H2 accepts unchanged, which collapses the two-database problem to nothing: **one directory of migrations, run verbatim on both.** Two alternatives were weighed and rejected:
+
+| Option | Why not |
+|---|---|
+| H2 in `MODE=PostgreSQL` | Fixes nothing that needed fixing — the one difference is Hibernate's choice of column type, and Hibernate still picks `H2Dialect` in that mode. It also changes how H2 folds unquoted identifiers, which risks an existing `./data/jobportal` file that was created without the mode. |
+| `db/migration/{vendor}` directories | Works, but every migration would have to be written twice. Every table in this project has at least one enum column (`JobStatus`, `ApplicationStatus`, `Role`), so "only split the ones that differ" would in practice mean splitting all of them, and two files that must stay in step are two files that eventually will not. |
+| Hibernate for tests, Flyway only for real databases | Rejected outright: a migration that is only ever run in production is a migration nobody has tested. |
+
+A side benefit worth having: the local H2 database now has the same column types as production instead of a near-miss, so "it worked locally" says more than it used to.
+
+**What V1 contains, and where its text came from**
+
+V1 is the complete schema as `ddl-auto=update` had built it — all nine tables, including the two history tables (`job_status_changes`, `application_status_changes`) and the two **nullable** lockout columns on `users` (4.10; they are nullable because `update` could not have added them to a populated table any other way, and V1 must describe what the live databases actually have, not what would be tidiest).
+
+It was **generated, not transcribed**. Hand-writing a baseline by reading the entity classes is how a baseline ends up subtly wrong in a way nothing notices; instead Hibernate's own `jakarta.persistence.schema-generation` output was captured for the PostgreSQL dialect and then reformatted for readability. It was checked three ways:
+
+1. Against the real `./data/jobportal` H2 file that `ddl-auto=update` created — every table, column, type, length and nullability, and even the generated foreign key names (`FKqt4m3c9yiioi16kwsyjrl0cpl` and friends, which V1 reproduces exactly so that an adopted database matches).
+2. By the whole test suite, which now runs on `ddl-auto=validate` over a Flyway-built schema (10.3). If V1 were missing a table or a column, every integration test would fail at context start-up.
+3. By `BaselineSchemaTest`, which rebuilds the schema twice — once from `db/migration`, once from Hibernate's generated DDL — and compares tables, columns, types, lengths, nullability, identity, primary keys, unique constraints and foreign keys. This exists because Hibernate's `validate` is narrower than people assume: it checks that mapped tables and columns exist with compatible type codes and **nothing else**. A migration declaring `full_name varchar(20)` instead of `varchar(100)` passes `validate` and all 392 other tests, and then truncates names in production. That test is the thing that catches it.
+
+**Adopting the databases that already exist**
+
+Both live databases — the hosted Render PostgreSQL one and any developer's `./data/jobportal` — already contain every table in V1, full of rows. Flyway must adopt them, not rebuild them, so `spring.flyway.baseline-on-migrate=true` and `baseline-version=1` are set: Flyway writes a single baseline row meaning *"this database is already at V1"* and starts work at V2. On a brand-new (empty) database the flag does not apply and V1 runs normally. Keeping it on permanently is what makes a fresh clone and a two-year-old database behave the same.
+
+The one assumption this makes is that the existing database really is at the V1 schema — i.e. that the app has been started on it at least once since the lockout columns were added (`0b9aa36`). Check before the first Flyway deploy, and add the columns by hand if the answer is `0`:
+
+```sql
+-- PostgreSQL: expect 2
+select count(*) from information_schema.columns
+ where table_name = 'users'
+   and column_name in ('failed_login_attempts', 'lockout_until');
+
+-- if it returns 0, this is what ddl-auto=update would have done:
+alter table users add column failed_login_attempts integer;
+alter table users add column lockout_until timestamp(6);
+```
+
+If the check is skipped and the database is behind, nothing is corrupted: Hibernate's `validate` refuses to start and names the missing column, Render's health check fails, and the previous version keeps serving. A stopped deploy is the correct outcome.
+
+Both paths were tried against a copy of a real `./data/jobportal` holding 10 users, 12 jobs, 15 applications and 97 activity log rows. Adopting it wrote one history row of type `BASELINE`, left every row untouched, and — on the copy that had not been started since `0b9aa36` — then stopped with *"Schema-validation: missing column [failed_login_attempts] in table [users]"*. An empty database instead wrote a row of type `SQL`, meaning V1 really ran.
+
+**Reading the history table in the H2 console** (10.4): Flyway creates `flyway_schema_history` with a quoted lower-case name, and H2 folds unquoted identifiers to upper case, so the obvious query fails with *"Table FLYWAY_SCHEMA_HISTORY not found"*. Quote the table **and** the columns:
+
+```sql
+select "installed_rank", "version", "description", "type", "success"
+  from "flyway_schema_history";
+```
+
+**How a feature adds a migration**
+
+The next several features each add tables. The routine is:
+
+1. Write the entity as usual.
+2. Add **one** new file, `V<n>__<what_it_does>.sql`, with the next unused number. Never edit a migration that has already been applied anywhere — Flyway stores a checksum of each file and will refuse to start if one changes under it. A mistake in an applied migration is fixed by a new migration.
+3. Write the DDL in the shared form: `varchar(n)` with a `check (... in (...))` for enum columns, `bigint generated by default as identity` for keys, `timestamp(6)` for `LocalDateTime`. Name new constraints properly (`fk_offers_job`, `uk_offer_application`) rather than copying V1's generated hashes — V1 keeps those only because the live databases already have them.
+4. Run `gradlew.bat build`. The schema the migration produces is checked from both directions automatically: `validate` catches a table or column the entity needs and the migration forgot, and `BaselineSchemaTest` catches a length, nullability or constraint that does not match what Hibernate would have generated.
+
+To generate the DDL for a new entity rather than writing it by hand, temporarily add these to `application-test.properties` and run any integration test; the file is written when the entity manager starts:
+
+```properties
+spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create
+spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=build/schema/new-entity.sql
+```
+
+**Adding a value to an enum now has a procedure.** 5.5 froze the enums at `foundation-v1` precisely because `ddl-auto=update` does not update a check constraint, so a new constant failed at insert time on any long-lived database and the only fix was deleting `./data`. That constraint is now visible in V1, so the change is a normal migration:
+
+```sql
+alter table jobs drop constraint <name of the check constraint>;
+alter table jobs add constraint ck_jobs_status check (status in ( ...old values..., 'NEW_VALUE' ));
+```
+
+Existing rows keep working, `./data` survives, and the change is reviewable in a diff — which is the whole point of the exercise.
+
+**Known gap: the optional MySQL profile (10.2).** Flyway 10 and later need a per-database module, and only `flyway-database-postgresql` was added (H2 is built into `flyway-core`). Starting with `--spring.profiles.active=mysql` will now fail with *"Unsupported Database: MySQL"*. Reviving that profile needs `org.flywaydb:flyway-mysql` **and** a MySQL migration set, because MySQL has no standard identity columns — `V1`'s `generated by default as identity` would have to become `auto_increment`. That is the `db/migration/{vendor}` split the table above rejected for H2 and PostgreSQL, and it would be the right answer for MySQL specifically. Nothing in the project currently exercises the MySQL profile, and it is listed as optional.
 
 ---
 
@@ -3416,6 +3539,7 @@ class JobApplicationTest extends IntegrationTestBase {
 | `FileStorageServiceTest` | Unit (`@TempDir`) | `#rejectsWrongExtension`, `#rejectsFakeContent`, `#rejectsEmpty`, `#rejectsTooLarge`, `#storesUnderUuidName`, `#copyCreatesIndependentFile`, `#deleteAfterCommitRunsOnlyOnCommit`, `#pathTraversalBlocked` | G-8, S-F2, S-F4 |
 | `JobSweepSchedulerTest` | Unit (mocked `JobSweepService`) | `#triggerDelegatesToSweepServiceAndNothingElse`: the `@Scheduled` method calls `sweep()` and nothing else, checked without a Spring context or a timer | 7.11 |
 | `GlobalExceptionHandlerTest` | Unit | `#adviceIsUnscoped`: the `@ControllerAdvice` annotation on `GlobalExceptionHandler` has empty `basePackages`, `annotations` and `assignableTypes`, so `MaxUploadSizeExceededException` (resolved with `handler == null`) still reaches it (7.3). The real oversize upload stays manual UP-1. | G-8 |
+| `BaselineSchemaTest` | Integration (no Spring context) | `#migrationsProduceTheSchemaHibernateExpects`: builds the schema twice, once from `db/migration` via Flyway and once from Hibernate's generated DDL, and compares tables, columns, types, lengths, nullability, identity, primary keys, unique constraints and foreign keys. `#lockoutColumnsStayNullable`. Catches everything `ddl-auto=validate` is blind to — a `varchar(20)` where the entity says 100 passes `validate` and every other test, then truncates data | 10.7, 4.10 |
 | `JobApplicationRepositoryTest` | `@DataJpaTest` | `#uniqueJobSeekerConstraint` (second `saveAndFlush` throws) | S-F2 |
 | `UserRepositoryTest` | `@DataJpaTest` | `#uniqueEmail`; `#currentUserProjection` | P-3, A-F1 |
 | `JobSpecificationsTest` | Integration | `live` excludes pending, rejected, closed, expired, hidden; `notAppliedBy`; `keyword` escapes `%` and `_` | S-F1, S-D5 |
@@ -3664,7 +3788,7 @@ Every application also has a first history row "Applied" (actor: the seeker) at 
 | R3 | Lab machine offline with an empty Gradle cache | Medium / High | Main fallback `run-jar.bat` with the prebuilt jar (needs only Java). Alternative: run `gradlew.bat build` on the lab machine the day before while online. |
 | R4 | No MySQL on lab machines | Certain / Low | H2 is the default; the `mysql` profile is optional; all queries are portable JPQL; date grouping is done in Java. |
 | R5 | No internet during the demo | Medium / Medium | Webjars only; M8 check for external URLs; manual X-01. |
-| R6 | Schema drift with `ddl-auto=update` (renamed fields leave old NOT NULL columns; new enum values violate old CHECK constraints) | High during development / Medium | Entities and enums frozen at `foundation-v1`; tests use `create-drop`; README troubleshooting: "NULL not allowed for column", "Check constraint violation" or "Value not permitted" after pulling changes means stop the app and run `reset-demo.bat`. |
+| R6 | Schema drift with `ddl-auto=update` (renamed fields leave old NOT NULL columns; new enum values violate old CHECK constraints) | Closed by 10.7 | Flyway now owns the schema and Hibernate only validates it, so a mismatch stops the app at start-up with the offending column named instead of surfacing as a failed query later. `BaselineSchemaTest` additionally catches the differences `validate` cannot see (length, nullability, keys). Entities and enums stay frozen at `foundation-v1` by convention, but a change is now a migration rather than a reason to delete `./data`. |
 | R7 | Leftover data from rehearsals makes the demo differ from the script | High / Medium | `reset-demo.bat` before every rehearsal and on the morning of the viva; seed dates are relative to today; the script starts from the seeded state. |
 | R8 | Port 8080 already in use | Medium / Medium | `server.port=${PORT:8080}`; `run.bat 9090`; README: `netstat -ano \| findstr :8080`, then end that process in Task Manager. |
 | R9 | H2 "Database may be already in use" (IDE run and terminal run together), or `reset-demo.bat` run while the app is still running on some port (for example after `run.bat 9090`) and deleting only half of `data` | Medium / Medium | Run one instance only (README). `reset-demo.bat` does not rely on a port number: it first tries to rename the `data` folder, which Windows refuses while any running instance, on any port, holds the H2 file open, and then stops with "The database is still in use, so the app is still running. Stop it first." before deleting anything. |
@@ -3869,7 +3993,8 @@ Keep one screenshot per row in the backup deck.
 | What does `@Transactional` do? | Runs the method in one database transaction: all changes commit together or roll back on an exception (the activity log entry rolls back with them). |
 | What are JPA and Hibernate? | JPA is the standard for mapping Java classes to tables; Hibernate implements it; Spring Data generates repository code from method names. |
 | Why H2, and how would you use MySQL? | H2 needs no installation and stores data in `./data`. MySQL: start with the `mysql` profile and credentials; the driver is already included. |
-| What does `ddl-auto=update` do, and its risk? | Creates or extends tables from entities at startup; it never drops or renames, so model changes can leave stale columns. Real projects use Flyway migrations. |
+| What does `ddl-auto=update` do, and its risk? | Creates or extends tables from entities at startup; it never drops or renames, does not update enum constraints, and only *logs* a change it could not make — so the app starts on a wrong schema and fails later at a query. The project used it up to `A-D6` and replaced it with Flyway (10.7). |
+| Why Flyway, and how did you adopt a database that already had tables? | The schema is now numbered SQL in `db/migration`, applied before Hibernate starts; `ddl-auto=validate` means Hibernate checks and never changes. Existing databases are adopted with `baseline-on-migrate`, which records V1 as already applied rather than recreating tables full of rows. V1 itself was generated from Hibernate's own DDL, not hand-written, and `BaselineSchemaTest` re-compares the two on every build. |
 | How is A-D5 "real-time"? Why not WebSockets? | The page polls `/admin/activity/feed?afterId=` every few seconds and adds new rows. Simpler than WebSockets, easy to test, and fast enough; push is future work. |
 | How are recommendations calculated? | Points for matching skills (10, 6 or 3), preferred job type, location, experience fit, past categories and freshness; a job needs a skill or category match and at least 5 points. Priya's Spring Boot Intern scores 34. |
 | How do you prevent duplicate applications? | The service checks first, and the database has a unique constraint on (job, seeker) as a safety net for double clicks. |
