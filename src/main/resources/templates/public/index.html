@@ -50,7 +50,7 @@
         <p class="text-muted small mt-3 mb-0">
             <span th:text="${liveJobCount}">6</span> live jobs
             &middot;
-            <span th:text="${employersHiringCount}">2</span> companies hiring
+            <a th:href="@{/companies}" class="text-decoration-none" th:text="${employersHiringCount} + ' companies hiring'">2 companies hiring</a>
         </p>
     </section>
 
