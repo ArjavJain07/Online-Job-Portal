@@ -5,7 +5,9 @@ import org.springframework.stereotype.Service;
 
 // Builds and sends every outbound email this application has (Section 16 #1): an
 // employer's job receiving an application, a candidate's application status changing, a
-// job being approved or rejected, and a password-reset link. One place, so the site-name
+// job being approved or rejected, a password-reset link, and - added with the interview
+// scheduling feature - an interview being scheduled, rescheduled or cancelled. One place,
+// so the site-name
 // substitution (Section 7.5: SystemSettings.siteName, never hard-coded - see siteName()
 // below) and the subject/body wording live in exactly one reviewable spot instead of being
 // copied into every calling service. Email bodies are plain text and hand-written Java
@@ -16,8 +18,9 @@ import org.springframework.stereotype.Service;
 // ===========================================================================
 // Why every method below takes plain Strings and primitives, never an entity
 // ===========================================================================
-// Each method here is @Async. JobApplicationService, JobModerationService and
-// PasswordResetService call one of them as the LAST thing they do inside their own
+// Each method here is @Async. JobApplicationService, JobModerationService,
+// PasswordResetService and InterviewService call one of them as the LAST thing they do
+// inside their own
 // @Transactional method, and because the target method lives on a DIFFERENT Spring bean,
 // the call passes through the @Async proxy and returns immediately - the caller's
 // transaction then commits exactly as fast as it would without this feature, which is
@@ -116,6 +119,112 @@ public class NotificationService {
         }
         body.append("Log in to ").append(site).append(" for details.\n\n- ").append(site);
         mailService.send(new MailMessage(employerEmail, subject, body.toString()));
+    }
+
+    // ==================== Interview scheduling ====================
+    //
+    // Three more triggers, one per thing that can happen to an appointment: it is made, it
+    // changes, it is called off. They obey this class's one hard rule exactly as the four
+    // above do - EVERY parameter is a String or primitive the caller resolved while its own
+    // transaction was still open, never an Interview or a JobApplication - and for these
+    // three that rule does one extra job worth naming. `whenText` is not a LocalDateTime
+    // and not a formatting instruction: it is the finished sentence fragment
+    // "23 Sep 2026, 3:30 PM IST (Asia/Kolkata)", produced by Interview#getWhenText, the one
+    // definition every page renders from too. So the time in the candidate's inbox is
+    // character-for-character the time on their application page, including the named zone
+    // - passing a raw LocalDateTime instead would mean this class choosing a format and a
+    // zone of its own on a background thread, which is precisely how the two come to
+    // disagree and a candidate turns up an hour late.
+    //
+    // All three are addressed to the CANDIDATE only. The employer is the one taking the
+    // action in every case, so there is nothing to tell them that they did not just type -
+    // the same reasoning that already keeps notifyApplicationStatusChanged from emailing a
+    // seeker about their own withdrawal.
+
+    @Async
+    public void notifyInterviewScheduled(String candidateEmail, String candidateName, String jobTitle,
+            String applicationReference, String whenText, String modeLabel, String detailLabel,
+            String locationOrNull, String notesOrNull) {
+        String site = siteName();
+        String subject = "Interview scheduled for " + jobTitle;
+        StringBuilder body = new StringBuilder("Hi ").append(candidateName).append(",\n\n")
+                .append("An interview has been scheduled for your application (").append(applicationReference)
+                .append(") for \"").append(jobTitle).append("\" on ").append(site).append(".\n\n");
+        appendDetails(body, whenText, modeLabel, detailLabel, locationOrNull, notesOrNull);
+        body.append("\nLog in to ").append(site).append(" to see the full details.\n\n- ").append(site);
+        mailService.send(new MailMessage(candidateEmail, subject, body.toString()));
+    }
+
+    // previousWhenTextOrNull is what separates the two things this one email covers: a
+    // non-null value means the SLOT MOVED and the candidate has a now-wrong entry in their
+    // calendar to find and fix, so the old time is named explicitly; null means only the
+    // mode, link/address or notes changed and the time is untouched, where naming a "from"
+    // time would invent a change that did not happen. One method rather than two because
+    // the recipient's job is the same either way - re-read the details below - and the
+    // caller already knows which case it is (InterviewService#reschedule compares the two
+    // instants); this is the same nullable-argument shape notifyJobDecision already uses
+    // for its rejection reason.
+    @Async
+    public void notifyInterviewRescheduled(String candidateEmail, String candidateName, String jobTitle,
+            String applicationReference, String whenText, String previousWhenTextOrNull, String modeLabel,
+            String detailLabel, String locationOrNull, String notesOrNull) {
+        String site = siteName();
+        boolean moved = previousWhenTextOrNull != null;
+        String subject = (moved ? "Interview rescheduled for " : "Interview details updated for ") + jobTitle;
+        StringBuilder body = new StringBuilder("Hi ").append(candidateName).append(",\n\n");
+        if (moved) {
+            body.append("Your interview for \"").append(jobTitle).append("\" (").append(applicationReference)
+                    .append(") on ").append(site).append(" has been moved from ").append(previousWhenTextOrNull)
+                    .append(".\n\nPlease update your calendar - the new details are below.\n\n");
+        } else {
+            body.append("The details of your interview for \"").append(jobTitle).append("\" (")
+                    .append(applicationReference).append(") on ").append(site)
+                    .append(" have been updated. The time has not changed.\n\n");
+        }
+        appendDetails(body, whenText, modeLabel, detailLabel, locationOrNull, notesOrNull);
+        body.append("\nLog in to ").append(site).append(" to see the full details.\n\n- ").append(site);
+        mailService.send(new MailMessage(candidateEmail, subject, body.toString()));
+    }
+
+    // Sent for BOTH ways an interview is cancelled (see InterviewStatus): the employer
+    // calling it off themselves, and the automatic cancellation of a still-future interview
+    // when the application leaves the Interview stage for a final status. The second of
+    // those means a candidate can receive this alongside the status-change email from the
+    // same action, which is intended, not duplication: "you were not selected" and "the
+    // interview you have in your calendar for Thursday is off" are two different facts, and
+    // a candidate who reads only the first still needs the second.
+    @Async
+    public void notifyInterviewCancelled(String candidateEmail, String candidateName, String jobTitle,
+            String applicationReference, String whenText, String reasonOrNull) {
+        String site = siteName();
+        String subject = "Interview cancelled for " + jobTitle;
+        StringBuilder body = new StringBuilder("Hi ").append(candidateName).append(",\n\n")
+                .append("The interview scheduled for ").append(whenText).append(", for your application (")
+                .append(applicationReference).append(") for \"").append(jobTitle).append("\" on ").append(site)
+                .append(", has been cancelled.\n\n");
+        if (reasonOrNull != null && !reasonOrNull.isBlank()) {
+            body.append("Reason: ").append(reasonOrNull).append("\n\n");
+        }
+        body.append("Log in to ").append(site).append(" to see the full details.\n\n- ").append(site);
+        mailService.send(new MailMessage(candidateEmail, subject, body.toString()));
+    }
+
+    // The "when / how / where / anything else" block the schedule and reschedule emails
+    // both end with, written once so the two cannot drift apart. detailLabel is
+    // InterviewMode's own word for what the location field means for THIS mode ("Joining
+    // link" for a video call, "Address" on-site), so the email labels the value the same
+    // way the page the candidate is being sent to does. Blank lines rather than any markup:
+    // MailMessage bodies are plain text (see this class's header).
+    private void appendDetails(StringBuilder body, String whenText, String modeLabel, String detailLabel,
+            String locationOrNull, String notesOrNull) {
+        body.append("When: ").append(whenText).append("\n");
+        body.append("How: ").append(modeLabel).append("\n");
+        if (locationOrNull != null && !locationOrNull.isBlank()) {
+            body.append(detailLabel).append(": ").append(locationOrNull).append("\n");
+        }
+        if (notesOrNull != null && !notesOrNull.isBlank()) {
+            body.append("Notes: ").append(notesOrNull).append("\n");
+        }
     }
 
     // Password reset (hard requirement 4). resetLink already contains the raw, single-use

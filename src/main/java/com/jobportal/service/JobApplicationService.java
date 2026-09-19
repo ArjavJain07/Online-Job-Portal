@@ -1,6 +1,7 @@
 package com.jobportal.service;
 
 import com.jobportal.domain.ApplicationStatusChange;
+import com.jobportal.domain.Interview;
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
 import com.jobportal.domain.SeekerProfile;
@@ -18,6 +19,7 @@ import com.jobportal.exception.BusinessRuleException;
 import com.jobportal.exception.FileValidationException;
 import com.jobportal.exception.ResourceNotFoundException;
 import com.jobportal.repository.ApplicationStatusChangeRepository;
+import com.jobportal.repository.InterviewRepository;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.JobSpecifications;
@@ -87,6 +89,9 @@ public class JobApplicationService {
 
     private final JobApplicationRepository jobApplicationRepository;
     private final ApplicationStatusChangeRepository applicationStatusChangeRepository;
+    // The interviews table, reached as a repository rather than through InterviewService -
+    // see recordStatusChange for why that direction is the only one available.
+    private final InterviewRepository interviewRepository;
     private final JobRepository jobRepository;
     private final SeekerProfileRepository seekerProfileRepository;
     private final MessageRepository messageRepository;
@@ -98,13 +103,15 @@ public class JobApplicationService {
     private final Clock clock;
 
     public JobApplicationService(JobApplicationRepository jobApplicationRepository,
-            ApplicationStatusChangeRepository applicationStatusChangeRepository, JobRepository jobRepository,
+            ApplicationStatusChangeRepository applicationStatusChangeRepository,
+            InterviewRepository interviewRepository, JobRepository jobRepository,
             SeekerProfileRepository seekerProfileRepository, MessageRepository messageRepository,
             UserRepository userRepository, FileStorageService fileStorageService,
             ActivityLogService activityLogService, SettingsService settingsService,
             NotificationService notificationService, Clock clock) {
         this.jobApplicationRepository = jobApplicationRepository;
         this.applicationStatusChangeRepository = applicationStatusChangeRepository;
+        this.interviewRepository = interviewRepository;
         this.jobRepository = jobRepository;
         this.seekerProfileRepository = seekerProfileRepository;
         this.messageRepository = messageRepository;
@@ -148,6 +155,49 @@ public class JobApplicationService {
 
         activityLogService.log(activityType, actor, description, TargetType.APPLICATION, application.getId());
 
+        // ---- Interview scheduling: a still-future interview does not survive the
+        // ---- application being closed.
+        //
+        // Placed HERE, inside the one method every status change in the application passes
+        // through, rather than in the three places a final status is reached from: this
+        // helper is already what makes "every change writes an ApplicationStatusChange row"
+        // true without anyone remembering to, and "every closed application stops having an
+        // upcoming interview" is exactly the same kind of invariant. Bulk rejection
+        // (bulkChangeStatus -> changeStatus -> here) therefore gets it for free, and so
+        // would any future caller.
+        //
+        // WHY IT IS CANCELLED AT ALL. From INTERVIEW the matrix (Section 5.6) allows only
+        // HIRED, REJECTED and WITHDRAWN, all final - so reaching any of them means nobody
+        // is going to that interview. Leaving the row SCHEDULED would put a live
+        // appointment on the page of a candidate who has just been told they were not
+        // selected, which is the single worst thing this feature could get wrong, and the
+        // one case where the failure is silent: nothing would error, the candidate would
+        // simply turn up.
+        //
+        // WHY ONLY AN UPCOMING ONE. An interview whose time has already passed happened (or
+        // at least, its moment came); it is history, and a hire or a rejection is very often
+        // the RESULT of it. Rewriting it to "Cancelled" would falsify the record in the one
+        // direction that matters to the candidate reading their own timeline afterwards, so
+        // isUpcoming (Interview, evaluated against the same `now` used above) is what
+        // decides - not the status alone.
+        //
+        // Reached through InterviewRepository rather than InterviewService, deliberately:
+        // InterviewService depends on THIS class for its one ownership-checked read, so the
+        // reverse dependency would be a cycle - and, more to the point, it would give a
+        // service that must never move a status a live reference to the method that does.
+        // What a cancelled row looks like is still defined in exactly one place
+        // (Interview#cancel), which is all the two callers have to agree on.
+        Interview cancelledInterview = null;
+        if (previousStatus == ApplicationStatus.INTERVIEW) {
+            cancelledInterview = interviewRepository.findByApplication_Id(application.getId())
+                    .filter(existing -> existing.isUpcoming(now))
+                    .orElse(null);
+            if (cancelledInterview != null) {
+                cancelledInterview.cancel(now, InterviewService.CLOSED_APPLICATION_REASON);
+                interviewRepository.save(cancelledInterview);
+            }
+        }
+
         // Section 16 #1 trigger 2 of 3: "a candidate's application status changes."
         // Deliberately gated on the ACTOR, not the new status: this shared helper is also
         // reached by withdraw() with actor = the seeker themselves, and a candidate needs
@@ -162,6 +212,22 @@ public class JobApplicationService {
             notificationService.notifyApplicationStatusChanged(application.getSeeker().getEmail(),
                     application.getSeeker().getFullName(), application.getJob().getTitle(), newStatus.getSeekerLabel(),
                     application.getReference());
+
+            // A SECOND email, on purpose, when the change above also cancelled an upcoming
+            // interview. "Your application is now: Not selected" and "the interview in your
+            // calendar for Thursday is off" are two different facts, and a candidate who
+            // skims the first still has to act on the second. Gated on the employer being
+            // the actor for exactly the reason the status email is: the seeker's own
+            // withdrawal cancels their interview just the same (the block above is not
+            // gated), but telling them about a consequence of the button they just pressed
+            // is noise. Last statement, and every value already resolved - same rule as
+            // above.
+            if (cancelledInterview != null) {
+                notificationService.notifyInterviewCancelled(application.getSeeker().getEmail(),
+                        application.getSeeker().getFullName(), application.getJob().getTitle(),
+                        application.getReference(), cancelledInterview.getWhenText(),
+                        cancelledInterview.getCancellationReason());
+            }
         }
     }
 
