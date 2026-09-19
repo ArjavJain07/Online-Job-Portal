@@ -246,7 +246,7 @@ public class JobAlertService {
 
         if (matchLines.isEmpty()) {
             // Nothing new to report. lastSentAt is DELIBERATELY left untouched (see that
-            // field's own comment on JobAlertSubscription) rather than stamped "checked, //
+            // field's own comment on JobAlertSubscription) rather than stamped "checked,
             // found nothing": stamping it would make this subscription wait out a full
             // digestFrequencyDays window even if a great match appears an hour later,
             // whereas leaving it alone keeps the subscription "due" on every future tick
