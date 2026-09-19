@@ -27,13 +27,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Admin user management (A-D1, Section 7.9): q (name, email or company contains),
     // role and status are all optional. Callers pass q already trimmed and lower-cased,
     // or null for "no filter" (the same convention as role and enabled).
+    // The casts matter on PostgreSQL: with a null :q the driver sends an untyped
+    // parameter, so the server resolves || as bytea||bytea and LIKE then fails with
+    // "operator does not exist: text ~~ bytea". H2 infers the type without them.
     @Query("select u from User u where "
             + "(:role is null or u.role = :role) "
             + "and (:enabled is null or u.enabled = :enabled) "
             + "and (:q is null "
-            + "     or lower(u.fullName) like concat('%', :q, '%') "
-            + "     or lower(u.email) like concat('%', :q, '%') "
-            + "     or lower(u.companyName) like concat('%', :q, '%'))")
+            + "     or lower(u.fullName) like concat('%', cast(:q as String), '%') "
+            + "     or lower(u.email) like concat('%', cast(:q as String), '%') "
+            + "     or lower(u.companyName) like concat('%', cast(:q as String), '%'))")
     Page<User> search(@Param("q") String q, @Param("role") Role role, @Param("enabled") Boolean enabled, Pageable pageable);
 
     @Query("select u.createdAt from User u where u.createdAt >= :from")
