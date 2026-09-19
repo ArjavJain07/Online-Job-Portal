@@ -50,6 +50,13 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 new Page("/register/seeker", null, "Create your job seeker account"),
                 new Page("/register/employer", null, "Create your employer account"),
                 new Page("/account/password", "priya@demo.local", "Change password"),
+                // Section 16 #1: self-service password reset. The reset-password row
+                // deliberately uses a token that does not exist, to prove the "invalid
+                // link" state itself renders cleanly - a real token is single-use and
+                // consumed the moment a test resets a password, so it could never stay
+                // valid for a second GET the way every other row here is reused freely.
+                new Page("/forgot-password", null, "Forgot your password?"),
+                new Page("/reset-password?token=does-not-exist", null, "Link no longer valid"),
                 // Admin module (M3, Section 6.2). User/job ids below are seed codes, which
                 // equal ids on a fresh database (Section 13.1), the same rule already used
                 // for "/jobs/1" above.

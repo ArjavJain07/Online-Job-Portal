@@ -94,13 +94,15 @@ public class JobApplicationService {
     private final FileStorageService fileStorageService;
     private final ActivityLogService activityLogService;
     private final SettingsService settingsService;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public JobApplicationService(JobApplicationRepository jobApplicationRepository,
             ApplicationStatusChangeRepository applicationStatusChangeRepository, JobRepository jobRepository,
             SeekerProfileRepository seekerProfileRepository, MessageRepository messageRepository,
             UserRepository userRepository, FileStorageService fileStorageService,
-            ActivityLogService activityLogService, SettingsService settingsService, Clock clock) {
+            ActivityLogService activityLogService, SettingsService settingsService,
+            NotificationService notificationService, Clock clock) {
         this.jobApplicationRepository = jobApplicationRepository;
         this.applicationStatusChangeRepository = applicationStatusChangeRepository;
         this.jobRepository = jobRepository;
@@ -110,6 +112,7 @@ public class JobApplicationService {
         this.fileStorageService = fileStorageService;
         this.activityLogService = activityLogService;
         this.settingsService = settingsService;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -144,6 +147,22 @@ public class JobApplicationService {
         applicationStatusChangeRepository.save(change);
 
         activityLogService.log(activityType, actor, description, TargetType.APPLICATION, application.getId());
+
+        // Section 16 #1 trigger 2 of 3: "a candidate's application status changes."
+        // Deliberately gated on the ACTOR, not the new status: this shared helper is also
+        // reached by withdraw() with actor = the seeker themselves, and a candidate needs
+        // no email informing them of the action they just took. Every employer-driven
+        // transition DOES go through here, including each row of a bulk status change
+        // (JobApplicationService#bulkChangeStatus calls changeStatus() once per id, which
+        // calls this), so one email is sent per application either way. Kept as the LAST
+        // statement in this method on purpose - see NotificationService's class comment on
+        // why a plain @Async call (not @TransactionalEventListener) was chosen, and what
+        // that trade-off requires of every call site.
+        if (actor.getRole() == Role.EMPLOYER) {
+            notificationService.notifyApplicationStatusChanged(application.getSeeker().getEmail(),
+                    application.getSeeker().getFullName(), application.getJob().getTitle(), newStatus.getSeekerLabel(),
+                    application.getReference());
+        }
     }
 
     // "fullName (companyName)" for employers, the plain name otherwise (Section 5.2).
@@ -587,6 +606,13 @@ public class JobApplicationService {
                 + job.getEmployer().getCompanyName() + " (" + application.getReference() + ")";
         activityLogService.log(ActivityType.APPLICATION_SUBMITTED, seeker, description, TargetType.APPLICATION,
                 application.getId());
+
+        // Section 16 #1 trigger 1 of 3: "an employer's job receives an application." Last
+        // statement in this method on purpose (NotificationService's class comment
+        // explains why); everything it needs is read here, inside this still-open
+        // transaction, rather than handed the job/seeker entities themselves.
+        notificationService.notifyApplicationReceived(job.getEmployer().getEmail(), job.getEmployer().getFullName(),
+                job.getTitle(), seeker.getFullName(), application.getReference());
 
         return application;
     }

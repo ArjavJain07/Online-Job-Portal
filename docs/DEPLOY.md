@@ -104,3 +104,21 @@ dialect; every page rendered with no SQL errors.
 
 **Region.** `render.yaml` uses Singapore, the closest Render region to India. To
 change it, edit the `region` field for both the service and the database.
+
+**Turning on real email (Section 16 #1).** Off by default: the hosted copy sends no
+mail at all until you configure it, exactly like every other Render deployment of
+this project so far. To turn it on, open the web service's **Environment** tab and:
+
+1. Fill in `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME` and `SMTP_PASSWORD` with a
+   real mail provider's details (for example an app password from a Gmail
+   account, or an API-key-as-password from a transactional mail service).
+   `render.yaml` lists these with `sync: false` so Render prompts for them here
+   instead of a value ever being written into the repository.
+2. Optionally set `MAIL_FROM` if the provider's required "From" address is
+   different from `SMTP_USERNAME`.
+3. Set `MAIL_ENABLED` to `true` and save. Render redeploys automatically.
+
+If `MAIL_ENABLED` is `true` but the SMTP values are missing or wrong, the app
+fails to start (the same fail-fast behaviour as a missing database column above)
+rather than silently pretending to send mail - so Render keeps the previous,
+working version running instead of going live half-configured.
