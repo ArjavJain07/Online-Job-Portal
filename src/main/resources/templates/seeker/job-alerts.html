@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--
+  Job alerts settings (Section 16 future-work item 5). SeekerJobAlertController#settings
+  puts one attribute, "status" (JobAlertService.JobAlertStatus: enabled + lastSentAt), which
+  is all this page needs - there is no frequency picker (a single weekly cadence, set by the
+  operator via app.job-alerts.digest-frequency-days, is a JobAlertService decision, not a
+  per-seeker one; see that class's own comment for why).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Job Alerts', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Job alerts</h1>
+            <p>Get a periodic email when new jobs match your profile.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm" style="max-width: 640px;">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <p class="fw-semibold mb-1">
+                        Status:
+                        <span class="badge job-live" th:if="${status.enabled}">On</span>
+                        <span class="badge bg-secondary" th:unless="${status.enabled}">Off</span>
+                    </p>
+                    <p class="text-muted small mb-0" th:if="${status.lastSentAt != null}">
+                        Last digest sent <span th:text="${@fmt.ago(status.lastSentAt)}">3 days ago</span>.
+                    </p>
+                    <p class="text-muted small mb-0" th:if="${status.lastSentAt == null}">
+                        No digest has been sent yet.
+                    </p>
+                </div>
+            </div>
+
+            <p>
+                We'll email you a summary of new jobs that match your skills, location, job type and experience -
+                the same matching used for your <a th:href="@{/seeker/recommendations}">recommendations</a> - only
+                when there is something genuinely new to report, so you'll never get an empty email.
+            </p>
+
+            <form method="post" th:if="${!status.enabled}" th:action="@{/seeker/job-alerts}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-bell me-1" aria-hidden="true"></i>Turn on job alerts
+                </button>
+            </form>
+            <form method="post" th:if="${status.enabled}" th:action="@{/seeker/job-alerts/disable}">
+                <button type="submit" class="btn btn-outline-danger">
+                    <i class="bi bi-bell-slash me-1" aria-hidden="true"></i>Turn off job alerts
+                </button>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

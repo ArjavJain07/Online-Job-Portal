@@ -1,11 +1,13 @@
 package com.jobportal.service;
 
+import java.util.List;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 // Builds and sends every outbound email this application has (Section 16 #1): an
 // employer's job receiving an application, a candidate's application status changing, a
-// job being approved or rejected, and a password-reset link. One place, so the site-name
+// job being approved or rejected, a password-reset link, and (Section 16 future-work item
+// 5) a seeker's job-alert digest. One place, so the site-name
 // substitution (Section 7.5: SystemSettings.siteName, never hard-coded - see siteName()
 // below) and the subject/body wording live in exactly one reviewable spot instead of being
 // copied into every calling service. Email bodies are plain text and hand-written Java
@@ -133,6 +135,35 @@ public class NotificationService {
                 + "If you did not request this, you can safely ignore this email - your password will not change.\n\n"
                 + "- " + site;
         mailService.send(new MailMessage(toEmail, subject, body));
+    }
+
+    // Job alert digest (Section 16 future-work item 5). JobAlertService is the only caller,
+    // and only once it has already decided there is something worth emailing - matchLines
+    // is never empty by the time it gets here (see that class's own comment on why an empty
+    // digest is refused before this method is ever reached, not inside it). Each line is
+    // already a fully-formatted "title at company (location) - why it matched" sentence,
+    // built by JobAlertService from a Job and its RecommendedJob while ITS OWN transaction
+    // was still open - exactly the "resolve to Strings before the @Async hop" rule this
+    // class's own header comment explains, extended here to a List<String> rather than one
+    // scalar per parameter simply because the number of matches varies run to run; nothing
+    // in the list is, or came from, a Hibernate-attached entity.
+    @Async
+    public void notifyJobAlertDigest(String toEmail, String recipientName, List<String> matchLines,
+            String unsubscribeLink) {
+        String site = siteName();
+        int count = matchLines.size();
+        String subject = (count == 1 ? "1 new job matches" : count + " new jobs match") + " your alert on " + site;
+        StringBuilder body = new StringBuilder("Hi " + recipientName + ",\n\n")
+                .append(count == 1 ? "A new job matches" : count + " new jobs match")
+                .append(" your profile on ").append(site).append(":\n\n");
+        for (String line : matchLines) {
+            body.append("- ").append(line).append("\n");
+        }
+        body.append("\nLog in to ").append(site).append(" to see full details and apply.\n\n")
+                .append("Don't want these emails? Unsubscribe at any time, no login needed:\n")
+                .append(unsubscribeLink).append("\n\n")
+                .append("- ").append(site);
+        mailService.send(new MailMessage(toEmail, subject, body.toString()));
     }
 
     // The one repository-backed read in this class, safe to make from the @Async thread

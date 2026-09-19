@@ -135,6 +135,24 @@
                                 </div>
                             </div>
 
+                            <!-- Save/unsave (Section 16 future-work item 5): every viewer of
+                                 this page is a job seeker (SecurityConfig), so "saved" is
+                                 never null here - contrast public/jobs.html, which has no
+                                 save control at all since an anonymous/employer/admin viewer
+                                 has nothing to save a job to. -->
+                            <div class="mb-4">
+                                <form method="post" th:if="${saved}" th:action="@{/seeker/jobs/{id}/unsave(id=${selectedJob.id})}">
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-bookmark-check-fill me-1" aria-hidden="true"></i>Saved
+                                    </button>
+                                </form>
+                                <form method="post" th:unless="${saved}" th:action="@{/seeker/jobs/{id}/save(id=${selectedJob.id})}">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-bookmark me-1" aria-hidden="true"></i>Save
+                                    </button>
+                                </form>
+                            </div>
+
                             <h3 class="h6">Job description</h3>
                             <p class="pre-line" th:text="${selectedJob.description}">Description</p>
 

@@ -7,10 +7,12 @@ import com.jobportal.domain.enums.Role;
 import com.jobportal.domain.enums.TargetType;
 import com.jobportal.exception.BusinessRuleException;
 import com.jobportal.exception.ResourceNotFoundException;
+import com.jobportal.repository.JobAlertSubscriptionRepository;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.MessageRepository;
 import com.jobportal.repository.PasswordResetTokenRepository;
+import com.jobportal.repository.SavedJobRepository;
 import com.jobportal.repository.SeekerProfileRepository;
 import com.jobportal.repository.UserRepository;
 import com.jobportal.web.form.UserForm;
@@ -47,6 +49,8 @@ public class UserService {
     private final JobApplicationRepository jobApplicationRepository;
     private final MessageRepository messageRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final SavedJobRepository savedJobRepository;
+    private final JobAlertSubscriptionRepository jobAlertSubscriptionRepository;
     private final ActivityLogService activityLogService;
     private final FileStorageService fileStorageService;
     private final SettingsService settingsService;
@@ -56,6 +60,7 @@ public class UserService {
     public UserService(UserRepository userRepository, SeekerProfileRepository seekerProfileRepository,
             JobRepository jobRepository, JobApplicationRepository jobApplicationRepository,
             MessageRepository messageRepository, PasswordResetTokenRepository passwordResetTokenRepository,
+            SavedJobRepository savedJobRepository, JobAlertSubscriptionRepository jobAlertSubscriptionRepository,
             ActivityLogService activityLogService, FileStorageService fileStorageService,
             SettingsService settingsService, PasswordEncoder passwordEncoder, Clock clock) {
         this.userRepository = userRepository;
@@ -64,6 +69,8 @@ public class UserService {
         this.jobApplicationRepository = jobApplicationRepository;
         this.messageRepository = messageRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.savedJobRepository = savedJobRepository;
+        this.jobAlertSubscriptionRepository = jobAlertSubscriptionRepository;
         this.activityLogService = activityLogService;
         this.fileStorageService = fileStorageService;
         this.settingsService = settingsService;
@@ -277,6 +284,17 @@ public class UserService {
         // dependencyCounts() above found nothing blocking this delete. Every role can have
         // requested a reset, not just job seekers, so this runs unconditionally.
         passwordResetTokenRepository.deleteByUser_Id(id);
+        // Same reasoning, same fix, for the two V5 tables (saved jobs + job alerts, Section
+        // 16 future-work item 5): saved_jobs.seeker_id and job_alert_subscriptions.user_id
+        // have no ON DELETE clause either (V5 migration's own comment), and neither is
+        // counted in dependencyCounts() above - a bookmark or a notification preference is
+        // not precious history the way a job/application/message is, so it is cleaned up
+        // silently here instead of ever blocking a delete Section 5.8 says should succeed.
+        // Only a job seeker can have rows in either table, but both calls are harmless
+        // no-ops for any other role, so - like the reset-token cleanup above - this runs
+        // unconditionally rather than branching on user.getRole().
+        savedJobRepository.deleteBySeeker_Id(id);
+        jobAlertSubscriptionRepository.deleteByUser_Id(id);
         userRepository.delete(user);
 
         // No target: the user row is gone (Section 5.7 catalogue, USER_DELETED).

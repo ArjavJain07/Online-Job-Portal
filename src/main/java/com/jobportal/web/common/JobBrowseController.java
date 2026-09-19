@@ -7,6 +7,7 @@ import com.jobportal.domain.enums.Role;
 import com.jobportal.dto.JobSearchResult;
 import com.jobportal.security.AppUserDetails;
 import com.jobportal.service.JobSearchService;
+import com.jobportal.service.SavedJobService;
 import com.jobportal.web.form.JobSearchCriteria;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
@@ -33,10 +34,12 @@ public class JobBrowseController {
     private static final DateTimeFormatter DEADLINE_DATE_FORMAT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
 
     private final JobSearchService jobSearchService;
+    private final SavedJobService savedJobService;
     private final Clock clock;
 
-    public JobBrowseController(JobSearchService jobSearchService, Clock clock) {
+    public JobBrowseController(JobSearchService jobSearchService, SavedJobService savedJobService, Clock clock) {
         this.jobSearchService = jobSearchService;
+        this.savedJobService = savedJobService;
         this.clock = clock;
     }
 
@@ -92,6 +95,13 @@ public class JobBrowseController {
         model.addAttribute("banner", banner(job, today, viewerId, viewerRole));
         model.addAttribute("showApplyPanel", live && anonymousOrSeeker);
         model.addAttribute("existingApplication", existingApplication.orElse(null));
+        // Save/unsave button (Section 16 future-work item 5): null for anyone but a job
+        // seeker - including an anonymous visitor, who has nowhere to save a job TO - the
+        // same "null means not applicable to this viewer" convention "existingApplication"
+        // already uses above. Deliberately independent of showApplyPanel/live: a seeker can
+        // still want to un-save a job here after it has closed or expired, not only while
+        // it is open for applications.
+        model.addAttribute("saved", viewerRole == Role.JOB_SEEKER ? savedJobService.isSaved(viewerId, job.getId()) : null);
         return "public/job-detail";
     }
 

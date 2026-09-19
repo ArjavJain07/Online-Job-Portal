@@ -97,7 +97,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers("/", "/jobs", "/jobs/*", "/companies", "/companies/*", "/login", "/register", "/register/**",
-                                "/forgot-password", "/reset-password", "/error")
+                                "/forgot-password", "/reset-password", "/job-alerts/unsubscribe", "/error")
                         .permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/employer/**").hasRole("EMPLOYER")

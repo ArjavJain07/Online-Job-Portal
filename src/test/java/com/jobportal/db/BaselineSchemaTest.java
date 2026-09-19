@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jobportal.domain.ActivityLog;
 import com.jobportal.domain.ApplicationStatusChange;
 import com.jobportal.domain.Job;
+import com.jobportal.domain.JobAlertSubscription;
 import com.jobportal.domain.JobApplication;
 import com.jobportal.domain.JobStatusChange;
 import com.jobportal.domain.JobView;
 import com.jobportal.domain.Message;
 import com.jobportal.domain.PasswordResetToken;
+import com.jobportal.domain.SavedJob;
 import com.jobportal.domain.SeekerProfile;
 import com.jobportal.domain.SystemSettings;
 import com.jobportal.domain.User;
@@ -70,9 +72,9 @@ import org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy;
 class BaselineSchemaTest {
 
     private static final Class<?>[] ENTITIES = {
-        ActivityLog.class, ApplicationStatusChange.class, Job.class, JobApplication.class,
-        JobStatusChange.class, JobView.class, Message.class, PasswordResetToken.class, SeekerProfile.class,
-        SystemSettings.class, User.class
+        ActivityLog.class, ApplicationStatusChange.class, Job.class, JobAlertSubscription.class, JobApplication.class,
+        JobStatusChange.class, JobView.class, Message.class, PasswordResetToken.class, SavedJob.class,
+        SeekerProfile.class, SystemSettings.class, User.class
     };
 
     // Flyway's own bookkeeping table exists only in the Flyway-built database, so it is
