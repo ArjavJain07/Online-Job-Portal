@@ -26,7 +26,15 @@ public final class TextMatcher {
     // Lower-cases the value and replaces every character other than letters, digits, +
     // and # with a space, then collapses runs of spaces. This makes "Node.js", "node js"
     // and "NODE-JS" all compare equal, while keeping "c++" and "c#" intact.
-    private static String normalise(String value) {
+    //
+    // Public since the skills-as-an-entity change (Section 10.8): Skill.slug is defined as
+    // exactly this function of the typed label, so "the canonical key of a skill" and "the
+    // token containsPhrase() looks for in a title or description" are the same string by
+    // construction, not by two definitions that happen to agree today. That is what lets
+    // RecommendationScorer's rule 1 (skill identity) and rules 2-3 (phrase in text) stay
+    // coherent: a seeker skill can never match a job's free text under rules 2-3 while
+    // failing to match the identical skill under rule 1.
+    public static String normalise(String value) {
         StringBuilder result = new StringBuilder();
         for (char c : value.toLowerCase(Locale.ROOT).toCharArray()) {
             if (Character.isLetterOrDigit(c) || c == '+' || c == '#') {
