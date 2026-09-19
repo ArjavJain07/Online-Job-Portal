@@ -68,12 +68,23 @@ public final class SearchIndex {
     // null as "this query matches no text at all" rather than as "match everything";
     // JobSpecifications.keyword does exactly that.
     //
-    // The result never needs LIKE-escaping and it is not an oversight that none is
+    // The result never needs LIKE-escaping, and it is not an oversight that none is
     // applied: normalise() turns every character except letters, digits, + and # into a
     // space, and \, % and _ are none of those four. A pattern built from it provably
     // cannot contain a metacharacter, which is a stronger guarantee than escaping one.
     // (JobSpecifications.locationContains still searches raw text with a substring LIKE
     // and still escapes - see JobSpecificationsTest#locationEscapesPercentAndUnderscore.)
+    //
+    // JobSpecifications nonetheless passes cb.like(..., pattern, '\\') rather than the
+    // two-argument form, and that is a portability decision, not a second opinion about
+    // escaping. Hibernate renders the two-argument form as `like ? escape ''`: an EMPTY
+    // escape clause, which H2 accepts and which PostgreSQL documents as "escaping is
+    // disabled" - probably fine, and a construct this application has never once executed
+    // against PostgreSQL. The three-argument form renders `like ? escape '\'`, which is
+    // character-for-character what the skills branch has been sending to production since
+    // Section 10.8. Given a free choice between a spelling that is argued to work and one
+    // that is observed to, on the half of the pair that no test here can reach, take the
+    // observed one.
     public static String phrasePattern(String query) {
         String phrase = TextMatcher.normalise(query == null ? "" : query);
         return phrase.isEmpty() ? null : "% " + phrase + " %";

@@ -106,10 +106,10 @@ public final class JobSpecifications {
                 return cb.disjunction();
             }
             return cb.or(
-                    cb.like(root.get("searchTitle"), pattern),
+                    cb.like(root.get("searchTitle"), pattern, '\\'),
                     skillPhraseMatches(root, query, cb, text),
-                    cb.like(root.get("employer").get("searchCompanyName"), pattern),
-                    cb.like(root.get("searchDescription"), pattern));
+                    cb.like(root.get("employer").get("searchCompanyName"), pattern, '\\'),
+                    cb.like(root.get("searchDescription"), pattern, '\\'));
         };
     }
 
@@ -168,12 +168,12 @@ public final class JobSpecifications {
     private static Expression<Integer> relevanceScore(Root<Job> root, CriteriaQuery<?> query, CriteriaBuilder cb,
             String text) {
         String pattern = SearchIndex.phrasePattern(text);
-        Expression<Integer> title = weighted(cb, cb.like(root.get("searchTitle"), pattern), TITLE_WEIGHT);
+        Expression<Integer> title = weighted(cb, cb.like(root.get("searchTitle"), pattern, '\\'), TITLE_WEIGHT);
         Expression<Integer> skills = weighted(cb, skillPhraseMatches(root, query, cb, text), SKILL_WEIGHT);
         Expression<Integer> company = weighted(cb,
-                cb.like(root.get("employer").get("searchCompanyName"), pattern), COMPANY_WEIGHT);
+                cb.like(root.get("employer").get("searchCompanyName"), pattern, '\\'), COMPANY_WEIGHT);
         Expression<Integer> description = weighted(cb,
-                cb.like(root.get("searchDescription"), pattern), DESCRIPTION_WEIGHT);
+                cb.like(root.get("searchDescription"), pattern, '\\'), DESCRIPTION_WEIGHT);
         return cb.sum(cb.sum(title, skills), cb.sum(company, description));
     }
 
