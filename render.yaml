@@ -57,6 +57,26 @@ services:
       - key: JAVA_OPTS
         value: -XX:MaxRAMPercentage=70 -XX:+UseSerialGC
 
+      # Outgoing email (Section 16 #1), off by default - see application-prod.properties.
+      # MAIL_ENABLED is a plain "false"/"true" switch, not a secret, so it is committed
+      # with a value like every other setting above. The five SMTP_*/MAIL_FROM values are
+      # real credentials and must never be written into this file (hard requirement 1):
+      # sync: false makes Render prompt for each one under the service's Environment tab
+      # instead, the same way ADMIN_PASSWORD's actual value never appears here either.
+      # Flip MAIL_ENABLED to "true" only once all four SMTP_* values are filled in.
+      - key: MAIL_ENABLED
+        value: "false"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+
 databases:
   - name: jobportal-db
     plan: free

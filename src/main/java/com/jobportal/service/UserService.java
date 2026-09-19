@@ -10,6 +10,7 @@ import com.jobportal.exception.ResourceNotFoundException;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.MessageRepository;
+import com.jobportal.repository.PasswordResetTokenRepository;
 import com.jobportal.repository.SeekerProfileRepository;
 import com.jobportal.repository.UserRepository;
 import com.jobportal.web.form.UserForm;
@@ -45,6 +46,7 @@ public class UserService {
     private final JobRepository jobRepository;
     private final JobApplicationRepository jobApplicationRepository;
     private final MessageRepository messageRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final ActivityLogService activityLogService;
     private final FileStorageService fileStorageService;
     private final SettingsService settingsService;
@@ -53,14 +55,15 @@ public class UserService {
 
     public UserService(UserRepository userRepository, SeekerProfileRepository seekerProfileRepository,
             JobRepository jobRepository, JobApplicationRepository jobApplicationRepository,
-            MessageRepository messageRepository, ActivityLogService activityLogService,
-            FileStorageService fileStorageService, SettingsService settingsService, PasswordEncoder passwordEncoder,
-            Clock clock) {
+            MessageRepository messageRepository, PasswordResetTokenRepository passwordResetTokenRepository,
+            ActivityLogService activityLogService, FileStorageService fileStorageService,
+            SettingsService settingsService, PasswordEncoder passwordEncoder, Clock clock) {
         this.userRepository = userRepository;
         this.seekerProfileRepository = seekerProfileRepository;
         this.jobRepository = jobRepository;
         this.jobApplicationRepository = jobApplicationRepository;
         this.messageRepository = messageRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.activityLogService = activityLogService;
         this.fileStorageService = fileStorageService;
         this.settingsService = settingsService;
@@ -266,6 +269,14 @@ public class UserService {
                 seekerProfileRepository.delete(profile);
             });
         }
+        // Section 16 #1 / V3 migration: password_reset_tokens.user_id has no ON DELETE
+        // clause (same convention as every other foreign key here), so a user who once
+        // requested a reset and never used the link would otherwise still have a live row
+        // pointing at them and userRepository.delete below would fail with a foreign-key
+        // RESTRICT - surfacing as the generic "related data exists" message even though
+        // dependencyCounts() above found nothing blocking this delete. Every role can have
+        // requested a reset, not just job seekers, so this runs unconditionally.
+        passwordResetTokenRepository.deleteByUser_Id(id);
         userRepository.delete(user);
 
         // No target: the user row is gone (Section 5.7 catalogue, USER_DELETED).
