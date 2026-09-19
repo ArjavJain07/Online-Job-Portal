@@ -5,6 +5,7 @@ import com.jobportal.domain.enums.JobDisplayStatus;
 import com.jobportal.domain.enums.JobStatus;
 import com.jobportal.domain.enums.JobType;
 import com.jobportal.domain.enums.WorkMode;
+import com.jobportal.util.SearchIndex;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -45,6 +46,28 @@ public class Job {
 
     @Column(nullable = false, length = 4000)
     private String description;
+
+    // The search index for the two prose columns above (Section 10.9, V7): each one holds
+    // SearchIndex.of(its source), so " java developer " for the title "Java Developer".
+    // Written ONLY by setTitle/setDescription below, so they cannot fall out of step with
+    // the text they describe - the same "one method writes both sides" discipline
+    // assignSkills uses for the legacySkills rollback column.
+    //
+    // They are a cache, not data: every value here is recomputable from the row it sits
+    // in, which is why V7 adds the columns empty and SearchIndexService fills them in Java
+    // rather than a migration parsing text in SQL that has to behave identically on H2 and
+    // PostgreSQL. SearchIndex.UNINDEXED ("") is the value a row that has never been
+    // indexed carries; a real index is never empty, because SearchIndex.of always returns
+    // at least its two padding spaces.
+    //
+    // NOT NULL, and initialised here, so that a code path which somehow inserts a job
+    // without going through the setters fails at the INSERT rather than quietly creating a
+    // job that no keyword search can ever find.
+    @Column(nullable = false, length = 122)
+    private String searchTitle = SearchIndex.UNINDEXED;
+
+    @Column(nullable = false, length = 4002)
+    private String searchDescription = SearchIndex.UNINDEXED;
 
     @Column(nullable = false, length = 2000)
     private String requirements;
@@ -237,16 +260,53 @@ public class Job {
         return title;
     }
 
+    // Setting the title re-indexes it in the same call (Section 10.9). Doing it here
+    // rather than in @PrePersist/@PreUpdate is deliberate: Hibernate decides which
+    // properties are dirty before it invokes @PreUpdate, so a field touched only inside
+    // that callback can be left out of the generated UPDATE - the index would then silently
+    // stop tracking edited titles, on exactly the rows a visitor is most likely to search
+    // for. Assigning it in the setter makes the field dirty at the moment the title is,
+    // which is the only ordering that is not a guess about Hibernate's internals.
     public void setTitle(String title) {
         this.title = title;
+        this.searchTitle = SearchIndex.of(title);
     }
 
     public String getDescription() {
         return description;
     }
 
+    // Same rule as setTitle: the index is written by the one method that changes the text.
     public void setDescription(String description) {
         this.description = description;
+        this.searchDescription = SearchIndex.of(description);
+    }
+
+    // True when this job still carries V7's "never indexed" placeholder in either search
+    // column, i.e. it predates Section 10.9 and SearchIndexService has not reached it yet.
+    // Package-private plus a service in another package would not compile, so it is public;
+    // it is a question about one row, and answering it needs no repository.
+    public boolean needsSearchIndex() {
+        return SearchIndex.UNINDEXED.equals(searchTitle) || SearchIndex.UNINDEXED.equals(searchDescription);
+    }
+
+    // Rebuilds both search columns from the text already on this job (Section 10.9). It
+    // deliberately re-runs the setters instead of duplicating the SearchIndex call, so
+    // "how a job is indexed" has exactly one definition even for the backfill path.
+    public void reindexSearchText() {
+        setTitle(title);
+        setDescription(description);
+    }
+
+    // The raw stored index. Package-private: only the test that proves the columns are
+    // really being maintained has any business reading them, the same way legacySkillsCsv()
+    // is reached.
+    String searchTitleIndex() {
+        return searchTitle;
+    }
+
+    String searchDescriptionIndex() {
+        return searchDescription;
     }
 
     public String getRequirements() {
