@@ -65,6 +65,8 @@ public class SeekerJobController {
         model.addAttribute("criteria", criteria);
         model.addAttribute("page", result.jobs());
         model.addAttribute("warning", firstWarningOrNull(result));
+        // Section 10.8: the "Java (24)" chips fragments/job-filters renders.
+        model.addAttribute("skillFacets", result.skillFacets());
         model.addAttribute("rows", jobApplicationService.withAppliedFlags(result.jobs().getContent(), me.getId()));
 
         Job selectedJob = jobSearchService.selectForPane(result.jobs().getContent(), jobId);

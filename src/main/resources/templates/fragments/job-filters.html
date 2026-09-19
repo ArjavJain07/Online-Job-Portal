@@ -28,11 +28,45 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<form th:fragment="filters(criteria, action)" method="get" th:action="${action}" class="jp-filters card mb-4">
+<form th:fragment="filters(criteria, action, skillFacets)" method="get" th:action="${action}" class="jp-filters card mb-4">
     <div class="card-header">
         <span><i class="bi bi-funnel me-2" aria-hidden="true"></i>Filter jobs</span>
     </div>
     <div class="card-body">
+        <!--
+          Skill facet (Section 10.8). Skills are their own entity now, so "which skills do
+          the jobs this search found actually ask for, and how many ask for each" is a
+          question the database can answer - it could not be asked at all while skills were
+          a comma-separated column.
+
+          The chips are links, not form controls, because picking a facet is navigation:
+          the result is a URL that can be bookmarked and shared, Back undoes it, and every
+          other filter survives (web.support.PageLinks builds each href by replacing just
+          the "skill" parameter). Clicking the selected chip again clears the filter, so
+          the same chip both applies and removes it.
+
+          The hidden field below is what keeps a chosen skill when the visitor then presses
+          Search: the form would otherwise submit without a "skill" parameter and silently
+          drop it. It sits outside the chip list, so a chip click (a plain link, which does
+          not submit the form) can never collide with it.
+        -->
+        <input type="hidden" name="skill" th:value="${criteria.skill}">
+        <div class="mb-3" th:if="${skillFacets != null and !#lists.isEmpty(skillFacets)}"
+             th:with="skillLinks=${@pageLinks.skillLinks(skillFacets)}">
+            <span class="form-label d-block mb-2">Skills</span>
+            <div class="d-flex flex-wrap gap-2">
+                <a th:each="facet : ${skillLinks}" th:href="${facet.href}"
+                   class="jp-chip text-decoration-none"
+                   th:classappend="${facet.selected} ? 'border-primary text-primary fw-semibold' : ''"
+                   th:attrappend="aria-pressed=${facet.selected} ? 'true' : 'false'"
+                   th:title="${facet.selected} ? 'Remove this skill filter' : 'Show only jobs asking for this skill'">
+                    <span th:text="${facet.label}">Java</span>
+                    <span class="text-body-secondary" th:text="'(' + ${facet.jobCount} + ')'">(24)</span>
+                    <i class="bi bi-x-lg ms-1" aria-hidden="true" th:if="${facet.selected}"></i>
+                </a>
+            </div>
+        </div>
+
         <div class="row g-3">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="filter-q">Keyword</label>

@@ -78,21 +78,37 @@
 --     because nothing non-blank is ever dropped, "a row with skills that
 --     produced no join rows" is unambiguously a bug, and the migration stops.
 --
--- PORTABILITY
--- Same one-directory-for-both-databases rule as V1 and V2 (Section 10.7).
--- Every construct here - WITH RECURSIVE, POSITION(x IN y), SUBSTRING(s FROM a
--- FOR b), REGEXP_REPLACE(s, re, r, 'g'), ROW_NUMBER() OVER (...) - is standard
--- SQL that H2 2.x and PostgreSQL 14 both implement, and the patterns avoid the
--- one place their regex engines differ in a way that matters here: the classes
--- used are spelled out ([^a-z0-9+#], \s) rather than POSIX names such as
--- [:alnum:], which Java's engine behind H2 does not accept.
+-- PORTABILITY, AND WHY THERE IS NO REGULAR EXPRESSION IN HERE
+-- Same one-directory-for-both-databases rule as V1 and V2 (Section 10.7). Every
+-- construct below - WITH RECURSIVE, POSITION(x IN y), SUBSTRING(s FROM a FOR b),
+-- CHARACTER_LENGTH, ASCII, ROW_NUMBER() OVER (...) - is standard SQL that H2 2.x
+-- and PostgreSQL 14 both implement the same way.
 --
--- The one known limit of the character class: it is Latin-oriented, matching
--- what TextMatcher computes for any skill written in ASCII letters, digits, +
--- and # - which every skill in this corpus is. A token written in another
--- script would canonicalise to an empty string, and the COALESCE below catches
--- exactly that case and falls back to the lower-cased text, which is what
--- TextMatcher would produce for it too. Such a token is preserved either way.
+-- The obvious way to write the canonicalisation is
+-- REGEXP_REPLACE(lower(s), '[^a-z0-9+#]+', ' ', 'g'), and it cannot be used:
+-- H2's REGEXP_REPLACE replaces every match and REJECTS the 'g' flag, while
+-- PostgreSQL's replaces only the FIRST match unless it is given 'g'. There is no
+-- single call that is global on both, so the same file would canonicalise
+-- correctly on H2 and mangle every multi-word skill on PostgreSQL - in
+-- production, where the data is. The character walk below replaces it: it is a
+-- direct transliteration of the loop in util.TextMatcher.normalise, one
+-- character at a time, with no regex engine involved on either side.
+--
+-- It carries the SHRINKING remainder rather than the original token plus an
+-- index, so the intermediate result is quadratic in the length of one skill
+-- (a dozen characters) instead of the length of one skill times the number of
+-- skills, which keeps it small on a real database.
+--
+-- Known, deliberate limits, both of which err towards keeping data:
+--   * a character outside ASCII is KEPT in the slug (the ASCII() > 127 branch).
+--     For letters and digits in any script that is what TextMatcher does too;
+--     for exotic punctuation such as an em dash, TextMatcher would turn it into
+--     a space and this keeps it, which at worst leaves a skill that a later
+--     re-typing does not land on. Nothing is lost either way.
+--   * only the space character is treated as whitespace. These columns were
+--     only ever written from single-line <input type="text"> fields, which
+--     cannot contain a tab or a newline, so there is no other whitespace to
+--     collapse.
 --
 -- New constraints are named properly (fk_job_skills_job and friends) rather
 -- than left to Hibernate's generated hashes - Section 10.7's rule for every
@@ -158,12 +174,20 @@ alter table seeker_profile_skills
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- Staging table, dropped at the end of this migration. One row per skill a job
--- or a profile lists, with the position it was typed at, its display spelling
--- and its canonical key. A real table rather than repeating the recursive CTE
--- in each of the four statements that need it: one definition of "how the old
--- text was parsed" is the whole point.
+-- Staging tables, both dropped at the end of this migration.
+--
+-- Two passes rather than one giant statement: the first splits the old columns
+-- on commas, the second normalises each entry character by character. Keeping
+-- them apart means "how the old text was parsed" and "what a skill's identity
+-- is" each have exactly one definition, and each can be read on its own.
 -- ---------------------------------------------------------------------------
+create table v4_skill_tokens_raw (
+    owner_kind varchar(10)  not null,
+    owner_id   bigint       not null,
+    seq        integer      not null,
+    token      varchar(400) not null
+);
+
 create table v4_skill_tokens (
     owner_kind varchar(10)  not null,
     owner_id   bigint       not null,
@@ -172,7 +196,10 @@ create table v4_skill_tokens (
     slug       varchar(400) not null
 );
 
-insert into v4_skill_tokens (owner_kind, owner_id, seq, label, slug)
+
+-- Pass 1: split both columns on commas, dropping entries that are blank after
+-- trimming - and nothing else.
+insert into v4_skill_tokens_raw (owner_kind, owner_id, seq, token)
 with recursive
 -- Both source columns, read the same way. COALESCE because
 -- seeker_profiles.skills is nullable (a seeker who never filled it in).
@@ -181,10 +208,10 @@ sources (owner_kind, owner_id, csv) as (
     union all
     select cast('SEEKER' as varchar(10)), p.id, coalesce(p.skills, '') from seeker_profiles p
 ),
--- Comma splitting, portably. A trailing comma is appended so every entry -
--- including the last - is terminated, and the walk stops when nothing is left.
--- The anchor row carries a NULL token (it has not consumed anything yet) and
--- is filtered out below; `seq` then numbers the real entries from 1.
+-- A trailing comma is appended so every entry - including the last - is
+-- terminated, and the walk stops when nothing is left. The anchor row carries a
+-- NULL token (it has not consumed anything yet) and is filtered out below;
+-- `seq` then numbers the real entries from 1.
 split (owner_kind, owner_id, seq, token, remainder) as (
     select s.owner_kind, s.owner_id, 0,
            cast(null as varchar(400)),
@@ -196,26 +223,71 @@ split (owner_kind, owner_id, seq, token, remainder) as (
            cast(substring(w.remainder from position(',' in w.remainder) + 1) as varchar(500))
       from split w
      where w.remainder <> ''
+)
+select owner_kind, owner_id, seq, token
+  from split
+ where token is not null
+   and trim(token) <> '';
+
+
+-- Pass 2: the character walk. `label` copies each character through, collapsing
+-- runs of spaces; `slug` lower-cases and keeps letters, digits, + and # (and
+-- anything outside ASCII), turning every other character into a single space.
+-- Both are trimmed at the end. This is util.TextMatcher.normalise and
+-- util.SkillParser's trim/collapse, written out in SQL - see the header for why
+-- it is not a REGEXP_REPLACE.
+--
+-- The COALESCE on the slug is the "never drop anything non-blank" rule: an
+-- entry of pure ASCII punctuation walks down to an empty slug, and rather than
+-- let it disappear, its lower-cased text becomes its own key.
+insert into v4_skill_tokens (owner_kind, owner_id, seq, label, slug)
+with recursive
+walk (owner_kind, owner_id, seq, remainder, label, slug) as (
+    select t.owner_kind, t.owner_id, t.seq,
+           cast(t.token as varchar(400)),
+           cast('' as varchar(400)),
+           cast('' as varchar(400))
+      from v4_skill_tokens_raw t
+    union all
+    select w.owner_kind, w.owner_id, w.seq,
+           cast(substring(w.remainder from 2) as varchar(400)),
+           -- Label: append the character, unless it is a space following a
+           -- space (or leading, which the final trim removes anyway).
+           cast(case
+                    when substring(w.remainder from 1 for 1) = ' '
+                         and (w.label = ''
+                              or substring(w.label from character_length(w.label) for 1) = ' ')
+                        then w.label
+                    else w.label || substring(w.remainder from 1 for 1)
+                end as varchar(400)),
+           -- Slug: keep it lower-cased if it is a letter, digit, + or # (or a
+           -- non-ASCII character); otherwise append one space, unless the slug
+           -- already ends in one.
+           cast(case
+                    when position(lower(substring(w.remainder from 1 for 1))
+                                  in 'abcdefghijklmnopqrstuvwxyz0123456789+#') > 0
+                         or ascii(substring(w.remainder from 1 for 1)) > 127
+                        then w.slug || lower(substring(w.remainder from 1 for 1))
+                    when w.slug = ''
+                         or substring(w.slug from character_length(w.slug) for 1) = ' '
+                        then w.slug
+                    else w.slug || ' '
+                end as varchar(400))
+      from walk w
+     where w.remainder <> ''
 ),
--- The two normalisation rules of the header, in SQL. The COALESCE is the
--- "never drop anything non-blank" rule: when the canonical form comes out
--- empty - pure punctuation, or a script the character class does not know -
--- the lower-cased text is used as the key instead of the row disappearing.
-cleaned (owner_kind, owner_id, seq, label, slug) as (
+walked (owner_kind, owner_id, seq, label, slug) as (
     select owner_kind, owner_id, seq,
-           trim(regexp_replace(token, '\s+', ' ', 'g')),
-           coalesce(
-               nullif(trim(regexp_replace(lower(token), '[^a-z0-9+#]+', ' ', 'g')), ''),
-               trim(regexp_replace(lower(token), '\s+', ' ', 'g')))
-      from split
-     where token is not null
-       and trim(token) <> ''
+           trim(label),
+           coalesce(nullif(trim(slug), ''), trim(lower(label)))
+      from walk
+     where remainder = ''
 ),
 -- Duplicates within one job or profile, by canonical key, first spelling kept.
 deduped (owner_kind, owner_id, seq, label, slug, rank_in_owner) as (
     select owner_kind, owner_id, seq, label, slug,
            row_number() over (partition by owner_kind, owner_id, slug order by seq)
-      from cleaned
+      from walked
 )
 select owner_kind, owner_id, seq, label, slug
   from deduped
@@ -294,3 +366,4 @@ select case when count(*) = 0 then 1 else null end
 
 drop table v4_backfill_guard;
 drop table v4_skill_tokens;
+drop table v4_skill_tokens_raw;
