@@ -9,9 +9,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 // General web plumbing: registers CurrentUserInterceptor for every request except static
 // assets and the error dispatch (Section 4.6). Also the home for
 // @EnableConfigurationProperties(AppProperties.class), since AppProperties is a plain
-// record and nothing else in this module scans for @ConfigurationProperties classes.
+// record and nothing else in this module scans for @ConfigurationProperties classes -
+// PasswordResetProperties (Section 16 #1) is registered alongside it for the same reason;
+// see that class's own comment for why it does not belong on SecurityConfig instead.
 @Configuration
-@EnableConfigurationProperties(AppProperties.class)
+@EnableConfigurationProperties({AppProperties.class, PasswordResetProperties.class})
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final CurrentUserInterceptor currentUserInterceptor;
