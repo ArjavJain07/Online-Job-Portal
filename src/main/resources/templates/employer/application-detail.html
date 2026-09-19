@@ -4,7 +4,12 @@
   over the application itself, the read-only "candidate" view model (Section 4.5's
   ownership table: only these fields, never the profile resume, Section 6.5.2), its full
   status history ("applicationStatusChanges", oldest first) and the two forms this page
-  posts to ("statusForm", "noteForm"). The status-change form is swapped for one of two
+  posts to ("statusForm", "noteForm"). Interview scheduling adds four more: "interview"
+  (the Interview entity, or null when none has ever been arranged - a CANCELLED one is
+  still passed through), "interviewModes" (InterviewMode.values(), for the mode select) and
+  the "interviewForm"/"interviewCancelForm" pair, the first pre-filled with whatever is
+  currently arranged so a reschedule is an edit rather than a re-typing.
+  The status-change form is swapped for one of two
   fixed sentences once the application is final (Section 6.3 E-F2 detail page); the
   private-note card is always shown and is never reached from any seeker/* template
   (Section 6.3 E-F2 business rule 6, D-27).
@@ -183,6 +188,122 @@
                         <button type="submit" class="btn btn-primary w-100">Update status</button>
                     </form>
 
+                </div>
+            </div>
+
+            <!-- Interview (interview scheduling feature). Sits directly under "Change
+                 status" because the two are one workflow read top to bottom: an interview
+                 can only be arranged for an application that is ALREADY at the Interview
+                 stage, and the control that puts it there is the card above. Nothing in
+                 this card can move a status - see service.InterviewService.
+
+                 Three states, from @fmt.interviewState (Formats): "NONE" (nothing
+                 arranged), "UPCOMING"/"PAST" (an interview exists and is still on) and
+                 "CANCELLED". The form below is the SAME form in all the cases that show
+                 one; only its action differs, so "schedule the first one", "schedule a
+                 replacement for a cancelled one" and "change the one that exists" are one
+                 piece of markup that cannot drift into three slightly different forms. -->
+            <div class="card shadow-sm mb-4"
+                 th:with="interviewState=${@fmt.interviewState(interview)},
+                          atInterviewStage=${jobApplication.status.name() == 'INTERVIEW'}">
+                <div class="card-header">Interview</div>
+                <div class="card-body">
+
+                    <!-- Nothing arranged and not at the stage yet: say what to do, rather
+                         than showing a form that every submission would refuse. -->
+                    <p th:if="${interviewState == 'NONE' and !atInterviewStage}" class="text-muted small mb-0">
+                        Move this candidate to the Interview stage to schedule an interview.
+                    </p>
+
+                    <div th:if="${interviewState != 'NONE'}"
+                         th:classappend="${atInterviewStage} ? 'mb-3' : ''">
+                        <div th:replace="~{fragments/interview :: details(${interview}, ${interviewState})}"></div>
+                    </div>
+
+                    <!-- A final application (Hired / Not selected / Withdrawn) keeps the
+                         record above but loses every action: an upcoming interview was
+                         already cancelled automatically on the way to that status, and a
+                         finished one is history. InterviewService enforces the same rule
+                         server-side; this is only the page agreeing with it. -->
+                    <th:block th:if="${atInterviewStage}">
+
+                        <form th:action="${interviewState == 'UPCOMING' or interviewState == 'PAST'}
+                                    ? @{/employer/applications/{id}/interview/reschedule(id=${jobApplication.id})}
+                                    : @{/employer/applications/{id}/interview(id=${jobApplication.id})}"
+                              th:object="${interviewForm}" method="post">
+
+                            <h2 class="h6" th:text="${interviewState == 'UPCOMING' or interviewState == 'PAST'}
+                                    ? 'Reschedule or update' : 'Schedule an interview'">Schedule an interview</h2>
+
+                            <div class="mb-2">
+                                <label class="form-label required" for="interviewDate">Date</label>
+                                <input type="date" class="form-control" id="interviewDate" th:field="*{date}"
+                                       th:classappend="${#fields.hasErrors('date')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{date}">Date error.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label required" for="interviewTime">Time</label>
+                                <input type="time" class="form-control" id="interviewTime" th:field="*{time}"
+                                       th:classappend="${#fields.hasErrors('time')} ? 'is-invalid'">
+                                <!-- The zone is the site's, not the employer's to choose
+                                     (domain.Interview): naming it here is what stops the
+                                     two of them meaning different moments by the same
+                                     digits. -->
+                                <div class="form-text" th:text="'Times are in ' + ${@fmt.siteZone()} + '.'">
+                                    Times are in Asia/Kolkata.
+                                </div>
+                                <div class="invalid-feedback" th:errors="*{time}">Time error.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label required" for="interviewMode">Mode</label>
+                                <select class="form-select" id="interviewMode" th:field="*{mode}"
+                                        th:classappend="${#fields.hasErrors('mode')} ? 'is-invalid'">
+                                    <option value="">Choose a mode</option>
+                                    <option th:each="m : ${interviewModes}" th:value="${m.name()}"
+                                            th:text="${m.label}">Video call</option>
+                                </select>
+                                <div class="invalid-feedback" th:errors="*{mode}">Mode error.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label" for="interviewLocation">Joining link, address or phone number</label>
+                                <input type="text" class="form-control" id="interviewLocation" th:field="*{location}"
+                                       maxlength="300"
+                                       th:classappend="${#fields.hasErrors('location') or #fields.hasErrors('locationProvidedForMode')} ? 'is-invalid'">
+                                <div class="invalid-feedback" th:errors="*{location}">Location error.</div>
+                                <div class="invalid-feedback d-block" th:if="${#fields.hasErrors('locationProvidedForMode')}"
+                                     th:errors="*{locationProvidedForMode}">Mode needs a link or address.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label" for="interviewNotes">Notes for the candidate (optional)</label>
+                                <textarea class="form-control" id="interviewNotes" th:field="*{notes}" rows="3"
+                                          maxlength="1000"
+                                          th:classappend="${#fields.hasErrors('notes')} ? 'is-invalid'"></textarea>
+                                <div class="invalid-feedback" th:errors="*{notes}">Notes error.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100"
+                                    th:text="${interviewState == 'UPCOMING' or interviewState == 'PAST'}
+                                        ? 'Save interview changes' : 'Schedule interview'">Schedule interview</button>
+                            <p class="form-text mb-0">The candidate is emailed whenever this changes.</p>
+                        </form>
+
+                        <!-- Its own form, not a second button on the one above: cancelling
+                             must not carry the date fields with it, and its reason is a
+                             different piece of text with a different reader. -->
+                        <form th:if="${interviewState == 'UPCOMING' or interviewState == 'PAST'}"
+                              th:action="@{/employer/applications/{id}/interview/cancel(id=${jobApplication.id})}"
+                              th:object="${interviewCancelForm}" method="post" class="mt-3 pt-3 border-top">
+                            <label class="form-label" for="cancelReason">Reason for cancelling (optional, visible to the candidate)</label>
+                            <textarea class="form-control mb-2" id="cancelReason" th:field="*{reason}" rows="2"
+                                      maxlength="500"
+                                      th:classappend="${#fields.hasErrors('reason')} ? 'is-invalid'"></textarea>
+                            <div class="invalid-feedback mb-2" th:errors="*{reason}">Reason error.</div>
+                            <button type="submit" class="btn btn-outline-danger w-100"
+                                    data-confirm="Cancel this interview? The candidate will be emailed.">
+                                Cancel interview
+                            </button>
+                        </form>
+
+                    </th:block>
                 </div>
             </div>
 

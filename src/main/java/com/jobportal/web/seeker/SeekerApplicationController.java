@@ -7,6 +7,7 @@ import com.jobportal.domain.enums.JobDisplayStatus;
 import com.jobportal.exception.ResourceNotFoundException;
 import com.jobportal.security.AppUserDetails;
 import com.jobportal.service.FileStorageService;
+import com.jobportal.service.InterviewService;
 import com.jobportal.service.JobApplicationService;
 import com.jobportal.web.support.FileResponses;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,12 +37,14 @@ import org.springframework.web.servlet.support.RequestContextUtils;
 public class SeekerApplicationController {
 
     private final JobApplicationService jobApplicationService;
+    private final InterviewService interviewService;
     private final FileStorageService fileStorageService;
     private final Clock clock;
 
-    public SeekerApplicationController(JobApplicationService jobApplicationService, FileStorageService fileStorageService,
-            Clock clock) {
+    public SeekerApplicationController(JobApplicationService jobApplicationService, InterviewService interviewService,
+            FileStorageService fileStorageService, Clock clock) {
         this.jobApplicationService = jobApplicationService;
+        this.interviewService = interviewService;
         this.fileStorageService = fileStorageService;
         this.clock = clock;
     }
@@ -60,6 +63,13 @@ public class SeekerApplicationController {
         model.addAttribute("shortlistedCount", view.shortlistedCount());
         model.addAttribute("interviewCount", view.interviewCount());
         model.addAttribute("unreadCounts", view.unreadCounts());
+        // Interview scheduling: one query for the whole page, keyed by application id, the
+        // same Map<Long, ...> shape this page already uses for its unread counts rather
+        // than a lookup per row. Applications with nothing arranged simply have no entry,
+        // and the template asks @fmt.interviewState about whatever it gets - including
+        // null - so it needs no second "has an interview" flag to stay in step with.
+        model.addAttribute("interviews", interviewService.byApplicationId(
+                view.applications().stream().map(JobApplication::getId).toList()));
         return "seeker/applications";
     }
 
@@ -93,6 +103,13 @@ public class SeekerApplicationController {
         model.addAttribute("applicationStatusChanges", jobApplicationService.timeline(id));
         model.addAttribute("trackerStepIndex", trackerStepIndex(application.getStatus()));
         model.addAttribute("notLiveMessage", notLiveMessage(application.getJob()));
+        // Interview scheduling. Null when nothing has been arranged; a CANCELLED one is
+        // still passed through rather than filtered out, because "an interview was arranged
+        // for Thursday and has been called off" is exactly what a candidate who has already
+        // blocked out Thursday needs this page to tell them. Read-only on this side: every
+        // action on an interview belongs to the employer, so there is no form here, in the
+        // same way this page shows the status but only the employer can change it.
+        model.addAttribute("interview", interviewService.findForApplication(id).orElse(null));
         return "seeker/application-detail";
     }
 

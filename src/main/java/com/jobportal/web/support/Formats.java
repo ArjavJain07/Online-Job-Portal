@@ -1,5 +1,6 @@
 package com.jobportal.web.support;
 
+import com.jobportal.domain.Interview;
 import com.jobportal.domain.Job;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -71,5 +72,41 @@ public class Formats {
 
     public String experience(int minExperienceYears) {
         return minExperienceYears <= 0 ? "Freshers welcome" : minExperienceYears + "+ years";
+    }
+
+    // Which of the four things an application's interview currently is, as a word a
+    // template can th:switch on: "NONE" (nothing arranged), "UPCOMING", "PAST" or
+    // "CANCELLED" (interview scheduling feature).
+    //
+    // This lives on @fmt rather than on Interview itself because the answer depends on what
+    // time it is, and Section 7.10 puts that behind the injected Clock - which this class
+    // already holds for exactly the same reason ago(...) does. The alternative, calling
+    // ${interview.isUpcoming(...)} from the page, would need "now" passed in as a model
+    // attribute by every controller that renders an interview, or a
+    // T(java.time.LocalDateTime).now() inside an attribute, which is the construction
+    // Thymeleaf 3.1 is unreliable about (see PageLinks.build(Page) and
+    // seeker/application-detail.html's own note on notLiveMessage).
+    //
+    // It also means the seeker's tracking list gets this per row with no extra model
+    // attribute and no view-model wrapper: the row already has the Interview, and every
+    // page asks the same one question of it in the same one way.
+    public String interviewState(Interview interview) {
+        if (interview == null) {
+            return "NONE";
+        }
+        if (interview.isCancelled()) {
+            return "CANCELLED";
+        }
+        return interview.isUpcoming(LocalDateTime.now(clock)) ? "UPCOMING" : "PAST";
+    }
+
+    // The zone every interview time on this site is entered and shown in, e.g.
+    // "Asia/Kolkata" - the injected Clock's, which is also the zone InterviewService stamps
+    // onto every row it writes (Section 7.10, and see domain.Interview for why that zone is
+    // stored rather than assumed). Used on the employer's scheduling form to say so out
+    // loud next to the time field, because an employer typing "3:30" has to know whose 3:30
+    // it is before the candidate finds out the hard way.
+    public String siteZone() {
+        return clock.getZone().getId();
     }
 }

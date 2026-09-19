@@ -179,6 +179,7 @@ public class InterviewService {
     @Transactional
     public Interview reschedule(Long applicationId, Long employerId, InterviewForm form) {
         JobApplication application = jobApplicationService.getForEmployer(applicationId, employerId);
+        requireInterviewStage(application);
         Interview interview = requireScheduled(applicationId);
 
         LocalDateTime now = LocalDateTime.now(clock);
@@ -220,6 +221,7 @@ public class InterviewService {
     @Transactional
     public Interview cancel(Long applicationId, Long employerId, InterviewCancelForm form) {
         JobApplication application = jobApplicationService.getForEmployer(applicationId, employerId);
+        requireInterviewStage(application);
         Interview interview = requireScheduled(applicationId);
 
         String reason = trimToNull(form.getReason());
@@ -239,6 +241,16 @@ public class InterviewService {
     // this with the wrong status, so it is a BusinessRuleException - flashed and redirected
     // by GlobalExceptionHandler (Section 7.3) - rather than a field error: there is no field
     // the employer could correct.
+    //
+    // Required by ALL THREE actions, not only schedule(). Once an application has left the
+    // Interview stage it is at a final status (Section 5.6 allows nothing else from
+    // INTERVIEW) and there is no legitimate edit left to make to its interview: an upcoming
+    // one was already cancelled automatically on the way out
+    // (JobApplicationService.recordStatusChange), and a past one is history that a
+    // rejection does not entitle anyone to rewrite. Without this check the employer's page
+    // would still offer "Cancel" on a rejected candidate's finished interview, and taking
+    // it would email them "your interview on <a date last week> has been cancelled" -
+    // technically true, actively confusing, and about an application that closed days ago.
     private void requireInterviewStage(JobApplication application) {
         if (application.getStatus() != ApplicationStatus.INTERVIEW) {
             throw new BusinessRuleException(NOT_AT_INTERVIEW_STAGE_MESSAGE);
