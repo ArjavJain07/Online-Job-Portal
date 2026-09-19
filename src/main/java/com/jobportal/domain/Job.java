@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.hibernate.annotations.BatchSize;
 
 // One job posting. The stored lifecycle is JobStatus (Section 5.5); Live, Expired and
 // Hidden are computed labels, never stored - see displayStatus(LocalDate).
@@ -57,11 +58,20 @@ public class Job {
     // "Java, SQL, Spring Boot") and that order is part of what the employer wrote. The
     // list is always replaced wholesale by assignSkills, so @OrderColumn's usual hazard -
     // a gap left behind by removing one element from the middle - cannot arise here.
+    //
+    // @BatchSize because of RecommendationService: it scores up to 200 candidate jobs in
+    // one request (7.8 step 3) and RecommendationScorer reads every one of their skill
+    // lists, which as a plain lazy collection is 200 extra round trips where the old CSV
+    // column was free. Batching turns those into four. An @EntityGraph on the paged
+    // finder would be the other way to do it and is the wrong one: eager-fetching a
+    // to-many alongside a Pageable makes Hibernate fetch every row and paginate in
+    // memory, which is a much worse trade than four queries.
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "job_skills",
             joinColumns = @JoinColumn(name = "job_id"),
             inverseJoinColumns = @JoinColumn(name = "skill_id"))
     @OrderColumn(name = "display_order")
+    @BatchSize(size = 50)
     private List<Skill> skills = new ArrayList<>();
 
     // The pre-Section-10.8 comma-separated column, kept for exactly one reason: rollback.

@@ -18,6 +18,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import org.hibernate.annotations.BatchSize;
 
 // The extra profile fields a job seeker has and an employer does not. Created empty at
 // registration; the resume fields are filled in later by SeekerProfileService.uploadResume.
@@ -52,6 +53,9 @@ public class SeekerProfile {
             joinColumns = @JoinColumn(name = "seeker_profile_id"),
             inverseJoinColumns = @JoinColumn(name = "skill_id"))
     @OrderColumn(name = "display_order")
+    // Batched for the same reason as Job.skills, on a smaller scale: the employer
+    // applications list builds a CandidateProfile per row.
+    @BatchSize(size = 50)
     private List<Skill> skills = new ArrayList<>();
 
     // The pre-Section-10.8 comma-separated column, kept only so that a rollback to the
