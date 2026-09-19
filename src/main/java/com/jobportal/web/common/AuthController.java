@@ -1,11 +1,18 @@
 package com.jobportal.web.common;
 
 import com.jobportal.security.AppUserDetails;
+import com.jobportal.security.LoginFailureHandler;
 import com.jobportal.service.SettingsService;
 import com.jobportal.service.UserAccountService;
 import com.jobportal.web.form.RegisterEmployerForm;
 import com.jobportal.web.form.RegisterSeekerForm;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,22 +28,51 @@ public class AuthController {
 
     private final SettingsService settingsService;
     private final UserAccountService userAccountService;
+    private final Clock clock;
 
-    public AuthController(SettingsService settingsService, UserAccountService userAccountService) {
+    public AuthController(SettingsService settingsService, UserAccountService userAccountService, Clock clock) {
         this.settingsService = settingsService;
         this.userAccountService = userAccountService;
+        this.clock = clock;
     }
 
     // GET /login: a logged-in user is sent to their own dashboard (Section 4.3). The
     // login-page messages (?error, ?blocked, ?changed, ?emailChanged, ?logout,
     // ?registered - Section 4.4) are read straight from the query string by the template
-    // itself, so no model attribute is needed here.
+    // itself, so no model attribute is needed for those.
+    //
+    // ?locked (Section 4.10) is the exception: it needs a number, and that number must
+    // not come from the URL. The countdown is computed here from the unlock instant
+    // LoginFailureHandler parked in the session, so the only visitor who can ever see it
+    // is the one whose own correct password was refused a moment ago. This page is
+    // anonymous, so it must never look an account up by the email in a parameter - that
+    // would be the very enumeration oracle the feature exists to avoid.
     @GetMapping("/login")
-    public String login(@AuthenticationPrincipal AppUserDetails me) {
+    public String login(@AuthenticationPrincipal AppUserDetails me, HttpServletRequest request, Model model) {
         if (me != null) {
             return "redirect:/dashboard";
         }
+        readLockoutCountdown(request).ifPresent(minutes -> model.addAttribute("lockedForMinutes", minutes));
         return "auth/login";
+    }
+
+    // Minutes left on the cooldown, rounded up so "59 seconds to go" reads as 1 minute
+    // rather than 0. Read-once: the attribute is removed whether or not it is still in
+    // the future, so a stale value cannot reappear on the next visit to the page. Never
+    // creates a session (getSession(false)); Spring Security has already made one for the
+    // CSRF token by the time a login can fail.
+    private Optional<Long> readLockoutCountdown(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return Optional.empty();
+        }
+        Object parked = session.getAttribute(LoginFailureHandler.LOCKED_UNTIL_ATTRIBUTE);
+        if (!(parked instanceof LocalDateTime lockedUntil)) {
+            return Optional.empty();
+        }
+        session.removeAttribute(LoginFailureHandler.LOCKED_UNTIL_ATTRIBUTE);
+        long seconds = ChronoUnit.SECONDS.between(LocalDateTime.now(clock), lockedUntil);
+        return seconds > 0 ? Optional.of((seconds + 59) / 60) : Optional.empty();
     }
 
     // GET /register: the chooser page hides a card when that role's registration is

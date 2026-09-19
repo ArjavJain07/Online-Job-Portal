@@ -304,7 +304,8 @@ The admin manages users and jobs but **cannot read application details, resumes 
 | Login page | `GET /login` (custom template), processed by the filter at `POST /login` |
 | Username parameter | `email` (case-insensitive: the email is trimmed and lower-cased before lookup) |
 | Password encoder | `BCryptPasswordEncoder` (strength 10) |
-| `UserDetailsService` | `AppUserDetailsService` (the only one; no hand-built `DaoAuthenticationProvider`) |
+| `UserDetailsService` | `AppUserDetailsService` (the only one) |
+| `AuthenticationProvider` | Spring's own `DaoAuthenticationProvider`, declared as a bean so that `setPostAuthenticationChecks(PostAuthenticationLockoutCheck)` can move the lockout question to after the password comparison (4.10). Nothing else about it is changed: `hideUserNotFoundExceptions` and the `mitigateAgainstTimingAttack` dummy hash both stay. |
 | Success handler | `RoleBasedAuthenticationSuccessHandler` |
 | Failure handler | `LoginFailureHandler` |
 | Logout | `POST /logout` then `/login?logout`; invalidates the session and deletes `JSESSIONID` |
@@ -381,6 +382,8 @@ Notes for the student:
 - **Why the entry point is built by hand.** The shortcut `exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(401, xhrMatcher))` is registered when the DSL runs, and form login registers its own login-page entry point later (when the filter chain is built), and only for requests whose `Accept` header asks for HTML. When there are two such mappings, Spring Security uses the **first registered** one (the 401) as the fallback for every request that matches neither, so a MockMvc `get(...)` without an `Accept` header, or a `*/*` client, would get 401 instead of the login redirect. Setting one `DelegatingAuthenticationEntryPoint` with `authenticationEntryPoint(...)` replaces all the defaults: XHR requests get 401, everything else is redirected to `/login`, whatever the `Accept` header says. Checked in M0 spike 4.
 - `dispatcherTypeMatchers(ERROR, FORWARD).permitAll()` lets requests that were **already allowed** (public pages, or any page for a logged-in user) render the 403, 404 and 500 pages during Spring Boot's error dispatch, instead of that second dispatch being sent to login. It does not make unknown URLs public: an anonymous `GET /nope` matches `anyRequest().authenticated()` and is redirected to `/login` before Spring MVC runs; a logged-in user opening `/nope` gets the 404 page. Anonymous visitors get 404 pages only on public paths, for example `/jobs/999999` or `/jobs/abc`.
 - **No `@PreAuthorize`.** URL zones decide the role; services decide ownership.
+- **The snippet above predates the lockout.** `SecurityConfig` now also carries `@EnableConfigurationProperties(LockoutProperties.class)` and an `AuthenticationProvider` `@Bean`; `filterChain` itself is unchanged. This section originally said "no hand-built `DaoAuthenticationProvider`" and 4.4 called moving a check to post-authentication "future work"; 4.10 is that future work, done for the lockout, and explains why it could not be avoided.
+- **The provider is a bean only, never `http.authenticationProvider(...)` as well.** A single `AuthenticationProvider` bean is picked up by `InitializeAuthenticationProviderBeanManagerConfigurer` and becomes the global `AuthenticationManager`, which is already the parent of the chain's own `ProviderManager` (whose only local provider is the anonymous one). Registering it on the chain too would put the same provider in both, and `ProviderManager` falls through to its parent after a local failure - so every wrong password would be BCrypt-hashed twice, doubling the CPU a guessing bot costs us in the one place meant to do the opposite.
 
 ### 4.3 Registration rules
 
@@ -413,6 +416,7 @@ Notes for the student:
 |---|---|---|
 | `?error` | "Invalid email or password." | danger |
 | `?blocked` | "Your account has been deactivated. Please contact the administrator." | danger |
+| `?locked` | "Too many failed login attempts, so this account is temporarily locked. You can try again in about N minutes." (Section 4.10; only ever reached with the **correct** password, and N comes from the session, never from the URL) | danger |
 | `?changed` | "Your account was updated by an administrator. Please log in again." | warning |
 | `?emailChanged` | "Your email address was changed. Please log in again with your new email." | info |
 | `?logout` | "You have been logged out." | success |
@@ -478,9 +482,48 @@ Logout is always a POST form (a plain link would fail the CSRF check). No `inval
 | Mass assignment | Form objects contain only editable fields |
 | SQL injection | JPQL parameters and Criteria API only; `LIKE` wildcards `%`, `_`, `\` in search text are escaped |
 | Malicious uploads | Extension whitelist, magic-byte check, size limit, random UUID file names, files stored outside `static`, downloads go through ownership checks, `nosniff` header (Section 7.4) |
-| Information leaks | `server.error.include-stacktrace=never`, `include-message=never`, whitelabel page off, generic login error for unknown email or wrong password (a deactivated account is revealed by its own message, accepted trade-off in 4.4), 404 for foreign ids |
+| Password guessing | Per-account lockout after repeated failures, with a cooldown (Section 4.10) |
+| Information leaks | `server.error.include-stacktrace=never`, `include-message=never`, whitelabel page off, generic login error for unknown email or wrong password (a deactivated account is revealed by its own message, accepted trade-off in 4.4; the lockout of 4.10 is deliberately built so that it adds nothing to that leak), 404 for foreign ids |
 | Open redirect | The "back to previous page" redirect uses only the path of a same-host `Referer`; otherwise `/dashboard` |
 | H2 console | Admin-only, CSRF exempt only for its own path, disabled in the `mysql` and `test` profiles. It can run any SQL, so mention it as a demo-only tool in the viva. |
+
+### 4.10 Login lockout (brute-force protection)
+
+Added after the hosted deployment went live: within minutes of the VPS being reachable, bots from two addresses were probing it for `/.env`, `/.env.prod` and `/.env.bak`. `POST /login` had no throttling of any kind, so an unattended password-guessing run against `admin@jobportal.local` would have been limited only by BCrypt's own cost. (Section 16 still lists "login rate limiting and account lockout" under future work; that list is left as written, and this section supersedes the lockout half of that row.)
+
+| Decision | Value |
+|---|---|
+| What is counted | **Consecutive** failed passwords per **account** (`users.failed_login_attempts`) |
+| Lockout | After `app.lockout.max-attempts` (5) failures, `users.lockout_until` is set to now + `app.lockout.cooldown-minutes` (15) |
+| Reset | A successful login clears both columns; so does the first failure after a cooldown has expired |
+| Enforcement point | `DaoAuthenticationProvider#setPostAuthenticationChecks` -> `PostAuthenticationLockoutCheck`, i.e. **after** the password is compared |
+| Clock | The `Clock` bean of 7.10, so `LoginAttemptServiceTest` can stand at two instants and test the cooldown without sleeping |
+
+**The enumeration rule, and why the check is post-authentication.** `AbstractUserDetailsAuthenticationProvider` runs `isAccountNonLocked()` in its *pre*-authentication checks, before the password is looked at - the same position that makes `isEnabled()` leak deactivated accounts in 4.4. Answering the lock question there would have turned that narrow, accepted leak into a general oracle over every address in the database: five junk passwords to any email, then a sixth, and "this account is locked" would mean "this address is registered" while the generic message would mean it is not. Enumerating the whole user list would cost six requests per address.
+
+Enforcing it one step later, in `postAuthenticationChecks`, removes the oracle entirely:
+
+| Attempt | Where it fails | What the caller sees |
+|---|---|---|
+| Unknown address, any password | `retrieveUser` (step 1) | `/login?error` |
+| Real address, wrong password, **not** locked | password compare (step 3) | `/login?error` |
+| Real address, wrong password, **locked** | password compare (step 3) | `/login?error` - identical to the two rows above |
+| Real address, right password, **locked** | `PostAuthenticationLockoutCheck` (step 4) | `/login?locked` + the unlock countdown |
+| Real address, right password, not locked | - | logged in, counter cleared |
+
+The lockout is fully enforced in every row: even the correct password gets no session during the cooldown. The only caller ever told that an account is locked is one that has just proved it knows that account's password, so the message tells it nothing it did not already know.
+
+**Trade-off accepted, stated plainly.** A real user who has forgotten their password and locked themselves out keeps seeing "Invalid email or password." and only learns about the cooldown if they happen to type the right password. The friendlier alternative - saying "locked, try again in 12 minutes" on any wrong password - is precisely the oracle above. Not handing out the user list wins. This is the opposite choice from 4.4, and deliberately so: there, the friendlier message was already the shipped behaviour for a handful of admin-deactivated accounts; here, the leak would cover every account on the site.
+
+**Three supporting decisions.**
+
+- **Per account, not per IP.** The address is only trustworthy behind the proxy, and only the `prod` profile sets `server.forward-headers-strategy=framework` (10.1); everywhere else `getRemoteAddr()` is the proxy itself, so every visitor would share one counter. More seriously, `X-Forwarded-For` is attacker-controlled the moment anything can reach the app port directly: a bot would rotate it to keep its counter at zero, and could instead forge a victim's address to lock that victim out. A security decision must not be keyed on a value the attacker writes. Shared addresses (office NAT, mobile carriers) would also punish innocent users. The known gap this leaves is **password spraying** - one common password against many accounts, where no single account reaches the threshold. That gap belongs to per-IP throttling at the nginx layer (`limit_req` on `POST /login`), which sees the real socket peer and cannot be lied to; it is deployment configuration, not application code.
+- **On the `User` row, not in memory.** A `ConcurrentHashMap` would avoid the write, but the hosted instance is a free Render web service that sleeps after 15 minutes idle and is replaced on every deploy (`render.yaml`), so an in-memory counter is wiped constantly and a patient bot would get unlimited fresh five-guess windows just by pausing. Two columns survive a restart and cost one indexed `UPDATE` on a path that already writes an `activity_log` row per failed login. Both columns are **nullable** (`Integer`, `LocalDateTime`): `ddl-auto=update` over a database that already holds rows cannot add a `NOT NULL` column, and Hibernate only *logs* a failed schema change, so the app would come up with a column that does not exist. `null` means "has never failed".
+- **Properties, not `SystemSettings`.** The ten settings of 7.5 are product knobs; this one decides how hard the site is to break into, and an admin-editable threshold is itself an attack surface - one compromised admin session could set it to 999 through `/admin/settings`. Changing `app.lockout.*` needs access to the deployment. The cost: loosening the lockout during a live demo needs a restart, which is acceptable because a locked demo account clears itself after 15 minutes.
+
+**An active lock is never extended.** Failures during a cooldown are neither counted nor allowed to push `lockout_until` further out. An extendable lockout is a denial-of-service switch: anyone who knows an address could keep its owner permanently locked out by posting the form in a loop. The cooldown always ends at the instant it was first set.
+
+**The unlock time travels in the session, not the URL.** `LoginFailureHandler` parks the instant under `loginLockoutUntil`; `AuthController` reads it once, removes it, and turns it into a minute count with the `Clock`. A `/login?locked&minutes=...` link therefore cannot make the page state a time of the sender's choosing, and `/login` - which is anonymous - never looks an account up by an email in a parameter.
 
 ---
 
@@ -513,6 +556,8 @@ erDiagram
         timestamp created_at
         timestamp updated_at
         timestamp last_login_at
+        int failed_login_attempts "lockout, 4.10"
+        timestamp lockout_until "lockout, 4.10"
     }
     SEEKER_PROFILES {
         bigint id PK
@@ -662,6 +707,8 @@ Without these widths the composed string would be longer than its column, Hibern
 | `createdAt` | `LocalDateTime` | NOT NULL | Set when created |
 | `updatedAt` | `LocalDateTime` | nullable | Set by services on update |
 | `lastLoginAt` | `LocalDateTime` | nullable | Set by `RoleBasedAuthenticationSuccessHandler` |
+| `failedLoginAttempts` | `Integer` | nullable | Consecutive failed passwords (4.10). Nullable on purpose: `ddl-auto=update` cannot add a `NOT NULL` column to a table that already has rows, and Hibernate only logs the failure. `getFailedLoginAttempts()` folds `null` to 0. |
+| `lockoutUntil` | `LocalDateTime` | nullable | When the cooldown ends, or null when not locked (4.10). Never extended while a lock is active. |
 
 There is no `@OneToMany` or inverse `@OneToOne` on `User`. Related rows are found through repositories.
 
@@ -2788,14 +2835,18 @@ Online Job Portal/
     │   │   ├── config/
     │   │   │   ├── AppProperties.java            @ConfigurationProperties("app"): uploadDir, seed, demo
     │   │   │   ├── ClockConfig.java              Clock bean
+    │   │   │   ├── LockoutProperties.java        @ConfigurationProperties("app.lockout"): maxAttempts, cooldownMinutes (4.10)
     │   │   │   ├── SecurityConfig.java
     │   │   │   └── WebMvcConfig.java             registers CurrentUserInterceptor
     │   │   ├── security/
+    │   │   │   ├── AccountLockedException.java   LockedException carrying the unlock instant (4.10)
     │   │   │   ├── AppUserDetails.java
     │   │   │   ├── AppUserDetailsService.java
     │   │   │   ├── CurrentUser.java              record for the navbar
     │   │   │   ├── CurrentUserInterceptor.java
+    │   │   │   ├── LoginAttemptService.java      per-account failure counter and cooldown (4.10)
     │   │   │   ├── LoginFailureHandler.java
+    │   │   │   ├── PostAuthenticationLockoutCheck.java  enforces the lockout AFTER the password check (4.10)
     │   │   │   ├── RoleBasedAuthenticationSuccessHandler.java
     │   │   │   └── RoleRoutes.java               dashboard URL and zone prefix per role
     │   │   ├── domain/
@@ -2960,6 +3011,7 @@ Online Job Portal/
         │   │   └── DataSeederTest.java
         │   ├── security/
         │   │   ├── AccessControlTest.java  AuthFlowTest.java  CsrfProtectionTest.java
+        │   │   ├── LoginAttemptServiceTest.java  LoginLockoutTest.java   lockout, 4.10
         │   └── web/
         │       ├── advice/    GlobalExceptionHandlerTest.java  (checks the advice is unscoped, 7.3)
         │       ├── common/    AccountTest.java  JobSearchTest.java  PublicPagesTest.java  RegistrationTest.java
@@ -3018,6 +3070,10 @@ server.error.whitelabel.enabled=false
 server.error.include-stacktrace=never
 server.error.include-message=never
 
+# ---------- Login lockout (Section 4.10) ----------
+app.lockout.max-attempts=5
+app.lockout.cooldown-minutes=15
+
 # ---------- Seed data ----------
 app.seed.demo-data=true
 app.seed.admin-email=admin@jobportal.local
@@ -3037,6 +3093,7 @@ logging.level.com.jobportal=INFO
 | `max-swallow-size=-1` | Tomcat reads the whole oversized request, so the browser gets the friendly page instead of a reset connection |
 | `spring.thymeleaf.cache` not set | DevTools turns caching off during `bootRun`; the packaged jar keeps caching on |
 | `app.demo.show-credentials` | Shows the demo accounts card on the login page; set `false` for a formal evaluation |
+| `app.lockout.*` | Security policy, so it lives here rather than in the admin-editable `SystemSettings` row - an admin-editable threshold could be switched off through a form. Bound by `LockoutProperties` and registered on `SecurityConfig`, not on `WebMvcConfig`. See 4.10 |
 
 `AppProperties` is a record bound with `@ConfigurationProperties(prefix = "app")` (enabled with `@ConfigurationPropertiesScan` on `JobPortalApplication`):
 
@@ -3330,6 +3387,8 @@ class JobApplicationTest extends IntegrationTestBase {
 | `AccessControlTest` | Integration | `#anonymousRedirectedToLoginForEachZone` (`/dashboard`, `/admin/**`, `/employer/**`, `/seeker/**`, `/nope`; requests without an `Accept` header), `#feedRedirectsAnonymousNonAjax` (`GET /admin/activity/feed` without `X-Requested-With` redirects to `/login` instead of returning 401, AC-A-D5-2), `#employerGets403OnAdminPages` (status only), `#seekerGets403OnEmployerPages` (status only), `#unknownUrlIs404ForLoggedInUser` (status only), `#foreignIdsReturn404` (job, application, thread, resume routes for both roles; includes AC-P6-2, Priya opening Rohan's `/seeker/applications/{A2}`) | X-1, G-1, S-D2, A-D5 |
 | `CsrfProtectionTest` | Integration | `#postWithoutTokenIs403` for a form POST, a multipart POST and logout | X-1 |
 | `AuthFlowTest` | Integration | `#loginRedirectsEachRoleToOwnDashboard`, `#badCredentialsShowGenericError`, `#disabledUserCannotLogin`, `#logoutInvalidatesSession`, `#loginToApplyReturnsToApplyForm` (asserts `redirectedUrlPattern("**/seeker/jobs/*/apply*")`, because the saved-request URL carries Spring Security 6's `?continue` marker, 4.4), `#savedRequestIgnoredForWrongRole`, `#lastLoginAtUpdated` | P-4, G-1 |
+| `LoginAttemptServiceTest` | Unit (mocked repository) | The lockout arithmetic of 4.10 with **two** `Clock.fixed` instants, so the cooldown is tested by moving time rather than waiting: `#locksForTheCooldownOnTheFinalAttempt`, `#furtherFailuresDuringTheCooldownChangeNothing`, `#lockHasLiftedOnceTheCooldownHasPassed`, `#lockIsStillActiveOneSecondBeforeItExpires`, `#failureAfterTheCooldownStartsCountingAgainFromOne`, `#successClearsBothCounterAndLock`, `#unknownAddressIsNotRecorded`, `#emailIsNormalisedBeforeLookup` | P-4 |
+| `LoginLockoutTest` | Integration | 4.10 end to end. The two that guard the enumeration rule are `#lockedAccountAnswersAWrongPasswordLikeAnUnknownAddress` (a locked account and an address that never existed must give byte-identical answers) and `#craftedLockedUrlCannotStateAnUnlockTime`; then `#consecutiveFailuresLockTheAccount`, `#failuresBelowTheThresholdDoNotLock`, `#furtherFailuresDoNotExtendAnActiveLock`, `#lockedAccountRefusesTheRightPasswordAndSaysWhenItUnlocks`, `#lockedMessageIsShownOnlyOnce`, `#successfulLoginClearsTheCounter`, `#lockLiftsOnceTheCooldownHasPassed`, `#firstFailureAfterTheCooldownStartsAFreshCount`, `#deactivatedAccountIsNeverCounted` (4.4 regression), `#unknownAddressCreatesNoAccountState`, `#everyRefusedAttemptIsLoggedOnce` | P-4, G-1 |
 | `RegistrationTest` | Integration | `#seekerRegistrationCreatesUserAndProfile`, `#duplicateEmailIgnoringCaseRejected`, `#employerNeedsCompanyName`, `#closedRegistrationCreatesNothing`, `#passwordMustBePrintableAscii` | P-3, G-10 |
 | `AccountTest` | Integration | `#changePasswordRequiresCurrentAndWorks` | P-5 |
 | `PublicPagesTest` | Integration | `#homeShowsOnlyLiveJobs`, `#hiringCardHiddenWhenEmployerRegistrationClosed`, `#pendingJobIs404ForPublicButVisibleToOwnerAndAdmin`, `#expiredJobShowsClosedBanner`, `#viewCountedOncePerSessionExcludingOwner` | P-1, P-2 |

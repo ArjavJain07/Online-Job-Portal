@@ -55,6 +55,23 @@ public class User {
 
     private LocalDateTime lastLoginAt;
 
+    // Brute-force lockout state (Section 4.10). Consecutive failed logins for this
+    // account; reset to 0 by a successful login and by the first failure after a lockout
+    // has expired. lockoutUntil is the instant the cooldown ends, or null when the
+    // account is not locked.
+    //
+    // Both are Integer/LocalDateTime (nullable) rather than a primitive with
+    // nullable = false: the app runs on ddl-auto=update over databases that already hold
+    // rows (the hosted Postgres of Section 10), and Hibernate's ALTER TABLE ... ADD
+    // COLUMN ... NOT NULL would fail there - silently, because hbm2ddl update only logs
+    // schema errors. A nullable column is added successfully on every dialect, and null
+    // simply means "has never failed", which failedLoginAttempts() below folds to 0.
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts;
+
+    @Column(name = "lockout_until")
+    private LocalDateTime lockoutUntil;
+
     public Long getId() {
         return id;
     }
@@ -149,5 +166,23 @@ public class User {
 
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    // Folds the nullable column to a count, so callers never have to think about the
+    // "column added to an existing table" null (see the field comment above).
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts == null ? 0 : failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    public LocalDateTime getLockoutUntil() {
+        return lockoutUntil;
+    }
+
+    public void setLockoutUntil(LocalDateTime lockoutUntil) {
+        this.lockoutUntil = lockoutUntil;
     }
 }

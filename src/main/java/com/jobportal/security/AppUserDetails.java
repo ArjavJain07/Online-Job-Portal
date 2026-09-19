@@ -59,6 +59,13 @@ public class AppUserDetails implements UserDetails, CredentialsContainer {
         return true;
     }
 
+    // Hard-coded true even though Section 4.10 gives accounts a brute-force lockout, and
+    // that is the deliberate part. Spring asks this question in its PRE-authentication
+    // checks, before the password is compared, so an honest answer here would tell any
+    // anonymous caller "this address is locked" - which is to say "this address exists" -
+    // after five junk guesses against any email in the database. The lockout is enforced
+    // one step later instead, by PostAuthenticationLockoutCheck, which only runs once the
+    // presented password has matched; see the reasoning in that class.
     @Override
     public boolean isAccountNonLocked() {
         return true;

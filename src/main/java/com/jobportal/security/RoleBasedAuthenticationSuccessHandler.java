@@ -27,13 +27,15 @@ public class RoleBasedAuthenticationSuccessHandler extends SimpleUrlAuthenticati
 
     private final UserRepository userRepository;
     private final ActivityLogService activityLogService;
+    private final LoginAttemptService loginAttemptService;
     private final Clock clock;
     private final RequestCache requestCache = new HttpSessionRequestCache();
 
     public RoleBasedAuthenticationSuccessHandler(UserRepository userRepository,
-            ActivityLogService activityLogService, Clock clock) {
+            ActivityLogService activityLogService, LoginAttemptService loginAttemptService, Clock clock) {
         this.userRepository = userRepository;
         this.activityLogService = activityLogService;
+        this.loginAttemptService = loginAttemptService;
         this.clock = clock;
     }
 
@@ -45,6 +47,13 @@ public class RoleBasedAuthenticationSuccessHandler extends SimpleUrlAuthenticati
         User user = userRepository.findById(me.getId())
                 .orElseThrow(() -> new IllegalStateException("Logged-in user no longer exists: " + me.getId()));
         user.setLastLoginAt(LocalDateTime.now(clock));
+        // "Consecutive" failures, so getting in wipes the slate (Section 4.10). Reaching
+        // this method already means the account was not inside its cooldown - the check
+        // that would have stopped it runs inside the AuthenticationProvider, before this
+        // handler exists - so a reset here can never clear a lockout that is still live.
+        // clearFailuresOn only mutates; the save below writes it, keeping a successful
+        // login at one UPDATE.
+        loginAttemptService.clearFailuresOn(user);
         userRepository.save(user);
         activityLogService.log(ActivityType.LOGIN_SUCCESS, user, user.getFullName() + " logged in",
                 TargetType.USER, user.getId());
