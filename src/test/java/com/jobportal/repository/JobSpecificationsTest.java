@@ -84,15 +84,79 @@ class JobSpecificationsTest extends IntegrationTestBase {
         assertThat(underscoreMatches).extracting(Job::getId).containsExactly(job.getId());
     }
 
+    // The defect that made skills an entity (Section 10.8): searching "Java" used to
+    // return every job whose skills column merely CONTAINED that text, so a pure
+    // JavaScript job came back for a Java search. The skills half of keyword() now matches
+    // whole tokens against Skill.slug, so it does not - while "spring" still finds a job
+    // whose skill is "Spring Boot", because a search box has to match part of a phrase.
+    //
+    // The fixture keeps the word out of the title, description, requirements and company
+    // name, so a match can only have come through the skills branch. (No seeded job works
+    // for this: Frontend Developer lists JavaScript, but its description says "JavaScript"
+    // too, and the prose columns are still - correctly - a substring search.)
+    @Test
+    void keywordMatchesSkillsAsWholeTokensNotSubstrings() {
+        Job job = jobRepository.saveAndFlush(skilledJob("Front End Engineer", "JavaScript, Spring Boot"));
+
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("java")))
+                .as("\"java\" must not match the skill \"JavaScript\"")
+                .extracting(Job::getId)
+                .doesNotContain(job.getId());
+
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("javascript")))
+                .extracting(Job::getId).contains(job.getId());
+
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("spring")))
+                .as("a word of a multi-word skill must still match")
+                .extracting(Job::getId).contains(job.getId());
+
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("boot")))
+                .as("including the last word")
+                .extracting(Job::getId).contains(job.getId());
+    }
+
+    // The same rule applied to the filter the facet chips use: hasSkill is exact identity,
+    // so it never leaks a near-miss into a filtered page.
+    @Test
+    void hasSkillMatchesOnlyTheExactSkill() {
+        Job job = jobRepository.saveAndFlush(skilledJob("Front End Engineer", "JavaScript"));
+
+        // The seeded Frontend Developer lists JavaScript too, so this is "contains", not
+        // "containsExactly" - what matters is that a "java" filter does not pick up a
+        // JavaScript job, which the second assertion pins down.
+        assertThat(jobRepository.findAll(JobSpecifications.hasSkill("javascript")))
+                .extracting(Job::getId).contains(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.hasSkill("java")))
+                .extracting(Job::getId).doesNotContain(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.hasSkill("java")))
+                .extracting(Job::getTitle)
+                .containsExactlyInAnyOrder("Java Developer", "Spring Boot Intern", "QA Engineer");
+    }
+
     // A job whose title literally contains "%" and "_" - no seeded job does, so any match
     // on these characters must come from this one job.
     private Job oddlyNamedJob() {
+        Job job = plainJob();
+        job.setTitle("50% Off_Sale Associate");
+        job.assignSkills(data.skills("Sales"));
+        return job;
+    }
+
+    // A job carrying the given skills and deliberately bland text, so a keyword match can
+    // only have come from the skills.
+    private Job skilledJob(String title, String skills) {
+        Job job = plainJob();
+        job.setTitle(title);
+        job.assignSkills(data.skills(skills));
+        return job;
+    }
+
+    private Job plainJob() {
         Job job = new Job();
         job.setEmployer(data.user("hr@acme.local"));
-        job.setTitle("50% Off_Sale Associate");
+        job.setTitle("Placeholder");
         job.setDescription("Seasonal sales role.");
         job.setRequirements("Retail experience preferred.");
-        job.assignSkills(data.skills("Sales"));
         job.setCategory(JobCategory.SALES);
         job.setJobType(JobType.CONTRACT);
         job.setWorkMode(WorkMode.ONSITE);
