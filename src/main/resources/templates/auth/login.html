@@ -9,6 +9,13 @@
   the three flash/model keys "success"/"error"/"warning" (Section 7.2) and has no "info"
   style for ?emailChanged - so they are written out here, with the exact wording and
   Bootstrap colour from the 4.4 table.
+
+  ?locked (Section 4.10) is the seventh, and the only one that also needs a model
+  attribute: ${lockedForMinutes} is the countdown AuthController computed from the unlock
+  instant stored in the session. It is deliberately NOT read from the query string, so a
+  hand-written /login?locked&minutes=... link cannot make this page state a time of the
+  sender's choosing. When the attribute is missing - a bookmarked ?locked URL, a new
+  session - the alert still renders, without a number.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{layout/public :: layout(title='Log In', content=~{::main}, scripts=~{})}">
@@ -23,6 +30,14 @@
             </div>
             <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${param.blocked}">
                 Your account has been deactivated. Please contact the administrator.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${param.locked}">
+                Too many failed login attempts, so this account is temporarily locked.
+                <span th:if="${lockedForMinutes}"
+                      th:text="${'You can try again in about ' + lockedForMinutes
+                                 + (lockedForMinutes == 1 ? ' minute.' : ' minutes.')}">You can try again in about 15 minutes.</span>
+                <span th:unless="${lockedForMinutes}">Please try again in a few minutes.</span>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             <div class="alert alert-warning alert-dismissible fade show" role="alert" th:if="${param.changed}">
