@@ -12,7 +12,9 @@
   not with Job.displayStatus(...) here, because that bean call needs
   T(java.time.LocalDate).now() as its argument and Thymeleaf 3.1 can reject exactly that
   combination in some attribute positions, the same reasoning PageLinks.build(Page)
-  documents).
+  documents), and "interview" (the Interview entity for this application, or null when
+  nothing has been arranged - a cancelled one is deliberately still passed through; see the
+  card below).
 
   The confirmation banner ("Application submitted! ...") is read straight from
   ${param.submitted}, present only on the redirect right after S-F2's apply POST
@@ -114,6 +116,29 @@
             <div th:if="${trackerStepIndex == null}">
                 <span th:replace="~{fragments/status-badge :: application(${jobApplication.status}, 'SEEKER')}"></span>
             </div>
+        </div>
+    </div>
+
+    <!-- Interview (interview scheduling feature). Deliberately ABOVE the two-column layout
+         and directly under the status tracker, not tucked into the main column with the
+         cover letter and the resume: when an interview is arranged it is the single most
+         time-critical thing on this page, and a candidate scanning for "where do I have to
+         be, and when" must not have to scroll past three cards of their own submission to
+         find it. Read-only - every action on an interview belongs to the employer, exactly
+         as the status above it does.
+
+         A cancelled interview keeps its card rather than disappearing: someone who has
+         already blocked out Thursday needs to be told Thursday is off, and an empty space
+         where the appointment used to be tells them nothing. @fmt.interviewState (Formats)
+         decides which of the three it is; "NONE" renders no card at all. -->
+    <div class="card shadow-sm mb-4" th:if="${interview != null}"
+         th:with="interviewState=${@fmt.interviewState(interview)}">
+        <div class="card-header">Interview</div>
+        <div class="card-body">
+            <div th:replace="~{fragments/interview :: details(${interview}, ${interviewState})}"></div>
+            <p class="form-text mb-0" th:if="${interviewState == 'UPCOMING'}">
+                Arranged by the employer. If you cannot make this time, message them below.
+            </p>
         </div>
     </div>
 

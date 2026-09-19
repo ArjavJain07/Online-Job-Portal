@@ -1,14 +1,19 @@
 package com.jobportal.web.employer;
 
+import com.jobportal.domain.Interview;
 import com.jobportal.domain.JobApplication;
 import com.jobportal.domain.enums.ApplicationStatus;
+import com.jobportal.domain.enums.InterviewMode;
 import com.jobportal.dto.ApplicationStatusOption;
 import com.jobportal.exception.ResourceNotFoundException;
 import com.jobportal.security.AppUserDetails;
 import com.jobportal.service.FileStorageService;
+import com.jobportal.service.InterviewService;
 import com.jobportal.service.JobApplicationService;
 import com.jobportal.web.form.ApplicationStatusForm;
 import com.jobportal.web.form.InternalNoteForm;
+import com.jobportal.web.form.InterviewCancelForm;
+import com.jobportal.web.form.InterviewForm;
 import com.jobportal.web.support.Csv;
 import com.jobportal.web.support.FileResponses;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,12 +56,14 @@ public class EmployerApplicationController {
     private static final DateTimeFormatter EXPORT_DATE_FORMAT = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
 
     private final JobApplicationService jobApplicationService;
+    private final InterviewService interviewService;
     private final FileStorageService fileStorageService;
     private final Clock clock;
 
     public EmployerApplicationController(JobApplicationService jobApplicationService,
-            FileStorageService fileStorageService, Clock clock) {
+            InterviewService interviewService, FileStorageService fileStorageService, Clock clock) {
         this.jobApplicationService = jobApplicationService;
+        this.interviewService = interviewService;
         this.fileStorageService = fileStorageService;
         this.clock = clock;
     }
@@ -222,6 +229,87 @@ public class EmployerApplicationController {
         return FileResponses.csv(csv.toString(), filename);
     }
 
+    // ==================== Interview scheduling ====================
+    //
+    // Three POSTs, all onto the same detail page, all thin in exactly the way the rest of
+    // this class is (11.3 contract item 1): every rule - the application must already be at
+    // the Interview stage, the slot must be in the future and not absurdly far in it, an
+    // interview must exist and still be scheduled before it can be moved or called off -
+    // lives in InterviewService, and none of them can move an application's status. The
+    // employer reaches the Interview stage through the "Change status" form above, and
+    // nowhere else.
+    //
+    // The split between what re-renders and what redirects is the same one the two handlers
+    // above already make (Section 7.2/7.3): a FIELD the employer can fix (a missing date, a
+    // video interview with no joining link) re-renders this page with the error attached to
+    // it, while a BusinessRuleException - which by definition has no field to attach to,
+    // since it means the page they were looking at is stale - is left uncaught for
+    // GlobalExceptionHandler to flash and redirect.
+
+    @PostMapping("/employer/applications/{id}/interview")
+    public String scheduleInterview(@PathVariable Long id,
+            @Valid @ModelAttribute("interviewForm") InterviewForm form, BindingResult result,
+            @AuthenticationPrincipal AppUserDetails me, Model model, RedirectAttributes redirect) {
+        if (result.hasErrors()) {
+            addDetailModel(id, me.getId(), model);
+            return "employer/application-detail";
+        }
+        Interview interview = interviewService.schedule(id, me.getId(), form);
+        redirect.addFlashAttribute("success", "Interview scheduled for " + interview.getWhenText()
+                + ". The candidate has been notified.");
+        return "redirect:/employer/applications/" + id;
+    }
+
+    // "Reschedule" is what the button says, but the service decides from the data whether
+    // the slot actually moved (see InterviewService#reschedule) - so this handler words its
+    // own flash the same way, from what came back, rather than promising a change the
+    // employer may not have made.
+    @PostMapping("/employer/applications/{id}/interview/reschedule")
+    public String rescheduleInterview(@PathVariable Long id,
+            @Valid @ModelAttribute("interviewForm") InterviewForm form, BindingResult result,
+            @AuthenticationPrincipal AppUserDetails me, Model model, RedirectAttributes redirect) {
+        if (result.hasErrors()) {
+            addDetailModel(id, me.getId(), model);
+            return "employer/application-detail";
+        }
+        Interview interview = interviewService.reschedule(id, me.getId(), form);
+        redirect.addFlashAttribute("success", "Interview updated - now " + interview.getWhenText()
+                + ". The candidate has been notified.");
+        return "redirect:/employer/applications/" + id;
+    }
+
+    @PostMapping("/employer/applications/{id}/interview/cancel")
+    public String cancelInterview(@PathVariable Long id,
+            @Valid @ModelAttribute("interviewCancelForm") InterviewCancelForm form, BindingResult result,
+            @AuthenticationPrincipal AppUserDetails me, Model model, RedirectAttributes redirect) {
+        if (result.hasErrors()) {
+            addDetailModel(id, me.getId(), model);
+            return "employer/application-detail";
+        }
+        interviewService.cancel(id, me.getId(), form);
+        redirect.addFlashAttribute("success", "Interview cancelled. The candidate has been notified.");
+        return "redirect:/employer/applications/" + id;
+    }
+
+    // The form pre-filled with whatever is currently arranged, so "Reschedule" opens on the
+    // existing details and the employer changes only what they mean to change - a blank
+    // form would make every reschedule a re-typing exercise and every re-typing a chance to
+    // lose the joining link. A cancelled interview is deliberately NOT pre-filled: the next
+    // action on it is scheduling a NEW interview (InterviewService#schedule), and carrying
+    // the called-off slot forward as a default is how a cancelled time gets accidentally
+    // re-sent to the candidate.
+    private InterviewForm interviewFormFor(Interview interview) {
+        InterviewForm form = new InterviewForm();
+        if (interview != null && !interview.isCancelled()) {
+            form.setDate(interview.getScheduledAt().toLocalDate());
+            form.setTime(interview.getScheduledAt().toLocalTime());
+            form.setMode(interview.getMode());
+            form.setLocation(interview.getLocation());
+            form.setNotes(interview.getNotes());
+        }
+        return form;
+    }
+
     @PostMapping("/employer/applications/{id}/internal-note")
     public String saveInternalNote(@PathVariable Long id, @Valid @ModelAttribute("noteForm") InternalNoteForm form,
             BindingResult result, @AuthenticationPrincipal AppUserDetails me, Model model, RedirectAttributes redirect) {
@@ -295,6 +383,23 @@ public class EmployerApplicationController {
             InternalNoteForm noteForm = new InternalNoteForm();
             noteForm.setInternalNote(application.getInternalNote());
             model.addAttribute("noteForm", noteForm);
+        }
+
+        // Interview scheduling. "interview" is null when nothing has ever been arranged,
+        // and non-null-but-cancelled once it has been called off - the template tells the
+        // three live cases apart with @fmt.interviewState (see Formats), never by
+        // re-deriving "is this in the future" itself. The two forms follow the same
+        // "only if not already in the model" rule as the two above (Section 7.2): whichever
+        // one was just submitted and failed validation is already there with its errors
+        // attached, and must not be replaced by a fresh copy.
+        Interview interview = interviewService.findForApplication(id).orElse(null);
+        model.addAttribute("interview", interview);
+        model.addAttribute("interviewModes", InterviewMode.values());
+        if (!model.containsAttribute("interviewForm")) {
+            model.addAttribute("interviewForm", interviewFormFor(interview));
+        }
+        if (!model.containsAttribute("interviewCancelForm")) {
+            model.addAttribute("interviewCancelForm", new InterviewCancelForm());
         }
     }
 }

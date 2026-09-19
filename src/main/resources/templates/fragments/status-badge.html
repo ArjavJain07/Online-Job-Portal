@@ -11,6 +11,17 @@
   "application(status, audience)" takes the stored ApplicationStatus plus who is looking:
   employers and admins see the plain label ("Rejected"), seekers see the softer one
   ("Not selected"), Section 5.6.
+
+  "interview(state)" takes the WORD @fmt.interviewState produced for an application's
+  interview - "UPCOMING", "PAST" or "CANCELLED" - rather than the entity, because two of
+  those three depend on what time it is and that decision belongs behind the injected Clock
+  (Section 7.10; see Formats#interviewState). It deliberately borrows the existing badge
+  palette instead of adding colours of its own: a scheduled interview is the same
+  .app-interview blue as the Interview stage it belongs to, a cancelled one the same
+  .app-rejected red as every other "this is not happening" badge, and a slot whose time has
+  simply gone by is the muted .app-withdrawn grey, which says "nothing to act on" without
+  claiming anything went wrong. Text always accompanies colour (Section 7.1), and "NONE"
+  renders nothing at all so a caller can pass the state through unchecked.
 -->
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
@@ -36,6 +47,13 @@
     <span th:case="'HIRED'"         class="badge app-hired"         th:text="${text}">Hired</span>
     <span th:case="'REJECTED'"      class="badge app-rejected"      th:text="${text}">Not selected</span>
     <span th:case="'WITHDRAWN'"     class="badge app-withdrawn"     th:text="${text}">Withdrawn</span>
+</span>
+
+<span th:fragment="interview(state)" th:switch="${state}">
+    <span th:case="'UPCOMING'"  class="badge app-interview">Interview scheduled</span>
+    <span th:case="'PAST'"      class="badge app-withdrawn">Interview date passed</span>
+    <span th:case="'CANCELLED'" class="badge app-rejected">Interview cancelled</span>
+    <span th:case="*"></span>
 </span>
 
 </body>

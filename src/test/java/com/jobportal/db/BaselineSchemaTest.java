@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jobportal.domain.ActivityLog;
 import com.jobportal.domain.ApplicationStatusChange;
+import com.jobportal.domain.Interview;
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobAlertSubscription;
 import com.jobportal.domain.JobApplication;
@@ -73,9 +74,9 @@ import org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy;
 class BaselineSchemaTest {
 
     private static final Class<?>[] ENTITIES = {
-        ActivityLog.class, ApplicationStatusChange.class, Job.class, JobAlertSubscription.class,
-        JobApplication.class, JobStatusChange.class, JobView.class, Message.class,
-        PasswordResetToken.class, SavedJob.class, SeekerProfile.class, Skill.class,
+        ActivityLog.class, ApplicationStatusChange.class, Interview.class, Job.class,
+        JobAlertSubscription.class, JobApplication.class, JobStatusChange.class, JobView.class,
+        Message.class, PasswordResetToken.class, SavedJob.class, SeekerProfile.class, Skill.class,
         SystemSettings.class, User.class
     };
 

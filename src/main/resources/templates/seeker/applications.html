@@ -7,7 +7,11 @@
   shortlistedCount/interviewCount - always the UNFILTERED totals, so the chips stay stable
   while the table follows the chosen filter) and per-application unread message counts
   under "unreadCounts" (Section 6.5.3), the same Map<Long,Long> pattern
-  employer/applications.html already uses.
+  employer/applications.html already uses. Interview scheduling adds "interviews", a
+  Map<Long,Interview> in that same keyed-by-application-id shape (one query for the page,
+  not one per row - InterviewService#byApplicationId): applications with nothing arranged
+  have no entry at all, so the Interview column guards on null rather than needing a second
+  "has an interview" flag that could fall out of step with it.
 
   Only non-zero status chips are shown next to "All N" (Section 6.4 S-D2 screen example
   "All 3 - Applied 1 - Under review 1 - Interview 1" has no "Shortlisted 0").
@@ -67,6 +71,7 @@
                     <th>Company</th>
                     <th>Applied on</th>
                     <th>Status</th>
+                    <th>Interview</th>
                     <th>Last update</th>
                     <th>Unread</th>
                     <th>Actions</th>
@@ -81,6 +86,27 @@
                     <td th:text="${a.job.employer.companyName}">Company</td>
                     <td th:text="${#temporals.format(a.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
                     <td><span th:replace="~{fragments/status-badge :: application(${a.status}, 'SEEKER')}"></span></td>
+                    <!-- Interview scheduling. The whole point of putting it in this table
+                         rather than only on the detail page: this is the page a candidate
+                         opens to see what is happening across all their applications, so
+                         "you are due somewhere on Wednesday" has to be visible without
+                         opening anything. The time comes from Interview#getWhenText, the
+                         same one definition the detail page and the emails use, including
+                         its named zone - a shortened "23 Sep" here would be the one place
+                         in the feature where the zone went missing.
+                         "interviews" is a Map<Long, Interview> keyed by application id
+                         (SeekerApplicationController#active), the same shape as
+                         "unreadCounts" above; a row with nothing arranged simply has no
+                         entry, and @fmt.interviewState answers "NONE" for the null. -->
+                    <td th:with="interview=${interviews.get(a.id)}">
+                        <th:block th:if="${interview != null}"
+                                  th:with="interviewState=${@fmt.interviewState(interview)}">
+                            <span th:replace="~{fragments/status-badge :: interview(${interviewState})}"></span>
+                            <span class="d-block small" th:classappend="${interviewState == 'UPCOMING'} ? '' : 'text-muted'"
+                                  th:text="${interview.whenText}">23 Sep 2026, 3:30 PM IST (Asia/Kolkata)</span>
+                        </th:block>
+                        <span th:if="${interview == null}" class="text-muted">-</span>
+                    </td>
                     <td>
                         <span th:if="${a.statusChangedAt != null}" th:text="${#temporals.format(a.statusChangedAt, 'dd MMM yyyy')}">16 Sep 2026</span>
                         <span th:unless="${a.statusChangedAt != null}">&ndash;</span>

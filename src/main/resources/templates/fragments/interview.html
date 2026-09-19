@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!--
+  What is arranged for one application's interview, read-only (interview scheduling
+  feature; entity in domain.Interview). One fragment, shown to BOTH sides - the employer's
+  rail on employer/application-detail.html and the candidate's own card on
+  seeker/application-detail.html - because there is nothing here either party should be
+  shown differently: a time, a mode, a link or address, any notes, and whether the slot has
+  moved or been called off. The employer's page wraps it with the forms that change those
+  facts; this fragment never contains an action.
+
+  That shared-ness is the point, not a saving. The single worst failure this feature could
+  have is the two people who must meet reading different arrangements, so the words they
+  each see come from one piece of markup binding one set of fields - and the time itself
+  comes from Interview#getWhenText, the same one definition the three emails use.
+
+  "state" is the word @fmt.interviewState produced ("UPCOMING", "PAST" or "CANCELLED" -
+  never "NONE", since callers guard on that before calling). It is passed in rather than
+  recomputed because it depends on the clock, which lives behind Formats (Section 7.10).
+
+  The status badge is written out here instead of delegating to fragments/status-badge ::
+  interview(state) for the reason fragments/timeline.html already documents at length: a
+  parameterised fragment call whose argument is forwarded from THIS fragment's own
+  parameter arrives null in the callee under Thymeleaf 3.1. The classes and words are
+  identical to that fragment's, so the two still say the same thing; they simply cannot be
+  wired together here.
+
+  THE LOCATION IS NOT A LINK, ON PURPOSE. For a video interview it usually holds a URL and
+  a th:href would be the obvious convenience - but it is free text typed by an employer,
+  and turning attacker-controlled text into a live link is how "javascript:" and lookalike
+  domains reach a candidate who has every reason to trust what this page tells them. It is
+  rendered as text (.text-break so a long URL still wraps), which the candidate copies
+  deliberately. Called out in the delivery report as the one deliberate piece of friction.
+-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="details(interview, state)">
+
+    <p class="mb-2" th:switch="${state}">
+        <span th:case="'UPCOMING'"  class="badge app-interview">Interview scheduled</span>
+        <span th:case="'PAST'"      class="badge app-withdrawn">Interview date passed</span>
+        <span th:case="'CANCELLED'" class="badge app-rejected">Interview cancelled</span>
+    </p>
+
+    <dl class="row small mb-0">
+        <!-- Always the stored wall clock plus its stored zone, never converted - see
+             domain.Interview. A past interview reaches this line unchanged; only the badge
+             above it changes. -->
+        <dt class="col-sm-4">When</dt>
+        <dd class="col-sm-8" th:text="${interview.whenText}">23 Sep 2026, 3:30 PM IST (Asia/Kolkata)</dd>
+
+        <dt class="col-sm-4">How</dt>
+        <dd class="col-sm-8" th:text="${interview.mode.label}">Video call</dd>
+
+        <!-- Labelled by the MODE ("Joining link" / "Address" / "Phone number",
+             InterviewMode#getDetailLabel), so one stored column reads correctly for all
+             three and the candidate is never told to go to an "address" that is a URL. -->
+        <th:block th:if="${interview.location != null}">
+            <dt class="col-sm-4" th:text="${interview.mode.detailLabel}">Joining link</dt>
+            <dd class="col-sm-8 text-break" th:text="${interview.location}">https://meet.example.com/abc-defg-hij</dd>
+        </th:block>
+
+        <th:block th:if="${interview.notes != null}">
+            <dt class="col-sm-4">Notes</dt>
+            <dd class="col-sm-8 pre-line" th:text="${interview.notes}">Please bring a laptop.</dd>
+        </th:block>
+
+        <!-- Shown only while the interview is still on: after a cancellation, which slot it
+             used to be in stops being anything the reader has to act on, and the cancelled
+             block below is the whole story. -->
+        <th:block th:if="${state != 'CANCELLED' and interview.previousWhenText != null}">
+            <dt class="col-sm-4">Rescheduled</dt>
+            <dd class="col-sm-8">
+                Moved from <span th:text="${interview.previousWhenText}">21 Sep 2026, 10:00 AM IST (Asia/Kolkata)</span>
+                <span th:if="${interview.rescheduleCount > 1}" class="text-muted"
+                      th:text="'(changed ' + ${interview.rescheduleCount} + ' times)'">(changed 2 times)</span>
+            </dd>
+        </th:block>
+
+        <th:block th:if="${state == 'CANCELLED'}">
+            <dt class="col-sm-4">Cancelled on</dt>
+            <dd class="col-sm-8" th:text="${#temporals.format(interview.cancelledAt, 'dd MMM yyyy')}">20 Sep 2026</dd>
+        </th:block>
+        <th:block th:if="${state == 'CANCELLED' and interview.cancellationReason != null}">
+            <dt class="col-sm-4">Reason</dt>
+            <dd class="col-sm-8 pre-line" th:text="${interview.cancellationReason}">Reason given by the employer.</dd>
+        </th:block>
+    </dl>
+
+</div>
+
+</body>
+</html>
