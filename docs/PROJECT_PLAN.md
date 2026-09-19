@@ -3394,6 +3394,24 @@ The usual objection to keeping a column is drift, so the mapping removes the pos
 
 `SkillBackfillMigrationTest` is the test that matters here: every other test runs against a database where those columns were empty when V4 ran, so the whole backfill is dead code as far as the suite is concerned — delete it and everything still passes, and the first sign of trouble is a production database whose skills quietly vanished. That test migrates to **V1 only**, inserts legacy comma-separated rows the way the old application would have, then lets the rest run and checks what came out.
 
+**Before the first deploy: run V4 against a PostgreSQL copy.** Every test in this project runs on H2, and V4 is the first migration with real logic in it rather than DDL — so "it passes" means "it is right on H2". The constructs were chosen to be standard on both and the one known divergence (`REGEXP_REPLACE`) was designed out, but *designed to be portable* is not *observed to be portable*. This is cheap to close, and worth closing on a migration that moves data:
+
+```sql
+-- On a COPY of the production database, before deploying. Expect 0 rows from both.
+select j.id, j.skills from jobs j
+ where coalesce(trim(j.skills), '') <> ''
+   and not exists (select 1 from job_skills js where js.job_id = j.id);
+
+select p.id, p.skills from seeker_profiles p
+ where coalesce(trim(p.skills), '') <> ''
+   and not exists (select 1 from seeker_profile_skills ps where ps.seeker_profile_id = p.id);
+
+-- And spot-check the canonicalisation, which is the part that differs between engines:
+select slug, label from skills order by slug;
+```
+
+If the backfill had gone wrong, V4's own guard would already have aborted the migration and left the database untouched — so the failure mode is a stopped deploy, not lost data. The check above is for the subtler outcome the guard cannot see: rows that *did* move, under slugs a different engine computed differently.
+
 **Known limits**
 
 * The facet is single-select and shows the top 12 skills by count. Multi-select (`skill=java&skill=sql`) is a natural follow-up.
