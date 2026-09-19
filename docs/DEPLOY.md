@@ -64,12 +64,38 @@ as a convenience for sharing, not the main demo.
 `autoDeployTrigger: commit` is set in `render.yaml`.
 
 **Watching a deploy.** Open the service and use the **Logs** tab. A healthy start
-ends with `Started JobPortalApplication`, followed by the seeding line
+now begins with a few Flyway lines and ends with `Started JobPortalApplication`,
+followed by the seeding line
 `Demo dataset loaded (Section 13): 10 users, 12 jobs, 15 applications`.
 
+**The schema is managed by Flyway** (PROJECT_PLAN 10.7), not by Hibernate. There
+is one thing to do **before the first deploy that includes it**, once only: check
+that the hosted database already has the login-lockout columns, and add them if it
+does not. Flyway adopts the existing database at version 1 rather than rebuilding
+it, so it takes version 1 at its word.
+
+```sql
+-- expect 2
+select count(*) from information_schema.columns
+ where table_name = 'users'
+   and column_name in ('failed_login_attempts', 'lockout_until');
+
+-- only if that returned 0
+alter table users add column failed_login_attempts integer;
+alter table users add column lockout_until timestamp(6);
+```
+
+Nothing is at risk if this is forgotten: the app refuses to start and names the
+missing column, the health check fails, and Render keeps the previous version
+running. Fix it and redeploy.
+
 **Starting the data again.** Delete the database in Render and apply the blueprint
-again, or connect with `psql` and drop the tables. The app recreates the schema
-and reseeds on the next start.
+again. The app recreates the schema and reseeds on the next start.
+
+If you instead connect with `psql` and drop the tables by hand, **drop
+`flyway_schema_history` too** — otherwise Flyway still believes the schema is at
+version 1, creates nothing, and the app fails start-up with a missing table.
+`drop schema public cascade; create schema public;` takes everything at once.
 
 **The database is Postgres, not H2.** The code does not care: every query is
 written in JPQL, so Hibernate produces the right SQL for each database. This was
