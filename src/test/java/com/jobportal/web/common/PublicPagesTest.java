@@ -9,10 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jobportal.domain.SystemSettings;
 import com.jobportal.repository.JobRepository;
+import com.jobportal.repository.JobViewRepository;
 import com.jobportal.repository.SystemSettingsRepository;
 import com.jobportal.support.IntegrationTestBase;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpSession;
@@ -23,8 +25,18 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 // AC-P2-3, AC-P2-4.
 class PublicPagesTest extends IntegrationTestBase {
 
+    // An ordinary desktop browser User-Agent, for tests that need the dated view analytics
+    // feature's BotDetector check to pass (Section 6.3 E-D5 decision 2).
+    private static final String BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+    // Well before any seed or test data (FixedClockConfig's "today" is 16 Sep 2026), so
+    // findViewedAtSince(..., FAR_PAST) below returns every JobView row a test created.
+    private static final LocalDateTime FAR_PAST = LocalDateTime.of(2000, 1, 1, 0, 0);
+
     @Autowired
     private JobRepository jobRepository;
+    @Autowired
+    private JobViewRepository jobViewRepository;
     @Autowired
     private SystemSettingsRepository systemSettingsRepository;
     @Autowired
@@ -111,6 +123,72 @@ class PublicPagesTest extends IntegrationTestBase {
         assertThat(currentViewCount(javaJobId)).isEqualTo(before + 1);
     }
 
+    // Dated view analytics (JobView, not Job.viewCount - Section 6.3 E-D5): an anonymous
+    // visitor with an ordinary browser User-Agent gets exactly one JobView row for a Live
+    // job, following the same per-session dedupe viewCount already uses above - a second
+    // view in the same session adds no second row.
+    @Test
+    void humanViewOfLiveJobIsRecordedAsJobView() throws Exception {
+        Long javaJobId = data.jobId("Java Developer");
+        Long acmeId = data.userId("hr@acme.local");
+        long before = jobViewCount(acmeId, javaJobId);
+
+        MockHttpSession session = new MockHttpSession();
+        mockMvc.perform(get("/jobs/{id}", javaJobId).session(session).header("User-Agent", BROWSER_USER_AGENT))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/jobs/{id}", javaJobId).session(session).header("User-Agent", BROWSER_USER_AGENT))
+                .andExpect(status().isOk());
+
+        assertThat(jobViewCount(acmeId, javaJobId)).isEqualTo(before + 1);
+    }
+
+    // Decision 2 of the feature ("write amplification and bot noise"): a scanner-style
+    // User-Agent still bumps viewCount exactly as before - no regression to AC-P2-3 - but
+    // util.BotDetector keeps it out of the JobView table.
+    @Test
+    void botUserAgentBumpsViewCountButNotJobView() throws Exception {
+        Long javaJobId = data.jobId("Java Developer");
+        Long acmeId = data.userId("hr@acme.local");
+        int viewCountBefore = currentViewCount(javaJobId);
+        long jobViewsBefore = jobViewCount(acmeId, javaJobId);
+
+        mockMvc.perform(get("/jobs/{id}", javaJobId).header("User-Agent", "curl/8.4.0"))
+                .andExpect(status().isOk());
+
+        assertThat(currentViewCount(javaJobId)).isEqualTo(viewCountBefore + 1);
+        assertThat(jobViewCount(acmeId, javaJobId)).isEqualTo(jobViewsBefore);
+    }
+
+    // A request with no User-Agent header at all (every real browser sends one) is treated
+    // the same as a bot by util.BotDetector, so it is not recorded as a JobView either -
+    // still bumps viewCount, matching viewCountedOncePerSessionExcludingOwner above.
+    @Test
+    void missingUserAgentIsNotRecordedAsJobView() throws Exception {
+        Long javaJobId = data.jobId("Java Developer");
+        Long acmeId = data.userId("hr@acme.local");
+        long before = jobViewCount(acmeId, javaJobId);
+
+        mockMvc.perform(get("/jobs/{id}", javaJobId)).andExpect(status().isOk());
+
+        assertThat(jobViewCount(acmeId, javaJobId)).isEqualTo(before);
+    }
+
+    // The job's own employer never creates a JobView row either, mirroring viewCount's own
+    // exclusion (decision D-19): an employer checking their own listing is not a candidate
+    // reading it, so it should not feed either the counter or the dated analytics.
+    @Test
+    void ownerViewIsNotRecordedAsJobView() throws Exception {
+        Long javaJobId = data.jobId("Java Developer");
+        Long acmeId = data.userId("hr@acme.local");
+        long before = jobViewCount(acmeId, javaJobId);
+
+        UserDetails owner = userDetailsService.loadUserByUsername("hr@acme.local");
+        mockMvc.perform(get("/jobs/{id}", javaJobId).with(user(owner)).header("User-Agent", BROWSER_USER_AGENT))
+                .andExpect(status().isOk());
+
+        assertThat(jobViewCount(acmeId, javaJobId)).isEqualTo(before);
+    }
+
     // The two-pane /jobs list (JobSearchTest) adds a new "job" request parameter and a
     // ".jp-jobs-detail" pane, but must not touch the standalone GET /jobs/{id} route at
     // all - it is still a public route with its own tests (this class's other methods
@@ -138,5 +216,11 @@ class PublicPagesTest extends IntegrationTestBase {
     private int currentViewCount(Long jobId) {
         entityManager.clear();
         return jobRepository.findById(jobId).orElseThrow().getViewCount();
+    }
+
+    // Every JobView row recorded for one employer's job, regardless of when - tests only
+    // ever add rows "now", so a fixed far-past cutoff is enough to read them all back.
+    private long jobViewCount(Long employerId, Long jobId) {
+        return jobViewRepository.findViewedAtSince(employerId, jobId, FAR_PAST).size();
     }
 }

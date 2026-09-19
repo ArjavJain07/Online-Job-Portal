@@ -12,6 +12,7 @@ import com.jobportal.repository.ApplicationStatusChangeRepository;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.JobSpecifications;
+import com.jobportal.repository.JobViewRepository;
 import com.jobportal.repository.MessageRepository;
 import com.jobportal.repository.projection.ApplicationStatusCount;
 import com.jobportal.repository.projection.FirstResponseRow;
@@ -53,15 +54,17 @@ public class EmployerStatisticsService {
 
     private final JobRepository jobRepository;
     private final JobApplicationRepository jobApplicationRepository;
+    private final JobViewRepository jobViewRepository;
     private final ApplicationStatusChangeRepository applicationStatusChangeRepository;
     private final MessageRepository messageRepository;
     private final Clock clock;
 
     public EmployerStatisticsService(JobRepository jobRepository, JobApplicationRepository jobApplicationRepository,
-            ApplicationStatusChangeRepository applicationStatusChangeRepository, MessageRepository messageRepository,
-            Clock clock) {
+            JobViewRepository jobViewRepository, ApplicationStatusChangeRepository applicationStatusChangeRepository,
+            MessageRepository messageRepository, Clock clock) {
         this.jobRepository = jobRepository;
         this.jobApplicationRepository = jobApplicationRepository;
+        this.jobViewRepository = jobViewRepository;
         this.applicationStatusChangeRepository = applicationStatusChangeRepository;
         this.messageRepository = messageRepository;
         this.clock = clock;
@@ -97,6 +100,13 @@ public class EmployerStatisticsService {
         long rejected = statusCountsInRange.getOrDefault(ApplicationStatus.REJECTED, 0L);
         long withdrawn = statusCountsInRange.getOrDefault(ApplicationStatus.WITHDRAWN, 0L);
 
+        // Dated view analytics (JobView, not Job.viewCount - see JobView's class comment):
+        // views over time and the view-to-application funnel, both scoped to the same
+        // range/job as applicationsOverTime.
+        List<LocalDateTime> viewTimestamps = jobViewRepository.findViewedAtSince(employerId, jobId, from);
+        ChartData viewsOverTime = DateBuckets.count(viewTimestamps, today, days, "Views");
+        ChartData viewToApplicationFunnel = viewToApplicationFunnelChart(viewsOverTime, total);
+
         List<KpiValue> kpis = List.of(
                 new KpiValue("Total applications", String.valueOf(total), null),
                 new KpiValue("Awaiting review", String.valueOf(awaitingReview), null),
@@ -109,7 +119,7 @@ public class EmployerStatisticsService {
                 engagementMetrics(employerId, from, jobStats, messageEvents, total, withdrawn);
 
         return new EmployerStatistics(days, jobId, kpis, applicationsOverTime, hiringPipeline, applicationsPerJob,
-                messagesOverTime, jobStats, engagementMetrics);
+                messagesOverTime, viewsOverTime, viewToApplicationFunnel, jobStats, engagementMetrics);
     }
 
     // Apply rate (Section 6.3 E-D5): applications / views as a percentage, one decimal
@@ -198,6 +208,19 @@ public class EmployerStatisticsService {
             values.add(row.applications());
         }
         return new ChartData("Applications", labels, values);
+    }
+
+    // View-to-application funnel (dated view analytics feature, Section 6.3 E-D5): two
+    // stages, both scoped to the selected range/job so the funnel tells the same "how is
+    // this period doing" story as applicationsOverTime and the rest of this page - unlike
+    // the per-job table's all-time Views and Apply rate columns below, which are left
+    // exactly as they were (Section 7.6: "views are not dated" there, deliberately, because
+    // Job.viewCount has no date to give them). Reuses viewsOverTime's own bucket totals
+    // instead of a second query, the same reasoning applicationsPerJobChart gives for
+    // reusing jobStats: the chart and the number it is built from can never disagree.
+    private ChartData viewToApplicationFunnelChart(ChartData viewsOverTime, long applicationsInRange) {
+        long viewsInRange = viewsOverTime.values().stream().mapToLong(Long::longValue).sum();
+        return new ChartData("Count", List.of("Views", "Applications"), List.of(viewsInRange, applicationsInRange));
     }
 
     // Candidate engagement: messages over time (Section 6.3 E-D5 chart 4, 7.6): every

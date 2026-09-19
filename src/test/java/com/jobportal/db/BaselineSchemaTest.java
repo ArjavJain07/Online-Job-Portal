@@ -7,6 +7,7 @@ import com.jobportal.domain.ApplicationStatusChange;
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
 import com.jobportal.domain.JobStatusChange;
+import com.jobportal.domain.JobView;
 import com.jobportal.domain.Message;
 import com.jobportal.domain.SeekerProfile;
 import com.jobportal.domain.SystemSettings;
@@ -69,7 +70,7 @@ class BaselineSchemaTest {
 
     private static final Class<?>[] ENTITIES = {
         ActivityLog.class, ApplicationStatusChange.class, Job.class, JobApplication.class,
-        JobStatusChange.class, Message.class, SeekerProfile.class, SystemSettings.class, User.class
+        JobStatusChange.class, JobView.class, Message.class, SeekerProfile.class, SystemSettings.class, User.class
     };
 
     // Flyway's own bookkeeping table exists only in the Flyway-built database, so it is

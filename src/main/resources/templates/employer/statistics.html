@@ -7,6 +7,13 @@
   two-series "messagesOverTime" (fed to fragments/chart-card :: multi) and the two tables.
   "ownJobs" is every one of this employer's own jobs (any status) for the job-filter select.
 
+  "viewsOverTime" and "viewToApplicationFunnel" are the dated view analytics feature, built
+  from the JobView table rather than the per-job table's all-time Job.viewCount below - see
+  EmployerStatistics' own comment. Both are single-series ChartData, so they use the same
+  fragments/chart-card :: card(...) call as applicationsChart/hiringPipelineChart, matching
+  this page's own convention of pairing every Chart.js chart with the same data as a table
+  (accessibility, Section 7.1) instead of inventing a one-off funnel widget.
+
   Scripts are a SIBLING of <main>, never inside it (Section 7.1), and follow the exact
   inlining pattern Section 7.6 specifies for feeding Chart.js.
 -->
@@ -61,7 +68,9 @@
         </div>
     </div>
 
-    <!-- The four charts of Section 6.3 E-D5; each keeps its own accessible data table. -->
+    <!-- The four charts of Section 6.3 E-D5, plus the dated view analytics feature's two
+         charts (views over time, view-to-application funnel); each keeps its own
+         accessible data table. -->
     <div class="row g-4">
         <div class="col-12 col-lg-6">
             <div th:replace="~{fragments/chart-card :: card('applicationsChart', 'Applications over time', ${stats.applicationsOverTime})}"></div>
@@ -74,6 +83,12 @@
         </div>
         <div class="col-12 col-lg-6">
             <div th:replace="~{fragments/chart-card :: multi('messagesChart', 'Candidate engagement: messages over time', ${stats.messagesOverTime})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('viewsChart', 'Views over time', ${stats.viewsOverTime})}"></div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('viewFunnelChart', 'View to application funnel', ${stats.viewToApplicationFunnel})}"></div>
         </div>
     </div>
 
@@ -141,11 +156,15 @@
         const hiringPipeline = /*[[${stats.hiringPipeline}]]*/ null;
         const applicationsPerJob = /*[[${stats.applicationsPerJob}]]*/ null;
         const messages = /*[[${stats.messagesOverTime}]]*/ null;
+        const views = /*[[${stats.viewsOverTime}]]*/ null;
+        const viewFunnel = /*[[${stats.viewToApplicationFunnel}]]*/ null;
 
         JobPortalCharts.line('applicationsChart', applications);
         JobPortalCharts.bar('hiringPipelineChart', hiringPipeline);
         JobPortalCharts.bar('applicationsPerJobChart', applicationsPerJob, true);
         JobPortalCharts.groupedBar('messagesChart', messages);
+        JobPortalCharts.line('viewsChart', views);
+        JobPortalCharts.bar('viewFunnelChart', viewFunnel);
     </script>
 </th:block>
 </body>
