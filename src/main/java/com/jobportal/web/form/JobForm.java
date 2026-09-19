@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.format.annotation.DateTimeFormat;
 
 // Employer job posting form (Section 6.3 E-F1/E-D1, field table). One class handles both
 // GET /employer/jobs/new and GET /employer/jobs/{id}/edit; JobService.create/update do the
@@ -78,7 +79,18 @@ public class JobForm {
 
     // The today-to-180-days range is checked in the service (needs the Clock, and on
     // edit only when the value actually changed) - see the class comment.
+    //
+    // @DateTimeFormat is what lets the edit form redisplay a deadline that is already
+    // stored. Spring's default for java.time types parses ISO happily (a POST of
+    // "2026-10-09" binds with or without this) but PRINTS with the locale's short style,
+    // so th:field rendered value="10/9/26" - a string <input type="date"> does not
+    // accept, leaving the control blank every time an employer opened "Edit job".
+    // Submitting it then failed @NotNull, and re-picking a date looked to
+    // JobService.update like a real deadline change, sending a live job back for
+    // approval. The "post a new job" path never showed it, because a blank form has
+    // nothing to print. Same failure mode, and same fix, as InterviewForm's two fields.
     @NotNull(message = DEADLINE_MESSAGE)
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate applicationDeadline;
 
     public String getTitle() {

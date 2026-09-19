@@ -19,6 +19,7 @@ import com.jobportal.service.JobService;
 import com.jobportal.support.IntegrationTestBase;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -237,6 +238,36 @@ class EmployerJobTest extends IntegrationTestBase {
                 .andExpect(content().string(containsString("Closed jobs can")))
                 .andExpect(content().string(containsString("t be edited. Reopen the job first.")));
     }
+
+    // The edit form has to redisplay the stored deadline in the one format
+    // <input type="date"> accepts. Without @DateTimeFormat on
+    // JobForm.applicationDeadline, Spring printed the locale's short style
+    // (value="10/9/26"), the browser discarded it, and the control opened blank every
+    // time an employer edited a job - then @NotNull rejected the submit, or a re-picked
+    // date looked like a real deadline change and sent a live job back for approval.
+    //
+    // No other test here could have caught it: they all POST, and ISO parsing worked
+    // with or without the annotation. Only reading what the GET rendered shows it.
+    // Asserted against the seeded value rather than a literal, so the test survives the
+    // seed clock moving.
+    @Test
+    void editFormRedisplaysTheStoredDeadlineInIsoFormat() throws Exception {
+        Job job = data.job("Java Developer");
+        LocalDate deadline = job.getApplicationDeadline();
+
+        mockMvc.perform(get("/employer/jobs/{id}/edit", job.getId()).with(user(employer())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"applicationDeadline\"")))
+                .andExpect(content().string(containsString("value=\"" + deadline + "\"")))
+                // The exact string the bug used to emit. The suite pins en-US (see the
+                // build flags), so this is the short style Spring would fall back to;
+                // under another locale it simply never matches, which is why the
+                // positive assertion above is the one that carries the test.
+                .andExpect(content().string(
+                        not(containsString("value=\"" + deadline.format(SHORT_STYLE) + "\""))));
+    }
+
+    private static final DateTimeFormatter SHORT_STYLE = DateTimeFormatter.ofPattern("M/d/yy");
 
     private UserDetails employer() {
         return userDetailsService.loadUserByUsername("hr@acme.local");
