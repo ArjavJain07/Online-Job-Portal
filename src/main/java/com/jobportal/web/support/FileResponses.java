@@ -24,4 +24,19 @@ public final class FileResponses {
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
     }
+
+    // Builds the download response for a generated CSV export (new feature: employer
+    // applications export). Always "attachment" - unlike a PDF resume, a CSV has no
+    // useful in-browser preview - and the body is prefixed with a UTF-8 byte-order mark:
+    // without it, Excel guesses the system codepage instead of UTF-8 and mangles any
+    // candidate or job data outside plain ASCII, even though the declared content type
+    // already says charset=UTF-8.
+    public static ResponseEntity<byte[]> csv(String content, String filename) {
+        byte[] body = ("﻿" + content).getBytes(StandardCharsets.UTF_8);
+        ContentDisposition disposition = ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build();
+        return ResponseEntity.ok()
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(body);
+    }
 }

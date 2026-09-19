@@ -6,11 +6,23 @@
   select, the two effective filter values under "jobId"/"status" so the filter bar keeps
   whatever was submitted (an unrecognised or foreign value the service already fell back
   to "no filter" for, Section 7.9), the full status list under "statuses" (an enum can't
-  be looped with T(...) in the template, Section 7.1 note), and per-application unread
-  message counts under "unreadCounts".
+  be looped with T(...) in the template, Section 7.1 note), per-application unread
+  message counts under "unreadCounts", and (new feature) "bulkStatusOptions" for the bulk
+  toolbar's "New status" select.
+
+  Bulk status change and CSV export (new feature, added on top of the E-D2 spec): the
+  whole table is now one <form method="post"> to
+  /employer/applications/bulk-status, with a checkbox per row ("applicationIds") and
+  three hidden fields (returnJobId/returnStatus/returnPage) that simply echo this same
+  page's own jobId/status/page(.number) back to the controller, so the redirect after the
+  bulk action can return to the exact filtered/paged view the employer was on - see
+  EmployerApplicationController#listRedirect. "Export CSV" beside the heading is a plain
+  GET link carrying the same jobId/status filter (not page - the file is always the WHOLE
+  filtered list, see JobApplicationService#exportForEmployer), so the download always
+  matches what is currently on screen.
 -->
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{layout/dashboard :: layout(title='Applications', content=~{::main}, scripts=~{})}">
+      th:replace="~{layout/dashboard :: layout(title='Applications', content=~{::main}, scripts=~{::scripts})}">
 <body>
 <main>
     <div class="jp-page-head mb-3">
@@ -18,6 +30,10 @@
             <h1 class="h3 mb-1">Applications</h1>
             <p>Review and manage everyone who applied to your jobs.</p>
         </div>
+        <a th:href="@{/employer/applications/export(jobId=${jobId}, status=${status})}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-download me-1" aria-hidden="true"></i>Export CSV
+        </a>
     </div>
 
     <form method="get" th:action="@{/employer/applications}" class="jp-filters card mb-4">
@@ -59,66 +75,151 @@
     </div>
 
     <div th:unless="${page.empty}" class="card shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                <tr>
-                    <th>Reference</th>
-                    <th>Candidate</th>
-                    <th>Job</th>
-                    <th>Applied on</th>
-                    <th>Status</th>
-                    <th class="numeric">Unread</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody>
-                <!-- Compact row: an initials chip stands in for a photo next to the candidate's
-                     name (same ".jp-avatar" hook the navbar uses for the signed-in user), the
-                     status pill always carries its own word (never colour alone), and the row
-                     ends with the one quick action this list offers - the full review happens
-                     on the application detail page. -->
-                <tr th:each="a : ${page.content}"
-                    th:with="initials=${a.seeker.fullName != null and !a.seeker.fullName.isEmpty()} ? ${a.seeker.fullName.substring(0,1).toUpperCase()} : '?'">
-                    <td th:text="${a.reference}">APP-00001</td>
-                    <td>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="jp-avatar" aria-hidden="true" th:text="${initials}">C</span>
-                            <span>
-                                <span th:text="${a.seeker.fullName}">Candidate name</span>
-                                <span th:unless="${a.seeker.enabled}" class="badge text-bg-secondary ms-1">Account deactivated</span>
-                            </span>
-                        </div>
-                    </td>
-                    <td>
-                        <a th:href="@{/employer/jobs/{id}(id=${a.job.id})}" th:text="${a.job.title}">Job title</a>
-                    </td>
-                    <td th:text="${#temporals.format(a.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
-                    <td>
-                        <!-- fragments/status-badge has no "New" case of its own, so the E-D2 override
-                             (Section 6.3: "Status badge ('New' for APPLIED)") is built here instead,
-                             reusing the same app-applied colour class; every other status still goes
-                             through the shared fragment (11.3 contract item 9). -->
-                        <span th:if="${a.status.name() == 'APPLIED'}" class="badge app-applied">New</span>
-                        <th:block th:unless="${a.status.name() == 'APPLIED'}">
-                            <span th:replace="~{fragments/status-badge :: application(${a.status}, 'EMPLOYER')}"></span>
-                        </th:block>
-                    </td>
-                    <td class="numeric">
-                        <span th:if="${unreadCounts.get(a.id) != null}" class="badge bg-danger"
-                              th:text="${unreadCounts.get(a.id)}">1</span>
-                        <span th:unless="${unreadCounts.get(a.id) != null}" class="text-muted">-</span>
-                    </td>
-                    <td>
-                        <a th:href="@{/employer/applications/{id}(id=${a.id})}" class="btn btn-sm btn-outline-secondary">View</a>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-        </div>
+        <form th:action="@{/employer/applications/bulk-status}" method="post">
+            <!-- Return-trip filters (new feature): plain copies of this same page's own
+                 jobId/status/page(.number) model attributes, read back by
+                 EmployerApplicationController#listRedirect so the redirect after the bulk
+                 action lands on this exact filtered/paged view, not a generic "back". -->
+            <input type="hidden" name="returnJobId" th:if="${jobId != null}" th:value="${jobId}">
+            <input type="hidden" name="returnStatus" th:value="${status}">
+            <input type="hidden" name="returnPage" th:value="${page.number}">
+
+            <!-- Bulk toolbar (new feature): applies to every checked row below. The Apply
+                 button starts disabled (scripts fragment) since nothing is checked on load,
+                 and its data-confirm text (forms.js's existing confirm mechanism, no change
+                 to that file) is rebuilt on every change so the employer always confirms an
+                 exact count and status - with stronger wording for Rejected, since a
+                 rejection, unlike every other status, cannot later be undone. -->
+            <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                <span class="me-auto"><i class="bi bi-check2-square me-2" aria-hidden="true"></i>Bulk status change</span>
+                <select class="form-select form-select-sm w-auto" name="newStatus" id="bulkNewStatus" required>
+                    <option value="">Choose a status</option>
+                    <option th:each="opt : ${bulkStatusOptions}" th:value="${opt.name}" th:text="${opt.label}">Status</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary" id="bulkApplyBtn" disabled
+                        data-confirm="Apply this status change to the selected applications? Rows this change is not legal for will be skipped and listed afterwards.">
+                    Apply to selected
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th><input type="checkbox" class="form-check-input" id="selectAllApplications" aria-label="Select all applications on this page"></th>
+                        <th>Reference</th>
+                        <th>Candidate</th>
+                        <th>Job</th>
+                        <th>Applied on</th>
+                        <th>Status</th>
+                        <th class="numeric">Unread</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <!-- Compact row: an initials chip stands in for a photo next to the candidate's
+                         name (same ".jp-avatar" hook the navbar uses for the signed-in user), the
+                         status pill always carries its own word (never colour alone), and the row
+                         ends with the one quick action this list offers - the full review happens
+                         on the application detail page. -->
+                    <tr th:each="a : ${page.content}"
+                        th:with="initials=${a.seeker.fullName != null and !a.seeker.fullName.isEmpty()} ? ${a.seeker.fullName.substring(0,1).toUpperCase()} : '?'">
+                        <td>
+                            <input type="checkbox" class="form-check-input" name="applicationIds" th:value="${a.id}"
+                                   th:attr="aria-label=|Select ${a.reference}|">
+                        </td>
+                        <td th:text="${a.reference}">APP-00001</td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="jp-avatar" aria-hidden="true" th:text="${initials}">C</span>
+                                <span>
+                                    <span th:text="${a.seeker.fullName}">Candidate name</span>
+                                    <span th:unless="${a.seeker.enabled}" class="badge text-bg-secondary ms-1">Account deactivated</span>
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <a th:href="@{/employer/jobs/{id}(id=${a.job.id})}" th:text="${a.job.title}">Job title</a>
+                        </td>
+                        <td th:text="${#temporals.format(a.appliedAt, 'dd MMM yyyy')}">16 Sep 2026</td>
+                        <td>
+                            <!-- fragments/status-badge has no "New" case of its own, so the E-D2 override
+                                 (Section 6.3: "Status badge ('New' for APPLIED)") is built here instead,
+                                 reusing the same app-applied colour class; every other status still goes
+                                 through the shared fragment (11.3 contract item 9). -->
+                            <span th:if="${a.status.name() == 'APPLIED'}" class="badge app-applied">New</span>
+                            <th:block th:unless="${a.status.name() == 'APPLIED'}">
+                                <span th:replace="~{fragments/status-badge :: application(${a.status}, 'EMPLOYER')}"></span>
+                            </th:block>
+                        </td>
+                        <td class="numeric">
+                            <span th:if="${unreadCounts.get(a.id) != null}" class="badge bg-danger"
+                                  th:text="${unreadCounts.get(a.id)}">1</span>
+                            <span th:unless="${unreadCounts.get(a.id) != null}" class="text-muted">-</span>
+                        </td>
+                        <td>
+                            <a th:href="@{/employer/applications/{id}(id=${a.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </form>
     </div>
 
     <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
 </main>
+
+<th:block th:fragment="scripts">
+    <script>
+        // Bulk status toolbar (new feature): progressive enhancement over forms.js's
+        // existing data-confirm handler (Section 7.1) - no change to that file. "Select
+        // all" only ever means "every row on THIS page" (bulk actions are not attempted
+        // across pages, matching the paging rule elsewhere, Section 7.9); the Apply
+        // button is disabled whenever nothing is checked or no status is chosen, and its
+        // data-confirm text is rebuilt on every change so the employer always confirms an
+        // exact row count and target status - with an extra sentence when the target is
+        // Rejected specifically, since (Section 5.6: "a mistaken rejection cannot be
+        // undone; the employer messages the candidate instead") that one status change,
+        // unlike every other, cannot later be revised.
+        (function () {
+            'use strict';
+            var selectAll = document.getElementById('selectAllApplications');
+            var statusSelect = document.getElementById('bulkNewStatus');
+            var applyBtn = document.getElementById('bulkApplyBtn');
+            if (!selectAll || !statusSelect || !applyBtn) {
+                return;
+            }
+
+            function rowBoxes() {
+                return document.querySelectorAll('input[name="applicationIds"]');
+            }
+
+            function refresh() {
+                var checked = document.querySelectorAll('input[name="applicationIds"]:checked').length;
+                applyBtn.disabled = checked === 0 || !statusSelect.value;
+                var chosen = statusSelect.options[statusSelect.selectedIndex];
+                var label = chosen ? chosen.text : 'the chosen status';
+                var message = 'Change ' + checked + ' selected application' + (checked === 1 ? '' : 's')
+                        + ' to "' + label + '"? Rows this is not a legal change for will be skipped and listed afterwards.';
+                if (statusSelect.value === 'REJECTED') {
+                    message += ' Rejecting an application cannot be undone.';
+                }
+                applyBtn.setAttribute('data-confirm', message);
+            }
+
+            selectAll.addEventListener('change', function () {
+                rowBoxes().forEach(function (box) {
+                    box.checked = selectAll.checked;
+                });
+                refresh();
+            });
+            rowBoxes().forEach(function (box) {
+                box.addEventListener('change', refresh);
+            });
+            statusSelect.addEventListener('change', refresh);
+        })();
+    </script>
+</th:block>
 </body>
 </html>

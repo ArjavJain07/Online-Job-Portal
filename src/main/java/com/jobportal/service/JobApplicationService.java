@@ -36,6 +36,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -193,6 +194,20 @@ public class JobApplicationService {
         return counts;
     }
 
+    // ---- CSV export (new feature: the E-D2 list, in full, as a file) ----
+
+    // Same ownership/filter resolution as listForEmployer above (jobId/status raw
+    // strings, Section 7.9 binding rule) and the SAME findForEmployer query - so an
+    // export can never show a row the paginated list itself would not - just unpaged and
+    // sorted the same "newest applied first" way, since the file must hold the WHOLE
+    // filtered list the employer is looking at, not only the one page on screen.
+    public List<JobApplication> exportForEmployer(Long employerId, String rawJobId, String rawStatus) {
+        Long jobId = ownJobIdOrNull(employerId, rawJobId);
+        Set<ApplicationStatus> statuses = statusesFor(normaliseStatus(rawStatus));
+        Pageable unpaged = Pageable.unpaged(Sort.by(Sort.Direction.DESC, "appliedAt"));
+        return jobApplicationRepository.findForEmployer(employerId, jobId, statuses, unpaged).getContent();
+    }
+
     // A jobId only ever narrows the list when it names one of the employer's OWN jobs
     // (Section 4.5): blank, non-numeric, unknown or another employer's job id is treated
     // as "no filter" instead of raising an error or, worse, leaking a wrong count.
@@ -323,6 +338,64 @@ public class JobApplicationService {
         recordStatusChange(application, newStatus, form.getNoteToCandidate(), employer,
                 ActivityType.APPLICATION_STATUS_CHANGED, description);
         return application;
+    }
+
+    // ---- Bulk status change (employer applications list, new feature) ----
+
+    // One employer action, many applications, but still exactly ONE place a status is
+    // ever allowed to move: this loops over changeStatus(id, employerId, form) itself
+    // rather than re-deriving canTransitionTo/recordStatusChange here, so the 14-of-49
+    // matrix (Section 5.6, ApplicationStatusTest) and the ApplicationStatusChange row it
+    // writes can never drift between the one-at-a-time page and this one.
+    //
+    // A mixed selection is applied wherever the matrix allows it and skipped wherever it
+    // does not, deliberately NOT all-or-nothing: REJECTED - the status a bulk action is
+    // most likely to target, since it is the only one legal from every active status
+    // (APPLIED, UNDER_REVIEW, SHORTLISTED and INTERVIEW all allow it) - is the exception,
+    // not the rule; a realistic multi-row selection almost always mixes current statuses,
+    // so failing the WHOLE batch because one row is already Hired or already Rejected
+    // would make "bulk" pointless for every target status except that one. Nothing is
+    // ever silently dropped either way: every id the caller sent comes back in exactly
+    // one of updated()/skipped(), which EmployerApplicationController turns into one
+    // flash message that names every skipped row and why.
+    @Transactional
+    public BulkStatusResult bulkChangeStatus(List<Long> applicationIds, Long employerId, ApplicationStatus newStatus) {
+        List<String> updated = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+
+        ApplicationStatusForm form = new ApplicationStatusForm();
+        form.setStatus(newStatus);
+        // No noteToCandidate: E-F2's optional note is a one-off aside to a single
+        // candidate and has no single meaning spread across a mixed batch; an employer
+        // who wants to say something candidate-specific still has the one-at-a-time page.
+
+        for (Long id : new LinkedHashSet<>(applicationIds)) { // de-duplicated, first occurrence kept
+            Optional<JobApplication> owned = jobApplicationRepository.findByIdAndJob_Employer_Id(id, employerId);
+            if (owned.isEmpty()) {
+                // Not this employer's application (wrong owner, or a stale/hand-crafted
+                // id) - the same ownership rule getForEmployer enforces one row at a time
+                // (Section 4.5), just reported instead of thrown so the rest of the batch
+                // still runs.
+                skipped.add("Application " + id + " (not found)");
+                continue;
+            }
+            String reference = owned.get().getReference();
+            try {
+                changeStatus(id, employerId, form);
+                updated.add(reference);
+            } catch (BusinessRuleException e) {
+                skipped.add(reference + " (currently " + owned.get().getStatus().getLabel() + ")");
+            }
+        }
+        return new BulkStatusResult(newStatus, updated, skipped);
+    }
+
+    // What EmployerApplicationController turns into the "N updated, M skipped" flash: the
+    // target status plus the reference of every application that moved and a short reason
+    // for every one that did not, in submission order. Deliberately not just a count: this
+    // feature's whole point is that the employer must end up understanding exactly what
+    // happened to their selection, so a skipped row has to be nameable, not just countable.
+    public record BulkStatusResult(ApplicationStatus newStatus, List<String> updated, List<String> skipped) {
     }
 
     // ---- Internal note (E-F2) ----
