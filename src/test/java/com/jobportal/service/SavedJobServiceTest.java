@@ -127,10 +127,31 @@ class SavedJobServiceTest {
         when(savedJobRepository.findBySeeker_IdOrderBySavedAtDesc(eq(42L), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(emptyPage);
 
-        service.list(42L, 2);
+        service.list(42L, "2");
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(savedJobRepository).findBySeeker_IdOrderBySavedAtDesc(eq(42L), captor.capture());
         assertThat(captor.getValue()).isEqualTo(PageRequest.of(2, 10));
+    }
+
+    // Same lenient binding every other paginated list in this app uses (Section 7.9): an
+    // absent, non-numeric or negative page is simply page 0, never a 400.
+    @Test
+    void listFallsBackToPageZeroForAnyUnparsableValue() {
+        SystemSettings settings = new SystemSettings();
+        settings.setPageSize(10);
+        when(settingsService.get()).thenReturn(settings);
+        Page<SavedJob> emptyPage = new PageImpl<>(java.util.List.of());
+        when(savedJobRepository.findBySeeker_IdOrderBySavedAtDesc(eq(42L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(emptyPage);
+
+        for (String badValue : new String[] {null, "", "abc", "-1"}) {
+            service.list(42L, badValue);
+        }
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(savedJobRepository, org.mockito.Mockito.times(4))
+                .findBySeeker_IdOrderBySavedAtDesc(eq(42L), captor.capture());
+        assertThat(captor.getAllValues()).allMatch(p -> p.getPageNumber() == 0);
     }
 }

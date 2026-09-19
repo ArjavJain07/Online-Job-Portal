@@ -207,7 +207,7 @@ public class SeekerJobController {
     @GetMapping("/seeker/saved-jobs")
     public String savedJobs(@RequestParam(required = false) String page, @AuthenticationPrincipal AppUserDetails me,
             Model model) {
-        Page<SavedJob> savedJobs = savedJobService.list(me.getId(), parsePage(page));
+        Page<SavedJob> savedJobs = savedJobService.list(me.getId(), page);
         model.addAttribute("page", savedJobs);
         return "seeker/saved-jobs";
     }
@@ -234,17 +234,5 @@ public class SeekerJobController {
         savedJobService.unsave(me.getId(), jobId);
         redirect.addFlashAttribute("success", "Job removed from your saved jobs.");
         return "redirect:" + SafeRedirects.backOrDashboard(request);
-    }
-
-    // Same lenient page-number parsing JobSearchService.parsePage uses (Section 7.9
-    // binding rule): an absent, non-numeric or negative value is simply page 0, never a
-    // 400.
-    private int parsePage(String raw) {
-        try {
-            int value = Integer.parseInt(raw);
-            return Math.max(value, 0);
-        } catch (NumberFormatException | NullPointerException e) {
-            return 0;
-        }
     }
 }

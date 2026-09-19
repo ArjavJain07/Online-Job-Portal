@@ -92,10 +92,22 @@ public class SavedJobService {
     }
 
     // "My saved jobs" (paginated like every other list of more-than-a-handful in this app,
-    // Section 7.9's pageSize setting), newest save first.
+    // Section 7.9's pageSize setting), newest save first. `rawPage` is a lenient, unparsed
+    // query parameter - the controller hands it straight through and the parsing happens
+    // here, the same split JobSearchService.search()/normalise() and
+    // JobApplicationService.applicationHistoryForSeeker() already use: an absent,
+    // non-numeric or negative value is simply page 0, never a 400.
     @Transactional(readOnly = true)
-    public Page<SavedJob> list(Long seekerId, int page) {
-        Pageable pageable = PageRequest.of(page, settingsService.get().getPageSize(), Sort.unsorted());
+    public Page<SavedJob> list(Long seekerId, String rawPage) {
+        Pageable pageable = PageRequest.of(parsePage(rawPage), settingsService.get().getPageSize(), Sort.unsorted());
         return savedJobRepository.findBySeeker_IdOrderBySavedAtDesc(seekerId, pageable);
+    }
+
+    private int parsePage(String rawPage) {
+        try {
+            return Math.max(Integer.parseInt(rawPage), 0);
+        } catch (NumberFormatException | NullPointerException e) {
+            return 0;
+        }
     }
 }

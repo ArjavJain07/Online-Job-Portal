@@ -259,6 +259,14 @@ public class JobAlertService {
         notificationService.notifyJobAlertDigest(user.getEmail(), user.getFullName(), List.copyOf(matchLines),
                 unsubscribeLink);
 
+        // The two lines right after the notify call, not later ones added by some future
+        // change to this method - the same "keep the gap as close to zero as possible"
+        // discipline NotificationService's own class comment asks every caller to follow.
+        // sendDueDigests() as a whole is still one @Transactional batch over every due
+        // subscription (mirroring JobSweepService.sweep()'s own single-transaction batch
+        // shape, Section 7.11), so a failure in some LATER subscriber's turn cannot roll
+        // this one's already-dispatched email and lastSentAt update back together - each
+        // subscription's own try/catch in the caller sees to that.
         subscription.setLastSentAt(now);
         jobAlertSubscriptionRepository.save(subscription);
         return true;

@@ -234,13 +234,15 @@ class JobAlertServiceTest {
     @Test
     void onlyJobsApprovedAfterLastSentAtCountAsNew() {
         User priya = seeker(42L, true);
-        LocalDateTime lastSentAt = NOW.minusDays(3);
+        // Due (>= the 7-day digest-frequency-days) but recent enough that one of the two
+        // mocked matches below was approved after it and the other before.
+        LocalDateTime lastSentAt = NOW.minusDays(10);
         JobAlertSubscription due = subscription(priya, true, lastSentAt);
         when(jobAlertSubscriptionRepository.findByEnabledTrue()).thenReturn(List.of(due));
 
         RecommendedJob freshlyPosted = new RecommendedJob(job("New Job", "Acme", NOW.minusDays(1)), 20, "Good match",
                 List.of("reason"));
-        RecommendedJob alreadySeen = new RecommendedJob(job("Old Job", "Acme", NOW.minusDays(5)), 15, "Good match",
+        RecommendedJob alreadySeen = new RecommendedJob(job("Old Job", "Acme", NOW.minusDays(15)), 15, "Good match",
                 List.of("reason"));
         when(recommendationService.recommend(42L, 20))
                 .thenReturn(new RecommendationResult(List.of(freshlyPosted, alreadySeen), false));
