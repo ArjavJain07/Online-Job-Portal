@@ -101,6 +101,56 @@ class InterviewSchedulingTest extends IntegrationTestBase {
                 .contains("A 45 minute technical discussion.");
     }
 
+    // The employer page's own branching, which decides whether the feature is reachable at
+    // all: the form appears exactly when the application is at the Interview stage, and the
+    // pipeline's own instruction appears when it is not. Worth a rendering test rather than
+    // trusting the POST tests above - a POST succeeds whether or not any page ever offered
+    // the form.
+    @Test
+    void schedulingFormAppearsOnlyOnceTheApplicationIsAtTheInterviewStage() throws Exception {
+        Long a1 = data.applicationId("priya@demo.local", "Java Developer"); // INTERVIEW
+        Long a2 = data.applicationId("rohan@demo.local", "Java Developer"); // SHORTLISTED
+
+        mockMvc.perform(get("/employer/applications/{id}", a1).with(user(acme())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Schedule an interview")))
+                .andExpect(content().string(containsString("/employer/applications/" + a1 + "/interview")))
+                // The zone the employer's typed time will be read in, said out loud next to
+                // the field rather than left to be discovered by the candidate.
+                .andExpect(content().string(containsString("Times are in Asia/Kolkata.")));
+
+        mockMvc.perform(get("/employer/applications/{id}", a2).with(user(acme())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Move this candidate to the Interview stage")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Times are in Asia/Kolkata."))));
+    }
+
+    // Once something is arranged the same card switches to "change it or call it off", with
+    // the form pre-filled from the stored row so a reschedule is an edit rather than a
+    // re-typing (which is how a joining link gets lost).
+    @Test
+    void scheduledInterviewSwitchesTheCardToRescheduleAndCancel() throws Exception {
+        Long a1 = data.applicationId("priya@demo.local", "Java Developer");
+        schedule(a1, FUTURE_DATE, FUTURE_TIME, "VIDEO", "https://meet.example.com/abc-defg-hij", null);
+
+        mockMvc.perform(get("/employer/applications/{id}", a1).with(user(acme())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Reschedule or update")))
+                .andExpect(content().string(containsString("/employer/applications/" + a1 + "/interview/reschedule")))
+                .andExpect(content().string(containsString("/employer/applications/" + a1 + "/interview/cancel")))
+                // The pre-filled values must be in the format the controls accept, not the
+                // locale's short style - see InterviewForm's @DateTimeFormat comment for
+                // the bug this pins down.
+                .andExpect(content().string(containsString("value=\"" + FUTURE_DATE + "\"")))
+                // "15:30:00", not "15:30": ISO.TIME prints seconds, and hh:mm:ss is a valid
+                // time string that <input type="time"> accepts and displays as 15:30 under
+                // the control's default one-minute step. Asserted as rendered rather than
+                // loosened to a prefix, so a future change to the format is a visible
+                // decision instead of a silent one.
+                .andExpect(content().string(containsString("value=\"15:30:00\"")))
+                .andExpect(content().string(containsString("https://meet.example.com/abc-defg-hij")));
+    }
+
     // The zone decision, asserted rather than described: the row stores the injected
     // Clock's zone (not the machine's), and the rendered time names it, so the employer and
     // the candidate cannot read the same digits as two different moments. Deliberately

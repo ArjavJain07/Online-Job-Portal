@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import org.springframework.format.annotation.DateTimeFormat;
 
 // The employer's "Schedule interview" form, and the identical "Reschedule / update" one
 // (interview scheduling feature). One form class for both actions because the employer is
@@ -32,10 +33,23 @@ import java.time.LocalTime;
 // BusinessRuleException, and its comment explains what the window is and why.
 public class InterviewForm {
 
+    // @DateTimeFormat on BOTH halves, which the rest of this project's date fields manage
+    // without - and they only get away with it because none of them is ever PRE-FILLED from
+    // a stored value in a way anyone has checked. Spring's default for java.time types
+    // parses ISO happily (which is why a POST of "2026-09-23" binds fine either way) but
+    // PRINTS with the locale's short style, so th:field renders value="9/23/26" - a string
+    // <input type="date"> does not accept, leaving the control blank. That is invisible
+    // until a form is redisplayed with data in it, which is exactly what the reschedule
+    // form does every time it opens: without these two annotations an employer moving an
+    // interview would be handed an empty date, an empty time, and no hint that the values
+    // were ever there. ISO.TIME rather than a "HH:mm" pattern so that a browser which
+    // submits seconds ("15:30:00") still binds.
     @NotNull(message = "Please choose an interview date.")
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate date;
 
     @NotNull(message = "Please choose an interview time.")
+    @DateTimeFormat(iso = DateTimeFormat.ISO.TIME)
     private LocalTime time;
 
     @NotNull(message = "Please choose how the interview will happen.")

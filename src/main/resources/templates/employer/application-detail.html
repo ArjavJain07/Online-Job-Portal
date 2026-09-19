@@ -209,10 +209,20 @@
                 <div class="card-header">Interview</div>
                 <div class="card-body">
 
-                    <!-- Nothing arranged and not at the stage yet: say what to do, rather
-                         than showing a form that every submission would refuse. -->
-                    <p th:if="${interviewState == 'NONE' and !atInterviewStage}" class="text-muted small mb-0">
+                    <!-- Nothing arranged and not at the stage: say what to do, rather than
+                         showing a form that every submission would refuse. The two cases
+                         are worded apart on purpose - an application still moving through
+                         the pipeline has an action available to it, whereas one that is
+                         already Hired, Not selected or Withdrawn has none, and telling its
+                         employer to "move this candidate to the Interview stage" would be
+                         advice the status matrix (Section 5.6) makes impossible to take. -->
+                    <p th:if="${interviewState == 'NONE' and !atInterviewStage and jobApplication.status.active}"
+                       class="text-muted small mb-0">
                         Move this candidate to the Interview stage to schedule an interview.
+                    </p>
+                    <p th:if="${interviewState == 'NONE' and !jobApplication.status.active}"
+                       class="text-muted small mb-0">
+                        No interview was scheduled for this application.
                     </p>
 
                     <div th:if="${interviewState != 'NONE'}"
