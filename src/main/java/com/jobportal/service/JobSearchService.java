@@ -2,6 +2,7 @@ package com.jobportal.service;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
+import com.jobportal.domain.JobView;
 import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.JobStatus;
 import com.jobportal.domain.enums.JobType;
@@ -13,6 +14,8 @@ import com.jobportal.exception.ResourceNotFoundException;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.JobSpecifications;
+import com.jobportal.repository.JobViewRepository;
+import com.jobportal.util.BotDetector;
 import com.jobportal.web.form.JobSearchCriteria;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
@@ -46,13 +49,15 @@ public class JobSearchService {
 
     private final JobRepository jobRepository;
     private final JobApplicationRepository jobApplicationRepository;
+    private final JobViewRepository jobViewRepository;
     private final SettingsService settingsService;
     private final Clock clock;
 
     public JobSearchService(JobRepository jobRepository, JobApplicationRepository jobApplicationRepository,
-            SettingsService settingsService, Clock clock) {
+            JobViewRepository jobViewRepository, SettingsService settingsService, Clock clock) {
         this.jobRepository = jobRepository;
         this.jobApplicationRepository = jobApplicationRepository;
+        this.jobViewRepository = jobViewRepository;
         this.settingsService = settingsService;
         this.clock = clock;
     }
@@ -231,8 +236,20 @@ public class JobSearchService {
     // Increments viewCount with one bulk update, only when the job is Live, the viewer is
     // not its own employer or an admin, and this session has not already counted a view of
     // this job (Section 3.5 rule 5: GET may only write view counts and read markers).
+    //
+    // Also records a JobView row (dated view analytics feature) for EmployerStatisticsService's
+    // "views over time" chart and view-to-application funnel - but only when userAgent also
+    // passes BotDetector's "looks human" check. viewCount itself is completely unchanged by
+    // that extra check: it still counts every session-deduplicated view exactly as it always
+    // has, so AC-P2-3 keeps holding. The two are allowed to diverge slightly (viewCount can
+    // run a little ahead of the JobView rows for the same job) because they answer different
+    // questions and nothing ever recomputes one from the other - see JobView's class comment.
+    // A dedicated JobView write path (rather than deriving it from viewCount's own bulk
+    // update) is what makes the extra bot check possible at all: a bulk UPDATE has nothing to
+    // gate per row, and gating the whole method on BotDetector would also suppress viewCount,
+    // which is deliberately not this method's job to change.
     @Transactional
-    public void recordView(Job job, HttpSession session, Long viewerId, Role viewerRole) {
+    public void recordView(Job job, HttpSession session, Long viewerId, Role viewerRole, String userAgent) {
         if (!job.isLive(LocalDate.now(clock))) {
             return;
         }
@@ -249,6 +266,12 @@ public class JobSearchService {
         }
         if (viewedJobIds.add(job.getId())) {
             jobRepository.incrementViewCount(job.getId());
+            if (!BotDetector.isLikelyNonHuman(userAgent)) {
+                JobView view = new JobView();
+                view.setJob(job);
+                view.setViewedAt(LocalDateTime.now(clock));
+                jobViewRepository.save(view);
+            }
         }
     }
 
