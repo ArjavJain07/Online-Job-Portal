@@ -2,10 +2,10 @@ package com.jobportal.service;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.SeekerProfile;
+import com.jobportal.domain.Skill;
 import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.WorkMode;
 import com.jobportal.dto.ScoreResult;
-import com.jobportal.util.SkillParser;
 import com.jobportal.util.TextMatcher;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -46,24 +46,38 @@ public final class RecommendationScorer {
     // nothing. A job qualifies to be recommended only through a skill match or category
     // affinity (signals 1-3 and 7) - freshness, location, job type and experience fit
     // can add points to an already-qualifying job, but never qualify one on their own.
+    //
+    // RULE 1 NOW COMPARES SKILL IDENTITY, NOT SPELLINGS (Section 10.8)
+    // It used to lower-case both skill lists and compare the strings, so a seeker's
+    // "Node.js" did not match a job's "Node JS" under rule 1 - even though Section 7.8's
+    // own case E7 says those are the same skill, and rule 3 duly matched them in the job's
+    // description text. The two sides now hold the same Skill rows, so rule 1 compares
+    // Skill.slug and that inconsistency is gone: anything rules 2-3 would recognise as the
+    // same phrase, rule 1 recognises as the same skill.
+    //
+    // This does not move any existing score. Rule 1 was already exact equality (a Set
+    // lookup, not a substring test), so it only ever gains matches that previously fell
+    // through to rule 2 or rule 3, and only for spelling variants of a skill the job
+    // genuinely lists. For every skill pair in the seed data and in cases E1-E7 the two
+    // rules agree, which is why those expectations are unchanged.
     public static ScoreResult score(SeekerProfile profile, Set<JobCategory> pastCategories, Job job, LocalDate today) {
         int total = 0;
         boolean qualified = false;
         List<String> reasons = new ArrayList<>();
 
         List<String> matchedSkills = new ArrayList<>();
-        Set<String> jobSkillsLower = toLowerCaseSet(job.skillList());
+        Set<String> jobSkillSlugs = slugs(job.getSkills());
         String descriptionAndRequirements = safe(job.getDescription()) + " " + safe(job.getRequirements());
-        for (String skill : parseSkillList(profile.getSkills())) {
-            if (jobSkillsLower.contains(skill.toLowerCase(Locale.ROOT))) {
+        for (Skill skill : profile.getSkills()) {
+            if (jobSkillSlugs.contains(skill.getSlug())) {
                 total += SKILL_IN_JOB_SKILLS_POINTS;
-                matchedSkills.add(skill);
-            } else if (TextMatcher.containsPhrase(job.getTitle(), skill)) {
+                matchedSkills.add(skill.getLabel());
+            } else if (TextMatcher.containsPhrase(job.getTitle(), skill.getLabel())) {
                 total += SKILL_IN_TITLE_POINTS;
-                matchedSkills.add(skill);
-            } else if (TextMatcher.containsPhrase(descriptionAndRequirements, skill)) {
+                matchedSkills.add(skill.getLabel());
+            } else if (TextMatcher.containsPhrase(descriptionAndRequirements, skill.getLabel())) {
                 total += SKILL_IN_DESCRIPTION_POINTS;
-                matchedSkills.add(skill);
+                matchedSkills.add(skill.getLabel());
             }
         }
         if (!matchedSkills.isEmpty()) {
@@ -114,29 +128,10 @@ public final class RecommendationScorer {
         return new ScoreResult(total, qualified, reasons);
     }
 
-    private static Set<String> toLowerCaseSet(List<String> skills) {
-        Set<String> lower = new LinkedHashSet<>();
-        for (String skill : skills) {
-            lower.add(skill.toLowerCase(Locale.ROOT));
-        }
-        return lower;
-    }
-
-    // The seeker's skills, normalised the same way Job.skillList() reads the stored,
-    // already-normalised CSV (SkillParser.parse trims, dedupes and joins with ", ";
-    // splitting on "," and trimming each part recovers the list without assuming no
-    // skill itself contains that exact separator).
-    private static List<String> parseSkillList(String csv) {
-        List<String> result = new ArrayList<>();
-        String normalised = SkillParser.parse(csv);
-        if (normalised.isBlank()) {
-            return result;
-        }
-        for (String part : normalised.split(",")) {
-            String trimmed = part.trim();
-            if (!trimmed.isEmpty()) {
-                result.add(trimmed);
-            }
+    private static Set<String> slugs(List<Skill> skills) {
+        Set<String> result = new LinkedHashSet<>();
+        for (Skill skill : skills) {
+            result.add(skill.getSlug());
         }
         return result;
     }

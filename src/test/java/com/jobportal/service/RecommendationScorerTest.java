@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.SeekerProfile;
+import com.jobportal.domain.Skill;
 import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.JobType;
 import com.jobportal.domain.enums.WorkMode;
 import com.jobportal.dto.ScoreResult;
+import com.jobportal.util.SkillParser;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -28,18 +32,30 @@ class RecommendationScorerTest {
     // years' experience, prefers FULL_TIME, no past categories.
     private SeekerProfile defaultSeeker() {
         SeekerProfile profile = new SeekerProfile();
-        profile.setSkills("Java, Spring Boot");
+        profile.assignSkills(skills("Java, Spring Boot"));
         profile.setLocation("Pune");
         profile.setExperienceYears(2);
         profile.setPreferredJobType(JobType.FULL_TIME);
         return profile;
     }
 
+    // Skill rows built in memory, never saved: RecommendationScorer has no Spring
+    // dependencies (Section 12.2) and compares Skill.slug, which Skill.of fills in
+    // without a database. Exactly what SkillService would produce for the same text,
+    // because both go through SkillParser.
+    private List<Skill> skills(String csv) {
+        List<Skill> result = new ArrayList<>();
+        for (String label : SkillParser.labels(csv)) {
+            result.add(Skill.of(label));
+        }
+        return result;
+    }
+
     private Job job(String title, String skills, String location, WorkMode workMode, JobType jobType,
             int minExperienceYears, JobCategory category, LocalDate approvedDate) {
         Job job = new Job();
         job.setTitle(title);
-        job.setSkills(skills);
+        job.assignSkills(skills(skills));
         job.setLocation(location);
         job.setWorkMode(workMode);
         job.setJobType(jobType);
@@ -136,7 +152,7 @@ class RecommendationScorerTest {
     @Test
     void e6ShortSkillDoesNotMatchAsSubstring() {
         SeekerProfile seeker = new SeekerProfile();
-        seeker.setSkills("C");
+        seeker.assignSkills(skills("C"));
         seeker.setExperienceYears(0); // no location, no preferred type
 
         Job job = job("Clerk", "", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1, JobCategory.OTHER, null);
@@ -154,7 +170,7 @@ class RecommendationScorerTest {
     @Test
     void e7SkillMatchesDescriptionAsNodeJs() {
         SeekerProfile seeker = new SeekerProfile();
-        seeker.setSkills("Node.js");
+        seeker.assignSkills(skills("Node.js"));
         seeker.setExperienceYears(0);
 
         Job job = job("Backend Developer", "", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1, JobCategory.OTHER,

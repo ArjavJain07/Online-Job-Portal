@@ -244,7 +244,7 @@ class JobSweepServiceTest extends IntegrationTestBase {
         job.setTitle(title);
         job.setDescription("A throwaway job used only by JobSweepServiceTest.");
         job.setRequirements("None.");
-        job.setSkills("Java");
+        job.assignSkills(data.skills("Java"));
         job.setCategory(JobCategory.SOFTWARE_DEVELOPMENT);
         job.setJobType(JobType.FULL_TIME);
         job.setWorkMode(WorkMode.ONSITE);

@@ -97,7 +97,8 @@ class JobViewRepositoryTest {
         job.setTitle(title);
         job.setDescription("Backend role.");
         job.setRequirements("Some experience.");
-        job.setSkills("Java, Spring Boot");
+        // No skills: this fixture never exercises them, and since Section 10.8 a job
+        // with an empty skill list is perfectly valid to save.
         job.setCategory(JobCategory.SOFTWARE_DEVELOPMENT);
         job.setJobType(JobType.FULL_TIME);
         job.setWorkMode(WorkMode.ONSITE);

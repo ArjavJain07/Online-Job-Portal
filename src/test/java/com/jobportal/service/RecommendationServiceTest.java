@@ -122,7 +122,7 @@ class RecommendationServiceTest extends IntegrationTestBase {
         job.setTitle(title);
         job.setDescription("A throwaway job used only to test recommendation tie-breaking.");
         job.setRequirements("None.");
-        job.setSkills("Java");
+        job.assignSkills(data.skills("Java"));
         job.setCategory(JobCategory.SOFTWARE_DEVELOPMENT); // one of Priya's past categories
         job.setJobType(JobType.FULL_TIME); // Priya's preferred type
         job.setWorkMode(WorkMode.ONSITE);

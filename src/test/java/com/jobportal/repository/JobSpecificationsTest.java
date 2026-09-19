@@ -92,7 +92,7 @@ class JobSpecificationsTest extends IntegrationTestBase {
         job.setTitle("50% Off_Sale Associate");
         job.setDescription("Seasonal sales role.");
         job.setRequirements("Retail experience preferred.");
-        job.setSkills("Sales");
+        job.assignSkills(data.skills("Sales"));
         job.setCategory(JobCategory.SALES);
         job.setJobType(JobType.CONTRACT);
         job.setWorkMode(WorkMode.ONSITE);

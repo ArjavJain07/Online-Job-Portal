@@ -20,6 +20,10 @@ public record NormalisedCriteria(
         Integer minSalary,
         Integer maxExperience,
         Integer postedWithin,
+        // The canonical slug of the selected skill facet, or null for "any skill"
+        // (Section 10.8). A slug nobody has ever used is dropped like any other
+        // unparsable filter, so a stale bookmark shows every job rather than none.
+        String skill,
         String sort,
         int page,
         List<String> warnings) {
