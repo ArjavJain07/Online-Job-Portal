@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!--
+  Public companies index page (Section 6.1 P-3 A-D6): a paginated list of employers that
+  currently have at least one visible job, sorted by the most recent job posting across
+  all their jobs. Each employer card shows their company name, description, the count of
+  visible jobs, and a link to their company detail page.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Browse Companies', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <p class="mb-3">
+        <a th:href="@{/}" class="text-decoration-none">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to home
+        </a>
+    </p>
+
+    <h1 class="h3 mb-4">Browse Companies</h1>
+
+    <div th:if="${employers.isEmpty()}" class="alert alert-info">
+        <p class="mb-0">No companies are currently hiring. Check back soon!</p>
+    </div>
+
+    <div th:if="${!employers.isEmpty()}" class="row g-3">
+        <div class="col-md-6 col-lg-4" th:each="employer : ${employers}">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <!-- Company logo initial -->
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="jp-logo" aria-hidden="true"
+                              th:text="${employer.companyName.substring(0,1).toUpperCase()}">C</span>
+                        <div class="flex-grow-1 ms-3">
+                            <h2 class="h5 mb-1">
+                                <a th:href="@{/companies/{id}(id=${employer.id})}"
+                                   th:text="${employer.companyName}"
+                                   class="text-decoration-none">Company Name</a>
+                            </h2>
+                        </div>
+                    </div>
+
+                    <!-- Company description -->
+                    <p class="text-muted small mb-3 flex-grow-1"
+                       th:text="${#strings.isEmpty(employer.companyDescription)} ? 'No description available.' : employer.companyDescription">
+                        Company description
+                    </p>
+
+                    <!-- Company website -->
+                    <p class="mb-3" th:if="${!#strings.isEmpty(employer.companyWebsite)}">
+                        <a th:href="${employer.companyWebsite}" th:text="${employer.companyWebsite}"
+                           target="_blank" rel="noopener" class="small">https://example.com</a>
+                    </p>
+
+                    <!-- View company link -->
+                    <a th:href="@{/companies/{id}(id=${employer.id})}" class="btn btn-sm btn-outline-primary mt-auto">
+                        View Company
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

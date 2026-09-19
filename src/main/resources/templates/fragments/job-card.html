@@ -44,7 +44,10 @@
                 <span class="badge app-applied" th:if="${applied}">Applied</span>
             </div>
 
-            <p class="job-company mb-0" th:text="${job.employer.companyName}">Company</p>
+            <p class="job-company mb-0">
+                <a th:href="@{/companies/{id}(id=${job.employer.id})}" th:text="${job.employer.companyName}"
+                   class="text-decoration-none">Company</a>
+            </p>
             <p class="job-meta mb-2" th:text="${job.location}">Location</p>
 
             <p class="job-salary mb-2" th:text="${@fmt.salaryRange(job)}">INR 6,00,000 - 9,00,000 per year</p>

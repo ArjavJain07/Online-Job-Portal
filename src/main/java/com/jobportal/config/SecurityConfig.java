@@ -54,7 +54,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-                        .requestMatchers("/", "/jobs", "/jobs/*", "/login", "/register", "/register/**", "/error")
+                        .requestMatchers("/", "/jobs", "/jobs/*", "/companies", "/companies/*", "/login", "/register", "/register/**", "/error")
                         .permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/employer/**").hasRole("EMPLOYER")
