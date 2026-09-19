@@ -75,6 +75,9 @@ public class SeekerJobController {
         model.addAttribute("warning", firstWarningOrNull(result));
         // Section 10.8: the "Java (24)" chips fragments/job-filters renders.
         model.addAttribute("skillFacets", result.skillFacets());
+        // Section 10.9: the same "Matched in ..." map JobBrowseController adds, read by the
+        // shared fragments/job-card. Empty when the search had no keyword.
+        model.addAttribute("matchReasons", result.matchReasons());
         model.addAttribute("rows", jobApplicationService.withAppliedFlags(result.jobs().getContent(), me.getId()));
 
         Job selectedJob = jobSearchService.selectForPane(result.jobs().getContent(), jobId);

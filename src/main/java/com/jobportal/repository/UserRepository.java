@@ -39,6 +39,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
             + "     or lower(u.companyName) like concat('%', cast(:q as String), '%'))")
     Page<User> search(@Param("q") String q, @Param("role") Role role, @Param("enabled") Boolean enabled, Pageable pageable);
 
+    // Employers whose company name predates the search index (Section 10.9, V7), rebuilt
+    // once at start-up by SearchIndexService.
+    //
+    // Both halves of the predicate are needed and neither is redundant: searchCompanyName
+    // is NULL both for "never indexed" and for "this user is not an employer and has no
+    // company name at all", and the overwhelming majority of rows are the second. Asking
+    // for the ones that have a name but no index is the exact question, so the backfill
+    // never loads every job seeker in the database to decide it has nothing to do.
+    @Query("select u from User u where u.companyName is not null and u.searchCompanyName is null")
+    List<User> findNeedingSearchIndex();
+
     @Query("select u.createdAt from User u where u.createdAt >= :from")
     List<LocalDateTime> findCreatedAtSince(@Param("from") LocalDateTime from);
 

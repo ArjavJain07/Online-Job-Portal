@@ -34,6 +34,18 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     // Used by the delete/role-change dependency checks of Section 5.8.
     long countByEmployer_Id(Long employerId);
 
+    // Jobs still carrying V7's "never indexed" placeholder in either search column
+    // (Section 10.9): rows that existed before the search index did, which
+    // SearchIndexService rebuilds once at start-up.
+    //
+    // The empty string is the sentinel rather than NULL because both columns are NOT NULL -
+    // see domain.Job for why a job with no index must fail at the INSERT instead of quietly
+    // becoming unfindable. A real index is never empty (SearchIndex.of always returns at
+    // least its two padding spaces), so this finder cannot keep matching a row it has
+    // already fixed.
+    @Query("select j from Job j where j.searchTitle = '' or j.searchDescription = ''")
+    List<Job> findNeedingSearchIndex();
+
     @Query("select j.createdAt from Job j where j.createdAt >= :from")
     List<LocalDateTime> findCreatedAtSince(@Param("from") LocalDateTime from);
 

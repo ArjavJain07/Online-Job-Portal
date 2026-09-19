@@ -7,16 +7,20 @@ import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.JobStatus;
 import com.jobportal.domain.enums.JobType;
 import com.jobportal.domain.enums.WorkMode;
+import com.jobportal.util.SearchIndex;
 import com.jobportal.util.SkillParser;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -38,30 +42,143 @@ public final class JobSpecifications {
                 cb.isTrue(root.get("employer").get("enabled")));
     }
 
-    // Title, description or company name contains the text, OR one of the job's skills
-    // matches it as a whole word (Section 7.9, 10.8).
+    // ---- Keyword search and relevance (Section 7.9, 10.8, 10.9) ----
+
+    // How much each place a typed phrase can be found is worth to a job's relevance score.
+    // Public and named because "why did this job come first" has to be answerable from
+    // outside this class: JobSearchService.matchReasons quotes the same four places back
+    // to the visitor, and JobSearchRelevanceTest pins the ordering these numbers produce.
     //
-    // WHY THE SKILLS HALF IS NO LONGER A LIKE '%text%'
-    // It used to be a fourth `like` over the jobs.skills CSV column, which is where
-    // searching "Java" started returning every "JavaScript" job: `%java%` matches
-    // "JavaScript" inside the stored text and there is no way to tell the two apart in a
-    // CSV. Skills are now rows, so this asks the right question instead - "does this job
-    // list a skill in which the typed text appears as a whole token" - using exactly the
-    // rule TextMatcher.containsPhrase uses on free text. "java" therefore matches the
-    // skill "Java" but not "JavaScript", while "spring" still matches "Spring Boot"
-    // (word boundary, not string equality), which is what a search box has to do.
+    // The numbers are chosen so that ONE higher place always beats ANY combination of
+    // lower ones (100 > 60 + 30 + 10), which is what makes the ranking explainable rather
+    // than merely plausible: a job is ahead of another because of the single best place its
+    // phrase was found, and the lower matches only break ties between jobs whose best place
+    // is the same. A job titled "Java Developer" is therefore always above a job that
+    // merely mentions Java in its description, whatever else the second job matches.
+    public static final int TITLE_WEIGHT = 100;
+    public static final int SKILL_WEIGHT = 60;
+    public static final int COMPANY_WEIGHT = 30;
+    public static final int DESCRIPTION_WEIGHT = 10;
+
+    // The job's title, description or company name contains the typed phrase as whole
+    // words, OR one of its skills does (Section 7.9, 10.8, 10.9).
     //
-    // Title, description and company name keep their `like '%text%'`. That is not an
-    // oversight: those are prose, and a substring search over prose is what a visitor
-    // typing half a word expects. Only the skills column was claiming a precision it
-    // could not deliver.
+    // WHY THERE IS NO LONGER A LIKE '%text%' ANYWHERE IN HERE
+    // The skills half stopped being a substring search in Section 10.8, when skills became
+    // rows: `%java%` matches "JavaScript" inside stored text and no amount of care can tell
+    // the two apart, so it now asks "does this job list a skill in which the typed text
+    // appears as a whole token" against Skill.slug. That half is unchanged below, weights
+    // and all - it was right.
+    //
+    // What 10.8 left behind, and 10.9 finishes, is the other three. They kept
+    // `like '%text%'` on the argument that they are prose and a visitor typing half a word
+    // expects a substring match. That argument does not survive contact with the site: the
+    // seeded Frontend Developer job lists HTML, CSS, JavaScript and React and no Java at
+    // all, and searching "java" returned it anyway, because its description says
+    // "interfaces with HTML, CSS and JavaScript". The skills half excluded it correctly and
+    // the prose LIKE dragged it back in, so the precision 10.8 bought was worth nothing to
+    // anybody actually using the search box.
+    //
+    // The two behaviours cannot both be had. "java matches part of a word" and "java does
+    // not match javascript" are the same rule read twice, so choosing precision costs the
+    // prefix match: searching "develop" no longer finds "Developer". That is the accepted
+    // trade (Section 10.9), and it buys one definition of matching across the entire
+    // application instead of two that disagree - the skills branch, these three prose
+    // columns, RecommendationScorer's rules 2 and 3, and the "why did this appear" line on
+    // each result card now all mean the same thing by "matches".
+    //
+    // The prose columns are matched against the persisted index V7 added rather than
+    // against the text itself: search_title holds SearchIndex.of(title), and the pattern is
+    // SearchIndex.phrasePattern(text). See SearchIndex for why the padding is stored rather
+    // than assembled in SQL, and why no LIKE escaping is needed on these three (it is still
+    // needed, and still applied, by locationContains below, which really is a substring
+    // search over raw text).
+    //
+    // A phrase that normalises to nothing - the visitor typed only punctuation, "%" or
+    // "---" - matches NO job rather than every job. That is the same answer
+    // TextMatcher.containsPhrase gives for an empty phrase and the same answer the skills
+    // branch has always given, and it is the safe one: the alternative is a stray keystroke
+    // silently turning a filtered search into an unfiltered one.
     public static Specification<Job> keyword(String text) {
-        String pattern = likePattern(text);
-        return (root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("title")), pattern, '\\'),
-                skillPhraseMatches(root, query, cb, text),
-                cb.like(cb.lower(root.get("description")), pattern, '\\'),
-                cb.like(cb.lower(root.get("employer").get("companyName")), pattern, '\\'));
+        String pattern = SearchIndex.phrasePattern(text);
+        return (root, query, cb) -> {
+            if (pattern == null) {
+                return cb.disjunction();
+            }
+            return cb.or(
+                    cb.like(root.get("searchTitle"), pattern),
+                    skillPhraseMatches(root, query, cb, text),
+                    cb.like(root.get("employer").get("searchCompanyName"), pattern),
+                    cb.like(root.get("searchDescription"), pattern));
+        };
+    }
+
+    // Orders a keyword search by how well each job matches, best first (Section 10.9).
+    //
+    // WHY THIS IS A Specification AND NOT A Sort
+    // Spring Data's Sort can only name mapped properties, and relevance is not one - it is
+    // a function of the row AND of what was typed, so it cannot be stored. Handing
+    // `findAll(spec, pageable)` a Pageable with Sort.unsorted() and setting the order from
+    // inside a Specification is the supported way round that, not a trick: Spring Data's
+    // own SimpleJpaRepository.getCountQuery clears the order list with the comment "Remove
+    // all Orders the Specifications might have applied", which only makes sense if
+    // Specifications are expected to apply them. The count query beside the page is
+    // therefore unaffected, and so is JobSkillFacetsImpl, which sets its own order after
+    // calling toPredicate - but this Specification is only ever chained onto the final
+    // paged query anyway (JobSearchService.search), never onto the one the facet counts are
+    // built from.
+    //
+    // WHY IT IS STABLE
+    // Three keys, and the last one is unique: score descending, then approvedAt descending
+    // (the existing "newest" order, so equally relevant jobs stay in the order the rest of
+    // the site would have shown them), then id descending. No two rows can tie on all
+    // three, so page 2 cannot repeat or drop a job that page 1 already showed - which is
+    // the failure a two-key relevance sort produces on the day two jobs are approved in the
+    // same second.
+    //
+    // A phrase that normalises to nothing leaves the score out of the order entirely rather
+    // than ordering by a constant. That is not only tidier: `order by 0 desc` is a positional
+    // reference on PostgreSQL ("ORDER BY position 0 is not in select list"), so emitting a
+    // bare literal here would be a query that runs on H2 and fails in production - exactly
+    // the shape of bug this whole section is about. keyword() returns no rows for such a
+    // phrase, so there is nothing to rank anyway.
+    public static Specification<Job> relevanceOrder(String text) {
+        return (root, query, cb) -> {
+            List<Order> order = new ArrayList<>();
+            if (SearchIndex.phrasePattern(text) != null) {
+                order.add(cb.desc(relevanceScore(root, query, cb, text)));
+            }
+            order.add(cb.desc(root.get("approvedAt")));
+            order.add(cb.desc(root.get("id")));
+            query.orderBy(order);
+            return cb.conjunction();
+        };
+    }
+
+    // The score itself: one CASE per place the phrase can be found, added together. Plain
+    // SQL:2003 that H2 and PostgreSQL 14 spell and evaluate identically - which is the
+    // whole reason the ranking is arithmetic over CASE expressions rather than ts_rank over
+    // a tsvector (Section 10.9). Every value in it is either a column, a varchar parameter
+    // built in Java, or an integer literal inside a CASE; nothing is concatenated, cast or
+    // assembled by the database.
+    //
+    // The four predicates are rebuilt here rather than shared with keyword()'s: they are
+    // cheap, and a Criteria node that appears in both the WHERE clause and the ORDER BY of
+    // one query is a thing to be sure about rather than to assume.
+    private static Expression<Integer> relevanceScore(Root<Job> root, CriteriaQuery<?> query, CriteriaBuilder cb,
+            String text) {
+        String pattern = SearchIndex.phrasePattern(text);
+        Expression<Integer> title = weighted(cb, cb.like(root.get("searchTitle"), pattern), TITLE_WEIGHT);
+        Expression<Integer> skills = weighted(cb, skillPhraseMatches(root, query, cb, text), SKILL_WEIGHT);
+        Expression<Integer> company = weighted(cb,
+                cb.like(root.get("employer").get("searchCompanyName"), pattern), COMPANY_WEIGHT);
+        Expression<Integer> description = weighted(cb,
+                cb.like(root.get("searchDescription"), pattern), DESCRIPTION_WEIGHT);
+        return cb.sum(cb.sum(title, skills), cb.sum(company, description));
+    }
+
+    private static Expression<Integer> weighted(CriteriaBuilder cb, Predicate matches, int weight) {
+        return cb.<Integer>selectCase().when(matches, weight).otherwise(0);
     }
 
     // "One of this job's skills contains the text as a whole token." Expressed as four
@@ -189,6 +306,11 @@ public final class JobSpecifications {
 
     // Lower-cases, escapes LIKE metacharacters (\, %, _) and wraps the text in %...% so
     // it can be passed straight to cb.like(..., pattern, '\\').
+    //
+    // Still the right tool for the two searches that are deliberately substring searches
+    // over raw text - locationContains ("pun" should find "Pune") and the admin jobs list's
+    // titleOrCompanyContains - and no longer used by keyword(), which since Section 10.9
+    // matches whole words against the V7 index with SearchIndex.phrasePattern instead.
     private static String likePattern(String text) {
         return "%" + escapeLikeMetacharacters(text.toLowerCase(Locale.ROOT)) + "%";
     }

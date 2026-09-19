@@ -19,6 +19,7 @@ import com.jobportal.repository.JobSkillFacets;
 import com.jobportal.repository.JobSpecifications;
 import com.jobportal.repository.JobViewRepository;
 import com.jobportal.util.BotDetector;
+import com.jobportal.util.TextMatcher;
 import com.jobportal.web.form.JobSearchCriteria;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
@@ -26,7 +27,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.domain.Page;
@@ -49,6 +52,13 @@ public class JobSearchService {
     private static final Set<Integer> POSTED_WITHIN_OPTIONS = Set.of(1, 7, 30);
     private static final int MAX_SALARY = 100_000_000;
     private static final int TEXT_FILTER_MAX_LENGTH = 100;
+
+    // The sort key that means "best match first" (Section 10.9). A constant because three
+    // places have to agree on the exact string - normalise() decides it, search() branches
+    // on it, and fragments/job-filters renders it as an <option value> - and a typo in any
+    // one of them would quietly restore date ordering with the dropdown still saying
+    // "Relevance".
+    static final String RELEVANCE_SORT = "relevance";
 
     // How many skill chips the filter panel shows (Section 10.8). Twelve fits the panel
     // without scrolling and is long enough that the useful skills are in it; the point of
@@ -116,9 +126,92 @@ public class JobSearchService {
         if (criteria.skill() != null) {
             spec = spec.and(JobSpecifications.hasSkill(criteria.skill()));
         }
-        Pageable pageable = PageRequest.of(criteria.page(), settingsService.get().getPageSize(), sortFor(criteria.sort()));
+
+        // Relevance (Section 10.9) cannot be a Sort, because it is not a property of a job
+        // - it depends on what was typed. JobSpecifications.relevanceOrder sets the order
+        // on the query itself, so the Pageable must be handed over UNSORTED or Spring Data
+        // would overwrite it with an empty Sort's orders. Every other sort is unchanged.
+        int pageSize = settingsService.get().getPageSize();
+        Pageable pageable;
+        if (RELEVANCE_SORT.equals(criteria.sort())) {
+            spec = spec.and(JobSpecifications.relevanceOrder(criteria.q()));
+            pageable = PageRequest.of(criteria.page(), pageSize);
+        } else {
+            pageable = PageRequest.of(criteria.page(), pageSize, sortFor(criteria.sort()));
+        }
+
         Page<Job> jobs = jobRepository.findAll(spec, pageable);
-        return new JobSearchResult(jobs, criteria, criteria.warnings(), facets);
+        return new JobSearchResult(jobs, criteria, criteria.warnings(), facets,
+                matchReasons(jobs.getContent(), criteria.q()));
+    }
+
+    // "Matched in title and skills", per job on the page just fetched (Section 10.9).
+    //
+    // WHY THIS IS SAFE TO COMPUTE IN JAVA, SEPARATELY FROM THE QUERY
+    // Because it is not a separate rule. Each line below is TextMatcher.containsPhrase,
+    // and containsPhrase is `SearchIndex.of(text).contains(" " + normalise(phrase) + " ")`
+    // - the same two strings the database was handed, one as the stored column and one as
+    // the LIKE pattern. A job can therefore never appear with no reason given, and a reason
+    // can never name a place the query did not actually match; the alternative, returning
+    // the score from SQL, would have meant a second query shape and a tuple result for
+    // information the page already has in memory.
+    //
+    // The order the places are listed in is the ranking order (title, skills, company,
+    // description - JobSpecifications' weights), so the first place named is always the one
+    // that decided where the job came. That is the whole of "explainable": a visitor can
+    // read why this job is above that one without anybody having to open the SQL.
+    //
+    // Only the jobs on the current page are examined, so this is bounded by the page size
+    // however many jobs matched. job.getSkills() is lazy, but @BatchSize(50) on that
+    // collection turns a page's worth of lists into one extra query (Section 10.8).
+    private Map<Long, String> matchReasons(List<Job> jobs, String q) {
+        if (q == null) {
+            return Map.of();
+        }
+        Map<Long, String> reasons = new LinkedHashMap<>();
+        for (Job job : jobs) {
+            List<String> places = new ArrayList<>();
+            if (TextMatcher.containsPhrase(job.getTitle(), q)) {
+                places.add("title");
+            }
+            if (matchesAnySkill(job, q)) {
+                places.add("skills");
+            }
+            if (TextMatcher.containsPhrase(job.getEmployer().getCompanyName(), q)) {
+                places.add("company name");
+            }
+            if (TextMatcher.containsPhrase(job.getDescription(), q)) {
+                places.add("description");
+            }
+            if (!places.isEmpty()) {
+                reasons.put(job.getId(), "Matched in " + listOfPlaces(places));
+            }
+        }
+        return Map.copyOf(reasons);
+    }
+
+    // The Java twin of JobSpecifications.skillPhraseMatches. Its four LIKE patterns over
+    // Skill.slug ask "is the typed token a whole word of this slug", and since a slug is
+    // already normalised, containsPhrase(slug, q) is that same question - " spring boot "
+    // contains " spring ". Neither side can drift because neither side owns the rule.
+    private boolean matchesAnySkill(Job job, String q) {
+        for (Skill skill : job.getSkills()) {
+            if (TextMatcher.containsPhrase(skill.getSlug(), q)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // "title", "title and skills", "title, skills and description" - the ordinary English
+    // list the card renders. Built here rather than in the template because Section 7.1's
+    // rule is that templates do no logic.
+    private String listOfPlaces(List<String> places) {
+        if (places.size() == 1) {
+            return places.get(0);
+        }
+        String head = String.join(", ", places.subList(0, places.size() - 1));
+        return head + " and " + places.get(places.size() - 1);
     }
 
     // The facet list for one search. The selected skill is always included even if it
@@ -144,7 +237,8 @@ public class JobSearchService {
     }
 
     // Whitelisted sort options only (Section 7.9): user input is never passed straight to
-    // Sort.by(...).
+    // Sort.by(...). "relevance" is deliberately absent - it is not a Sort at all, it is
+    // JobSpecifications.relevanceOrder, and search() above branches before reaching here.
     private Sort sortFor(String sort) {
         return switch (sort) {
             case "salary" -> Sort.by(Sort.Order.desc("salaryMax"), Sort.Order.desc("id"));
@@ -168,7 +262,7 @@ public class JobSearchService {
         Integer maxExperience = parseFromOptions(raw.getMaxExperience(), EXPERIENCE_OPTIONS);
         Integer postedWithin = parseFromOptions(raw.getPostedWithin(), POSTED_WITHIN_OPTIONS);
         String skill = parseSkill(raw.getSkill());
-        String sort = parseSort(raw.getSort());
+        String sort = parseSort(raw.getSort(), q);
         int page = parsePage(raw.getPage());
         return new NormalisedCriteria(q, location, category, jobType, workMode, minSalary, maxExperience,
                 postedWithin, skill, sort, page, warnings);
@@ -233,11 +327,27 @@ public class JobSearchService {
         }
     }
 
-    private String parseSort(String raw) {
+    // The sort whitelist, and the one place that decides what "no sort was asked for"
+    // means (Section 10.9).
+    //
+    // A keyword search with no explicit sort is ordered by relevance, because date order is
+    // an answer to a question nobody asked: someone who typed "java" wants the best java
+    // jobs, not the newest of everything that mentions java. With no keyword there is
+    // nothing to be relevant TO, so the default stays "newest" exactly as it was - which is
+    // why every existing test that does not pass q is unaffected.
+    //
+    // "relevance" asked for explicitly without a keyword falls back to "newest" for the
+    // same reason, rather than being rejected: it arrives from a URL a person can edit, and
+    // Section 7.9's binding rule is that a filter that cannot be honoured is dropped, never
+    // turned into an error page.
+    private String parseSort(String raw, String q) {
         if ("salary".equals(raw) || "deadline".equals(raw)) {
             return raw;
         }
-        return "newest";
+        if (q == null || "newest".equals(raw)) {
+            return "newest";
+        }
+        return RELEVANCE_SORT;
     }
 
     private int parsePage(String raw) {

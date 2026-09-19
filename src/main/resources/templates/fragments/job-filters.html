@@ -141,8 +141,18 @@
             </div>
             <div class="col-6 col-md-3">
                 <label class="form-label" for="filter-sort">Sort by</label>
+                <!-- Section 10.9: "Relevance" is the default the moment there is a keyword
+                     to be relevant to, and "Newest" is the default when there is not, which
+                     is what the two conditions below say. They read the RAW criteria (what
+                     the visitor typed) rather than the parsed sort, like every other control
+                     in this panel, so the same rule has to be spelled out here as in
+                     JobSearchService.parseSort. Picking Relevance with an empty keyword box
+                     is honoured as "newest" by that method - nothing to rank by - so the
+                     option is left visible and un-disabled rather than appearing and
+                     disappearing as the box is typed in. -->
                 <select class="form-select" id="filter-sort" name="sort">
-                    <option value="newest" th:selected="${criteria.sort == null or criteria.sort == '' or criteria.sort == 'newest'}">Newest</option>
+                    <option value="relevance" th:selected="${criteria.sort == 'relevance' or ((criteria.sort == null or criteria.sort == '') and criteria.q != null and criteria.q != '')}">Relevance</option>
+                    <option value="newest" th:selected="${criteria.sort == 'newest' or ((criteria.sort == null or criteria.sort == '') and (criteria.q == null or criteria.q == ''))}">Newest</option>
                     <option value="salary" th:selected="${criteria.sort == 'salary'}">Salary: high to low</option>
                     <option value="deadline" th:selected="${criteria.sort == 'deadline'}">Deadline: soonest</option>
                 </select>
