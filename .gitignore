@@ -14,3 +14,5 @@ bin/
 # Runtime data (H2 database files and uploaded resumes)
 data/
 uploads/
+# Scratch git worktrees used while developing features
+.claude/worktrees/
