@@ -2,6 +2,7 @@ package com.jobportal.web.seeker;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
+import com.jobportal.domain.SavedJob;
 import com.jobportal.dto.JobSearchResult;
 import com.jobportal.dto.RecommendationResult;
 import com.jobportal.exception.BusinessRuleException;
@@ -10,12 +11,16 @@ import com.jobportal.security.AppUserDetails;
 import com.jobportal.service.JobApplicationService;
 import com.jobportal.service.JobSearchService;
 import com.jobportal.service.RecommendationService;
+import com.jobportal.service.SavedJobService;
 import com.jobportal.web.form.ApplicationForm;
 import com.jobportal.web.form.JobSearchCriteria;
+import com.jobportal.web.support.SafeRedirects;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -27,11 +32,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-// Seeker job search, applying and recommendations (Section 6.4 S-F1, S-D1, S-F2, S-D5,
-// 6.6 route summary). Thin controller (11.3 contract item 1): every rule, ownership check
-// and side effect lives in JobApplicationService/RecommendationService (and, for the
-// search itself, the already-built JobSearchService), this class only wires the form/PRG
-// plumbing.
+// Seeker job search, applying, recommendations and saved jobs (Section 6.4 S-F1, S-D1,
+// S-F2, S-D5, 6.6 route summary; Section 16 future-work item 5 for the save/unsave/list
+// methods in the marked section below). Thin controller (11.3 contract item 1): every
+// rule, ownership check and side effect lives in JobApplicationService/RecommendationService/
+// SavedJobService (and, for the search itself, the already-built JobSearchService), this
+// class only wires the form/PRG plumbing.
 @Controller
 public class SeekerJobController {
 
@@ -42,13 +48,15 @@ public class SeekerJobController {
     private final JobSearchService jobSearchService;
     private final JobApplicationService jobApplicationService;
     private final RecommendationService recommendationService;
+    private final SavedJobService savedJobService;
     private final Clock clock;
 
     public SeekerJobController(JobSearchService jobSearchService, JobApplicationService jobApplicationService,
-            RecommendationService recommendationService, Clock clock) {
+            RecommendationService recommendationService, SavedJobService savedJobService, Clock clock) {
         this.jobSearchService = jobSearchService;
         this.jobApplicationService = jobApplicationService;
         this.recommendationService = recommendationService;
+        this.savedJobService = savedJobService;
         this.clock = clock;
     }
 
@@ -74,6 +82,11 @@ public class SeekerJobController {
         model.addAttribute("selectedJobId", selectedJob == null ? null : selectedJob.getId());
         model.addAttribute("existingApplication", selectedJob == null ? null
                 : jobApplicationService.findExisting(selectedJob.getId(), me.getId()).orElse(null));
+        // Save/unsave button state for the pane (Section 16 future-work item 5): every
+        // viewer of this page is already a job seeker (SecurityConfig), so - unlike the
+        // public job-detail page's "saved" attribute - this is never null.
+        model.addAttribute("saved", selectedJob == null ? null
+                : savedJobService.isSaved(me.getId(), selectedJob.getId()));
         return "seeker/jobs";
     }
 
@@ -183,5 +196,45 @@ public class SeekerJobController {
             form.setSaveToProfile(!hasProfileResume);
             model.addAttribute("applicationForm", form);
         }
+    }
+
+    // ---- Saved jobs (Section 16 future-work item 5) ----
+    // Added in its own marked section, the same convention 11.3 contract item 11 already
+    // asks for on JobApplicationService, so a later change here never has to untangle
+    // itself from the search/apply/recommendations methods above.
+
+    // GET /seeker/saved-jobs: the seeker's own bookmarked jobs, newest first, paginated
+    // like every other list of more than a handful (Section 7.9's pageSize setting) -
+    // mirrors SeekerApplicationController#history's page+rows shape.
+    @GetMapping("/seeker/saved-jobs")
+    public String savedJobs(@RequestParam(required = false) String page, @AuthenticationPrincipal AppUserDetails me,
+            Model model) {
+        Page<SavedJob> savedJobs = savedJobService.list(me.getId(), page);
+        model.addAttribute("page", savedJobs);
+        return "seeker/saved-jobs";
+    }
+
+    // POST /seeker/jobs/{jobId}/save and .../unsave: simple POST buttons (Section 7.2),
+    // reachable from the job list pane, the standalone job detail page and the saved-jobs
+    // list itself. SafeRedirects.backOrDashboard sends the seeker straight back to
+    // whichever of those pages the button was on, with every filter/page/selected-job query
+    // parameter it already had - the task's own "without losing the user's place"
+    // requirement, met by reusing the exact mechanism GlobalExceptionHandler and
+    // EmployerJobController#reopen already use for the same "go back to where you were"
+    // need, rather than inventing a bespoke return-url parameter for this one button.
+    @PostMapping("/seeker/jobs/{jobId}/save")
+    public String save(@PathVariable Long jobId, @AuthenticationPrincipal AppUserDetails me,
+            HttpServletRequest request, RedirectAttributes redirect) {
+        savedJobService.save(me.getId(), jobId);
+        redirect.addFlashAttribute("success", "Job saved. Find it any time under My saved jobs.");
+        return "redirect:" + SafeRedirects.backOrDashboard(request);
+    }
+
+    @PostMapping("/seeker/jobs/{jobId}/unsave")
+    public String unsave(@PathVariable Long jobId, @AuthenticationPrincipal AppUserDetails me,
+            HttpServletRequest request, RedirectAttributes redirect) {
+        savedJobService.unsave(me.getId(), jobId);
+        redirect.addFlashAttribute("success", "Job removed from your saved jobs.");
+        return "redirect:" + SafeRedirects.backOrDashboard(request);
     }
 }

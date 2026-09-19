@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!--
+  Saved jobs list (Section 16 future-work item 5). SeekerJobController#savedJobs puts a
+  real Spring Data Page<SavedJob> under "page" (pagination only, Section 7.9 - the same
+  shape every other paginated seeker list uses), newest save first. A saved job keeps
+  showing here even once its job is no longer Live (closed, expired, or taken down) - the
+  same "history keeps showing what happened" spirit seeker/application-history.html already
+  follows - so the current status badge (fragments/status-badge :: job) is shown on every
+  row rather than assuming Live.
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/dashboard :: layout(title='Saved Jobs', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="jp-page-head">
+        <div>
+            <h1 class="h3 mb-1">Saved jobs</h1>
+            <p>Jobs you've bookmarked to come back to later.</p>
+        </div>
+        <a th:href="@{/seeker/jobs}" class="btn btn-outline-secondary">Find more jobs</a>
+    </div>
+
+    <div th:if="${page.empty}" class="card shadow-sm">
+        <div class="card-body empty-state">
+            <i class="bi bi-bookmark icon" aria-hidden="true"></i>
+            <p class="message">You haven't saved any jobs yet. Save a job from its listing or detail page to see it here.</p>
+            <a th:href="@{/seeker/jobs}" class="btn btn-outline-primary action">Browse jobs</a>
+        </div>
+    </div>
+
+    <div th:unless="${page.empty}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Job</th>
+                    <th>Company</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Saved</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="saved : ${page.content}">
+                    <td>
+                        <a th:href="@{/jobs/{id}(id=${saved.job.id})}" th:text="${saved.job.title}">Job title</a>
+                    </td>
+                    <td th:text="${saved.job.employer.companyName}">Company</td>
+                    <td th:text="${saved.job.location}">Location</td>
+                    <td><span th:replace="~{fragments/status-badge :: job(${saved.job})}"></span></td>
+                    <td th:text="${@fmt.ago(saved.savedAt)}">3 days ago</td>
+                    <td>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <a th:href="@{/jobs/{id}(id=${saved.job.id})}" class="btn btn-sm btn-outline-secondary">View</a>
+                            <form method="post" th:action="@{/seeker/jobs/{id}/unsave(id=${saved.job.id})}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/pagination :: pagination(${page})}"></div>
+</main>
+</body>
+</html>

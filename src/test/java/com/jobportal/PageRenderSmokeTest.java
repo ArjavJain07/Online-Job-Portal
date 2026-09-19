@@ -102,7 +102,15 @@ class PageRenderSmokeTest extends IntegrationTestBase {
                 // are personalised rather than the "Latest jobs" fallback (Section 13.3).
                 new Page("/seeker/messages", "priya@demo.local", "Messages"),
                 new Page("/seeker/messages/1", "priya@demo.local", "Messages"),
-                new Page("/seeker/recommendations", "priya@demo.local", "Recommended for you"));
+                new Page("/seeker/recommendations", "priya@demo.local", "Recommended for you"),
+                // Saved jobs + job alerts (Section 16 future-work item 5). The unsubscribe
+                // row uses a token that does not exist, the same reasoning the
+                // reset-password row above already documents: a real one is single-use in
+                // the sense that JobAlertUnsubscribeFlowTest spends it, so it could not stay
+                // valid for a second GET the way every other row here is reused freely.
+                new Page("/seeker/saved-jobs", "priya@demo.local", "Saved jobs"),
+                new Page("/seeker/job-alerts", "priya@demo.local", "Job alerts"),
+                new Page("/job-alerts/unsubscribe?token=does-not-exist", null, "Link no longer valid"));
     }
 
     @ParameterizedTest(name = "GET {0} renders for {1}")

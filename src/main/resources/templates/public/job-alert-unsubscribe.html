@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  Public, no-login-required unsubscribe page (Section 16 future-work item 5). Reached only
+  from the link at the bottom of a job-alert digest email. JobAlertUnsubscribeController
+  puts "tokenValid" (does this token exist at all) and "unsubscribed" (has the POST below
+  already run) - three states, the same "invalid link" / "confirm" / "done" shape
+  auth/reset-password.html uses for its own two states, extended by one because unsubscribe
+  needs an explicit confirm step (Design rule 5: GET may never itself change business data,
+  so the click that opens this page cannot be the click that turns alerts off).
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/public :: layout(title='Unsubscribe', content=~{::main}, scripts=~{})}">
+<body>
+<main>
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+
+            <div class="card shadow-sm" th:unless="${tokenValid}">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-3">Link no longer valid</h1>
+                    <p>This unsubscribe link is invalid. If you're still receiving job alert emails you don't want,
+                        log in and turn them off from your job alerts settings.</p>
+                    <a th:href="@{/login}" class="btn btn-primary">Log in</a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm" th:if="${tokenValid and unsubscribed}">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-3">You're unsubscribed</h1>
+                    <p>You won't receive any more job alert emails. You can turn them back on any time from your
+                        job alerts settings while logged in.</p>
+                    <a th:href="@{/login}" class="btn btn-primary">Log in</a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm" th:if="${tokenValid and !unsubscribed}">
+                <div class="card-body p-4">
+                    <h1 class="h3 mb-1">Unsubscribe from job alerts?</h1>
+                    <p class="text-muted mb-4">You'll stop receiving the job alert digest email. This does not
+                        affect your account or any saved jobs.</p>
+                    <form th:action="@{/job-alerts/unsubscribe}" method="post">
+                        <input type="hidden" name="token" th:value="${token}">
+                        <button type="submit" class="btn btn-primary w-100">Unsubscribe</button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+</body>
+</html>

@@ -16,6 +16,7 @@ import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.JobSpecifications;
 import com.jobportal.repository.JobStatusChangeRepository;
+import com.jobportal.repository.SavedJobRepository;
 import com.jobportal.repository.UserRepository;
 import com.jobportal.repository.projection.JobStatusPairCount;
 import com.jobportal.util.SkillParser;
@@ -56,6 +57,7 @@ public class JobService {
     private final JobRepository jobRepository;
     private final JobStatusChangeRepository jobStatusChangeRepository;
     private final JobApplicationRepository jobApplicationRepository;
+    private final SavedJobRepository savedJobRepository;
     private final UserRepository userRepository;
     private final SettingsService settingsService;
     private final ActivityLogService activityLogService;
@@ -63,12 +65,14 @@ public class JobService {
     private final Clock clock;
 
     public JobService(JobRepository jobRepository, JobStatusChangeRepository jobStatusChangeRepository,
-            JobApplicationRepository jobApplicationRepository, UserRepository userRepository,
-            SettingsService settingsService, ActivityLogService activityLogService, SkillService skillService,
+            JobApplicationRepository jobApplicationRepository, SavedJobRepository savedJobRepository,
+            UserRepository userRepository, SettingsService settingsService,
+            ActivityLogService activityLogService, SkillService skillService,
             Clock clock) {
         this.jobRepository = jobRepository;
         this.jobStatusChangeRepository = jobStatusChangeRepository;
         this.jobApplicationRepository = jobApplicationRepository;
+        this.savedJobRepository = savedJobRepository;
         this.userRepository = userRepository;
         this.settingsService = settingsService;
         this.activityLogService = activityLogService;
@@ -336,6 +340,13 @@ public class JobService {
 
         List<JobStatusChange> changes = jobStatusChangeRepository.findByJob_IdOrderByChangedAtAsc(jobId);
         jobStatusChangeRepository.deleteAll(changes);
+        // Section 16 future-work item 5 / V5 migration: saved_jobs.job_id has no ON DELETE
+        // clause either (same convention as every foreign key here), so a job some seeker
+        // had bookmarked would otherwise block this delete with a foreign-key RESTRICT even
+        // though 0 applications is the only condition this rule actually asks for. A saved
+        // bookmark is not audit history the way JobStatusChange is, so it is simply removed
+        // rather than needing its own dependency check above.
+        savedJobRepository.deleteByJob_Id(jobId);
         jobRepository.delete(job);
 
         activityLogService.log(ActivityType.JOB_DELETED, employer, companyName + " deleted " + title, null, null);
