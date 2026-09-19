@@ -306,27 +306,10 @@ public class JobApplicationService {
         SeekerProfile profile = seekerProfileRepository.findByUser_Id(seeker.getId()).orElse(null);
         return new CandidateProfile(seeker.getFullName(), !seeker.isEnabled(), seeker.getEmail(),
                 profile == null ? null : profile.getPhone(), profile == null ? null : profile.getLocation(),
-                profile == null ? null : profile.getHeadline(), parseSkills(profile == null ? null : profile.getSkills()),
+                profile == null ? null : profile.getHeadline(),
+                profile == null ? List.<String>of() : profile.skillList(),
                 profile == null ? 0 : profile.getExperienceYears(), profile == null ? null : profile.getEducation(),
                 profile == null ? null : profile.getAbout());
-    }
-
-    // Same splitting logic as Job.skillList() (Section 7.1 note: templates never parse
-    // this themselves), just for a seeker profile's normalised skills CSV instead of a
-    // job's - SeekerProfile carries no such helper of its own (Section 3.2/5.2: entities
-    // outside this slice's file ownership are read-only here).
-    private List<String> parseSkills(String csv) {
-        List<String> result = new ArrayList<>();
-        if (csv == null || csv.isBlank()) {
-            return result;
-        }
-        for (String skill : csv.split(",")) {
-            String trimmed = skill.trim();
-            if (!trimmed.isEmpty()) {
-                result.add(trimmed);
-            }
-        }
-        return result;
     }
 
     // ---- Status change (E-F2) ----

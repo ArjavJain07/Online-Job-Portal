@@ -48,8 +48,12 @@ class SeekerProfileTest extends IntegrationTestBase {
                 .andExpect(redirectedUrl("/seeker/profile"))
                 .andExpect(flash().attribute("success", "Profile updated successfully."));
 
+        // Skills are Skill rows since Section 10.8, so the assertion is on the labels the
+        // relation holds rather than on a stored CSV string. Same claim as before - the
+        // two skills were saved, in the order typed - against the column that is now the
+        // source of truth.
         SeekerProfile profile = seekerProfileRepository.findByUser_Id(data.userId("neha@demo.local")).orElseThrow();
-        assertThat(profile.getSkills()).isEqualTo("Java, Spring Boot");
+        assertThat(profile.skillList()).containsExactly("Java", "Spring Boot");
 
         mockMvc.perform(get("/seeker/profile").with(user(neha)))
                 .andExpect(status().isOk())

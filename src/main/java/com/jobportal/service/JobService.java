@@ -2,6 +2,7 @@ package com.jobportal.service;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobStatusChange;
+import com.jobportal.domain.Skill;
 import com.jobportal.domain.User;
 import com.jobportal.domain.enums.ActivityType;
 import com.jobportal.domain.enums.ApplicationStatus;
@@ -58,17 +59,20 @@ public class JobService {
     private final UserRepository userRepository;
     private final SettingsService settingsService;
     private final ActivityLogService activityLogService;
+    private final SkillService skillService;
     private final Clock clock;
 
     public JobService(JobRepository jobRepository, JobStatusChangeRepository jobStatusChangeRepository,
             JobApplicationRepository jobApplicationRepository, UserRepository userRepository,
-            SettingsService settingsService, ActivityLogService activityLogService, Clock clock) {
+            SettingsService settingsService, ActivityLogService activityLogService, SkillService skillService,
+            Clock clock) {
         this.jobRepository = jobRepository;
         this.jobStatusChangeRepository = jobStatusChangeRepository;
         this.jobApplicationRepository = jobApplicationRepository;
         this.userRepository = userRepository;
         this.settingsService = settingsService;
         this.activityLogService = activityLogService;
+        this.skillService = skillService;
         this.clock = clock;
     }
 
@@ -216,14 +220,12 @@ public class JobService {
 
     // Section 5.5 "content fields" list: title, description, requirements, skills,
     // category, jobType, workMode, location, salaryMin, salaryMax, minExperienceYears.
-    // Deliberately excludes applicationDeadline and openings. Skills are compared
-    // ignoring case (business rule 4) after the same normalisation SkillParser applies.
+    // Deliberately excludes applicationDeadline and openings.
     private boolean contentFieldsChanged(Job job, JobForm form) {
-        String newSkills = SkillParser.parse(form.getSkills());
         return !job.getTitle().equals(form.getTitle())
                 || !job.getDescription().equals(form.getDescription())
                 || !job.getRequirements().equals(form.getRequirements())
-                || !job.getSkills().equalsIgnoreCase(newSkills)
+                || skillsChanged(job, form)
                 || job.getCategory() != form.getCategory()
                 || job.getJobType() != form.getJobType()
                 || job.getWorkMode() != form.getWorkMode()
@@ -233,11 +235,27 @@ public class JobService {
                 || job.getMinExperienceYears() != form.getMinExperienceYears();
     }
 
+    // Whether the edit really changes which skills the job asks for (business rule 4,
+    // Section 5.5). Compares canonical keys in order, so re-typing "java" as "Java", or
+    // "Node.js" as "Node JS", is not a content change and does not send a Live job back
+    // for re-approval - while adding, removing or reordering a skill is.
+    //
+    // Deliberately does NOT go through SkillService: this runs before the decision to
+    // save anything, and resolving would create rows for skills the employer might be
+    // about to correct. SkillParser.keys gives the same keys with no database at all.
+    private boolean skillsChanged(Job job, JobForm form) {
+        List<String> current = new ArrayList<>();
+        for (Skill skill : job.getSkills()) {
+            current.add(skill.getSlug());
+        }
+        return !current.equals(new ArrayList<>(SkillParser.keys(form.getSkills())));
+    }
+
     private void applyFormFields(Job job, JobForm form) {
         job.setTitle(form.getTitle());
         job.setDescription(form.getDescription());
         job.setRequirements(form.getRequirements());
-        job.setSkills(SkillParser.parse(form.getSkills()));
+        job.assignSkills(skillService.resolve(form.getSkills()));
         job.setCategory(form.getCategory());
         job.setJobType(form.getJobType());
         job.setWorkMode(form.getWorkMode());

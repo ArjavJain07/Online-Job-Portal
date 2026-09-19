@@ -55,6 +55,8 @@ public class JobBrowseController {
         model.addAttribute("criteria", criteria);
         model.addAttribute("page", result.jobs());
         model.addAttribute("warning", firstWarningOrNull(result));
+        // Section 10.8: the "Java (24)" chips fragments/job-filters renders.
+        model.addAttribute("skillFacets", result.skillFacets());
 
         Job selectedJob = jobSearchService.selectForPane(result.jobs().getContent(), jobId);
         model.addAttribute("selectedJob", selectedJob);

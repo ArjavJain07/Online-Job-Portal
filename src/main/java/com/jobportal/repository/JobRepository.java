@@ -17,7 +17,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificationExecutor<Job> {
+// JobSkillFacets is a custom fragment (Section 10.8), not a derived or @Query method: the
+// skill facet counts have to be built from the same Specification the search itself uses,
+// which only the Criteria API can do. See that interface for why.
+public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificationExecutor<Job>, JobSkillFacets {
 
     // Redeclared with @EntityGraph so each job's employer loads in the same query
     // (Section 7.9); safe with paging because employer is a to-one association.

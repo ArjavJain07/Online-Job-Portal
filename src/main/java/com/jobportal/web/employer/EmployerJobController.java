@@ -202,7 +202,10 @@ public class EmployerJobController {
         form.setTitle(job.getTitle());
         form.setDescription(job.getDescription());
         form.setRequirements(job.getRequirements());
-        form.setSkills(job.getSkills());
+        // From the Skill relation, not the legacy CSV column (Section 10.8): the edit box
+        // must be pre-filled with exactly the labels the page renders as chips, so an
+        // employer who saves without touching the field changes nothing.
+        form.setSkills(String.join(", ", job.skillList()));
         form.setCategory(job.getCategory());
         form.setJobType(job.getJobType());
         form.setWorkMode(job.getWorkMode());

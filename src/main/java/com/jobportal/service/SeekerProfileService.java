@@ -8,7 +8,6 @@ import com.jobportal.dto.ProfileCompleteness;
 import com.jobportal.dto.StoredFile;
 import com.jobportal.repository.SeekerProfileRepository;
 import com.jobportal.repository.UserRepository;
-import com.jobportal.util.SkillParser;
 import com.jobportal.web.form.SeekerProfileForm;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -30,14 +29,17 @@ public class SeekerProfileService {
     private final SeekerProfileRepository seekerProfileRepository;
     private final FileStorageService fileStorageService;
     private final ActivityLogService activityLogService;
+    private final SkillService skillService;
     private final Clock clock;
 
     public SeekerProfileService(UserRepository userRepository, SeekerProfileRepository seekerProfileRepository,
-            FileStorageService fileStorageService, ActivityLogService activityLogService, Clock clock) {
+            FileStorageService fileStorageService, ActivityLogService activityLogService,
+            SkillService skillService, Clock clock) {
         this.userRepository = userRepository;
         this.seekerProfileRepository = seekerProfileRepository;
         this.fileStorageService = fileStorageService;
         this.activityLogService = activityLogService;
+        this.skillService = skillService;
         this.clock = clock;
     }
 
@@ -82,7 +84,7 @@ public class SeekerProfileService {
         profile.setPhone(form.getPhone());
         profile.setLocation(form.getLocation());
         profile.setHeadline(form.getHeadline());
-        profile.setSkills(form.getSkills() == null ? null : SkillParser.parse(form.getSkills()));
+        profile.assignSkills(skillService.resolve(form.getSkills()));
         profile.setExperienceYears(form.getExperienceYears());
         profile.setPreferredJobType(form.getPreferredJobType());
         profile.setEducation(form.getEducation());
@@ -162,7 +164,7 @@ public class SeekerProfileService {
         } else if (hint == null) {
             hint = "Upload your resume so employers can review it.";
         }
-        if (isFilled(profile.getSkills())) {
+        if (!profile.getSkills().isEmpty()) {
             percent += 20;
         } else if (hint == null) {
             hint = "Add your skills to get better job recommendations.";

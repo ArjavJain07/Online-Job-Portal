@@ -1,10 +1,12 @@
 package com.jobportal.web.support;
 
+import com.jobportal.dto.SkillFacet;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
 
 // Template helper "@pageLinks" (Section 7.9): builds every link fragments/pagination
 // needs for the current request's Page<T>, keeping every other query parameter (filters,
@@ -25,6 +27,51 @@ public class PageLinks {
                 .replaceQueryParam("page", n)
                 .build()
                 .toUriString();
+    }
+
+    // The skill facet chips beside the job search results (Section 10.8). Each one is a
+    // link, not a form control: selecting a facet is navigation, so the result is a real
+    // URL that can be bookmarked and shared, the Back button undoes it, and every other
+    // filter in the query string survives untouched - exactly what fragments/job-filters
+    // already promises for the form itself.
+    //
+    // Built here in one call, like build(Page) above and for the same reason: Thymeleaf
+    // 3.1's restricted mode refuses some bean-call-with-argument forms inside attributes,
+    // so the template does one th:with and then only reads properties.
+    //
+    // "page" is reset because a facet changes the result set - staying on page 4 of a
+    // search that now has one page would show an empty list (the same reason the filter
+    // form has no page field).
+    public List<SkillFacetLink> skillLinks(List<SkillFacet> facets) {
+        List<SkillFacetLink> links = new ArrayList<>();
+        for (SkillFacet facet : facets) {
+            // Selecting the chip that is already selected clears the filter, so one chip
+            // is both "filter by this" and "stop filtering by this".
+            String href = facet.selected() ? withSkill(null) : withSkill(facet.slug());
+            links.add(new SkillFacetLink(facet.label(), facet.jobCount(), facet.selected(), href));
+        }
+        return links;
+    }
+
+    // The "Any skill" link: this search with no skill facet applied.
+    public String anySkillHref() {
+        return withSkill(null);
+    }
+
+    private String withSkill(String slug) {
+        UriComponentsBuilder builder = ServletUriComponentsBuilder.fromCurrentRequest()
+                .replaceQueryParam("page", 0);
+        // replaceQueryParam with no values removes the parameter entirely, which is what
+        // "no skill filter" has to mean - leaving "skill=" behind would round-trip as a
+        // blank filter and clutter every shared link.
+        return (slug == null ? builder.replaceQueryParam("skill") : builder.replaceQueryParam("skill", slug))
+                .build()
+                .toUriString();
+    }
+
+    // One skill facet ready to render: "Java", 24, whether it is the current filter, and
+    // where clicking it goes.
+    public record SkillFacetLink(String label, long jobCount, boolean selected, String href) {
     }
 
     public PaginationLinks build(Page<?> page) {

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jobportal.domain.enums.JobDisplayStatus;
 import com.jobportal.domain.enums.JobStatus;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 // Unit tests for Job.isLive and Job.displayStatus (Section 5.5): the only place the "Live"
@@ -110,19 +111,38 @@ class JobTest {
         assertThat(job(JobStatus.CLOSED, TODAY, true).isActive()).isFalse();
     }
 
+    // skillList() used to split the stored CSV; since skills became an entity (Section
+    // 10.8) it reads the Skill relation, so what is worth asserting here is that it keeps
+    // the labels and the order assignSkills was given. The CSV parsing it replaced now
+    // lives in SkillParser, which SkillParserTest covers on its own - including the
+    // trimming and blank-dropping this test used to check.
     @Test
-    void skillListSplitsTrimsAndDropsBlanks() {
+    void skillListReturnsLabelsInTheOrderAssigned() {
         Job job = job(JobStatus.APPROVED, TODAY, true);
-        job.setSkills("Java, Spring Boot ,  , SQL");
+        job.assignSkills(List.of(Skill.of("Java"), Skill.of("Spring Boot"), Skill.of("SQL")));
         assertThat(job.skillList()).containsExactly("Java", "Spring Boot", "SQL");
     }
 
     @Test
-    void skillListIsEmptyForBlankSkills() {
+    void skillListIsEmptyForAJobWithNoSkills() {
         Job job = job(JobStatus.APPROVED, TODAY, true);
-        job.setSkills("");
         assertThat(job.skillList()).isEmpty();
-        job.setSkills(null);
+        job.assignSkills(List.of());
         assertThat(job.skillList()).isEmpty();
+    }
+
+    // The rollback column (Section 10.8) is written by the same call that writes the
+    // relation, so a downgrade to the previous release still finds a job's skills where
+    // it expects them. Nothing reads it in the running application, which is exactly why
+    // it needs a test of its own: without one, a later change could stop maintaining it
+    // and no other test in the suite would notice.
+    @Test
+    void assignSkillsAlsoWritesTheLegacyRollbackColumn() {
+        Job job = job(JobStatus.APPROVED, TODAY, true);
+        job.assignSkills(List.of(Skill.of("Java"), Skill.of("Spring Boot")));
+        assertThat(job.legacySkillsCsv()).isEqualTo("Java, Spring Boot");
+
+        job.assignSkills(List.of());
+        assertThat(job.legacySkillsCsv()).isEmpty();
     }
 }

@@ -209,7 +209,8 @@ public class SeekerProfileController {
         form.setPhone(profile.getPhone());
         form.setLocation(profile.getLocation());
         form.setHeadline(profile.getHeadline());
-        form.setSkills(profile.getSkills());
+        // See EmployerJobController.toForm: the relation's labels, not the legacy CSV.
+        form.setSkills(String.join(", ", profile.skillList()));
         form.setExperienceYears(profile.getExperienceYears());
         form.setPreferredJobType(profile.getPreferredJobType());
         form.setEducation(profile.getEducation());

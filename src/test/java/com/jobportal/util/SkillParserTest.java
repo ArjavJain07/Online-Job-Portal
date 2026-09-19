@@ -59,6 +59,34 @@ class SkillParserTest {
         assertThat(keys).containsExactlyInAnyOrder("java", "spring boot", "sql");
     }
 
+    // Since Section 10.8 the duplicate rule is canonical identity, not lower-cased
+    // equality: punctuation and spacing variants of one skill are one skill, which is
+    // what stops "Node.js" and "Node JS" becoming two rows in the skills table and two
+    // chips on a job.
+    @Test
+    void punctuationAndSpacingVariantsAreOneSkill() {
+        assertThat(SkillParser.parse("Node.js, node js, NODE-JS")).isEqualTo("Node.js");
+        assertThat(SkillParser.canonical("Node.js")).isEqualTo("node js");
+        assertThat(SkillParser.canonical("NODE-JS")).isEqualTo("node js");
+    }
+
+    // ...and the other direction: + and # are kept, so these stay three distinct skills.
+    // Folding them would quietly claim a C developer knows C++.
+    @Test
+    void plusAndHashAreKeptSoRelatedSkillsStayDistinct() {
+        assertThat(SkillParser.keys("C, C++, C#")).containsExactly("c", "c++", "c#");
+    }
+
+    // A canonically empty entry has no identity to match on, so it is not a skill.
+    // (The V4 backfill deliberately does NOT apply this rule to values already stored -
+    // see that migration's header - because dropping something a person typed is only
+    // acceptable for input that is being entered right now and can be re-typed.)
+    @Test
+    void entriesWithNothingButPunctuationAreDropped() {
+        assertThat(SkillParser.parse("Java, ---, SQL")).isEqualTo("Java, SQL");
+        assertThat(SkillParser.canonical("---")).isEmpty();
+    }
+
     @Test
     void keysIsEmptyForBlankInput() {
         assertThat(SkillParser.keys(null)).isEmpty();

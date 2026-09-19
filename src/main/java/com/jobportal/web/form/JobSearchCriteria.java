@@ -16,6 +16,10 @@ public class JobSearchCriteria {
     private String minSalary;
     private String maxExperience;
     private String postedWithin;
+    // The selected skill facet, carried as a canonical slug (Section 10.8). A String like
+    // every other filter here, so "skill=does-not-exist" falls back to "any skill"
+    // instead of reaching the type-mismatch 404 handler (Section 7.9 binding rule).
+    private String skill;
     private String sort;
     private String page;
 
@@ -81,6 +85,14 @@ public class JobSearchCriteria {
 
     public void setPostedWithin(String postedWithin) {
         this.postedWithin = postedWithin;
+    }
+
+    public String getSkill() {
+        return skill;
+    }
+
+    public void setSkill(String skill) {
+        this.skill = skill;
     }
 
     public String getSort() {

@@ -26,6 +26,7 @@ import com.jobportal.repository.SeekerProfileRepository;
 import com.jobportal.repository.UserRepository;
 import com.jobportal.service.ActivityLogService;
 import com.jobportal.service.FileStorageService;
+import com.jobportal.service.SkillService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -100,6 +101,10 @@ public class DemoDataLoader {
     private final MessageRepository messageRepository;
     private final ActivityLogService activityLogService;
     private final FileStorageService fileStorageService;
+    // Seeded skills go through the same resolver the job form and the profile form use
+    // (Section 10.8), so the demo data exercises the real free-text path and the seeded
+    // jobs and profiles end up sharing Skill rows exactly as real ones do.
+    private final SkillService skillService;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
     private final Clock clock;
@@ -109,7 +114,7 @@ public class DemoDataLoader {
             JobApplicationRepository jobApplicationRepository,
             ApplicationStatusChangeRepository applicationStatusChangeRepository, MessageRepository messageRepository,
             ActivityLogService activityLogService, FileStorageService fileStorageService,
-            PasswordEncoder passwordEncoder, AppProperties appProperties, Clock clock) {
+            SkillService skillService, PasswordEncoder passwordEncoder, AppProperties appProperties, Clock clock) {
         this.userRepository = userRepository;
         this.seekerProfileRepository = seekerProfileRepository;
         this.jobRepository = jobRepository;
@@ -119,6 +124,7 @@ public class DemoDataLoader {
         this.messageRepository = messageRepository;
         this.activityLogService = activityLogService;
         this.fileStorageService = fileStorageService;
+        this.skillService = skillService;
         this.passwordEncoder = passwordEncoder;
         this.appProperties = appProperties;
         this.clock = clock;
@@ -262,7 +268,7 @@ public class DemoDataLoader {
         priyaProfile.setUser(priya);
         priyaProfile.setHeadline("Java backend developer");
         priyaProfile.setLocation("Pune");
-        priyaProfile.setSkills("Java, Spring Boot, SQL, Git");
+        priyaProfile.assignSkills(skillService.resolve("Java, Spring Boot, SQL, Git"));
         priyaProfile.setExperienceYears(2);
         priyaProfile.setPreferredJobType(JobType.FULL_TIME);
         priyaProfile.setPhone("9876500001");
@@ -275,7 +281,7 @@ public class DemoDataLoader {
         SeekerProfile arjunProfile = new SeekerProfile();
         arjunProfile.setUser(arjun);
         arjunProfile.setLocation("Mumbai");
-        arjunProfile.setSkills("Python, SQL, Excel");
+        arjunProfile.assignSkills(skillService.resolve("Python, SQL, Excel"));
         arjunProfile.setExperienceYears(1);
         attachResume(arjunProfile, ARJUN_RESUME, arjun.getCreatedAt());
         seekerProfileRepository.save(arjunProfile);
@@ -285,7 +291,7 @@ public class DemoDataLoader {
         rohanProfile.setUser(rohan);
         rohanProfile.setHeadline("Customer support specialist");
         rohanProfile.setLocation("Mumbai");
-        rohanProfile.setSkills("Communication, CRM, Java");
+        rohanProfile.assignSkills(skillService.resolve("Communication, CRM, Java"));
         rohanProfile.setExperienceYears(3);
         rohanProfile.setPreferredJobType(JobType.FULL_TIME);
         rohanProfile.setPhone("9876500003");
@@ -297,7 +303,7 @@ public class DemoDataLoader {
         snehaProfile.setUser(sneha);
         snehaProfile.setHeadline("Frontend developer");
         snehaProfile.setLocation("Pune");
-        snehaProfile.setSkills("HTML, CSS, JavaScript, React");
+        snehaProfile.assignSkills(skillService.resolve("HTML, CSS, JavaScript, React"));
         snehaProfile.setExperienceYears(1);
         snehaProfile.setPreferredJobType(JobType.FULL_TIME);
         snehaProfile.setEducation("B.Sc. Information Technology, 2025");
@@ -487,7 +493,7 @@ public class DemoDataLoader {
         job.setTitle(title);
         job.setDescription(description);
         job.setRequirements(requirements);
-        job.setSkills(skills);
+        job.assignSkills(skillService.resolve(skills));
         job.setCategory(category);
         job.setJobType(jobType);
         job.setWorkMode(workMode);

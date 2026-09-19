@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.SeekerProfile;
+import com.jobportal.domain.Skill;
 import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.JobType;
 import com.jobportal.domain.enums.WorkMode;
 import com.jobportal.dto.ScoreResult;
+import com.jobportal.util.SkillParser;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -28,18 +32,30 @@ class RecommendationScorerTest {
     // years' experience, prefers FULL_TIME, no past categories.
     private SeekerProfile defaultSeeker() {
         SeekerProfile profile = new SeekerProfile();
-        profile.setSkills("Java, Spring Boot");
+        profile.assignSkills(skills("Java, Spring Boot"));
         profile.setLocation("Pune");
         profile.setExperienceYears(2);
         profile.setPreferredJobType(JobType.FULL_TIME);
         return profile;
     }
 
+    // Skill rows built in memory, never saved: RecommendationScorer has no Spring
+    // dependencies (Section 12.2) and compares Skill.slug, which Skill.of fills in
+    // without a database. Exactly what SkillService would produce for the same text,
+    // because both go through SkillParser.
+    private List<Skill> skills(String csv) {
+        List<Skill> result = new ArrayList<>();
+        for (String label : SkillParser.labels(csv)) {
+            result.add(Skill.of(label));
+        }
+        return result;
+    }
+
     private Job job(String title, String skills, String location, WorkMode workMode, JobType jobType,
             int minExperienceYears, JobCategory category, LocalDate approvedDate) {
         Job job = new Job();
         job.setTitle(title);
-        job.setSkills(skills);
+        job.assignSkills(skills(skills));
         job.setLocation(location);
         job.setWorkMode(workMode);
         job.setJobType(jobType);
@@ -136,7 +152,7 @@ class RecommendationScorerTest {
     @Test
     void e6ShortSkillDoesNotMatchAsSubstring() {
         SeekerProfile seeker = new SeekerProfile();
-        seeker.setSkills("C");
+        seeker.assignSkills(skills("C"));
         seeker.setExperienceYears(0); // no location, no preferred type
 
         Job job = job("Clerk", "", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1, JobCategory.OTHER, null);
@@ -148,13 +164,62 @@ class RecommendationScorerTest {
         assertThat(result.reasons()).isEmpty();
     }
 
+    // Section 10.8: the case rule 1 used to get wrong. The seeker wrote "Node.js" and the
+    // job's own skill list says "Node JS" - the same skill, and case E7 below already
+    // treats them as the same phrase when it appears in a description. Comparing
+    // spellings, rule 1 missed it and the job fell through to rule 2/3 (or scored nothing
+    // at all when the text did not happen to mention it); comparing Skill.slug, it is the
+    // +10 skill-list match it always should have been.
+    //
+    // Every other signal is neutralised the way E6 and E7 do it, so the score is exactly
+    // rule 1's contribution and nothing else.
+    @Test
+    void skillListMatchIgnoresPunctuationAndSpacing() {
+        SeekerProfile seeker = new SeekerProfile();
+        seeker.assignSkills(skills("Node.js"));
+        seeker.setExperienceYears(0);
+
+        Job job = job("Backend Developer", "Node JS", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1,
+                JobCategory.OTHER, null);
+
+        ScoreResult result = RecommendationScorer.score(seeker, Set.of(), job, TODAY);
+
+        assertThat(result.score()).isEqualTo(RecommendationScorer.SKILL_IN_JOB_SKILLS_POINTS);
+        assertThat(result.qualified()).isTrue();
+        // The reason quotes the SEEKER's spelling, because the sentence is addressed to
+        // them: "Matches your skills". The job is free to spell it differently.
+        assertThat(result.reasons()).containsExactly("Matches your skills: Node.js");
+    }
+
+    // The other half of the same rule: canonicalising punctuation must not start folding
+    // skills that are genuinely different. "+" and "#" survive, so these stay three
+    // skills and none of them matches either of the others.
+    @Test
+    void plusAndHashKeepRelatedSkillsApart() {
+        SeekerProfile seeker = new SeekerProfile();
+        seeker.assignSkills(skills("C++"));
+        seeker.setExperienceYears(0);
+
+        Job cSharp = job("Developer", "C#", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1, JobCategory.OTHER,
+                null);
+        Job plainC = job("Developer", "C", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1, JobCategory.OTHER,
+                null);
+        Job cPlusPlus = job("Developer", "c++", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1,
+                JobCategory.OTHER, null);
+
+        assertThat(RecommendationScorer.score(seeker, Set.of(), cSharp, TODAY).qualified()).isFalse();
+        assertThat(RecommendationScorer.score(seeker, Set.of(), plainC, TODAY).qualified()).isFalse();
+        assertThat(RecommendationScorer.score(seeker, Set.of(), cPlusPlus, TODAY).score())
+                .isEqualTo(RecommendationScorer.SKILL_IN_JOB_SKILLS_POINTS);
+    }
+
     // E7: seeker skill "Node.js"; job description "Experience with Node JS required" ->
     // rule 3 (description/requirements) matches for +3, with every other signal
     // neutralised the same way as E6 so the whole score is exactly the rule-3 contribution.
     @Test
     void e7SkillMatchesDescriptionAsNodeJs() {
         SeekerProfile seeker = new SeekerProfile();
-        seeker.setSkills("Node.js");
+        seeker.assignSkills(skills("Node.js"));
         seeker.setExperienceYears(0);
 
         Job job = job("Backend Developer", "", "Somewhere", WorkMode.ONSITE, JobType.FULL_TIME, 1, JobCategory.OTHER,

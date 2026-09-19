@@ -3,6 +3,7 @@ package com.jobportal.service;
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
 import com.jobportal.domain.JobView;
+import com.jobportal.domain.Skill;
 import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.JobStatus;
 import com.jobportal.domain.enums.JobType;
@@ -10,9 +11,11 @@ import com.jobportal.domain.enums.Role;
 import com.jobportal.domain.enums.WorkMode;
 import com.jobportal.dto.JobSearchResult;
 import com.jobportal.dto.NormalisedCriteria;
+import com.jobportal.dto.SkillFacet;
 import com.jobportal.exception.ResourceNotFoundException;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
+import com.jobportal.repository.JobSkillFacets;
 import com.jobportal.repository.JobSpecifications;
 import com.jobportal.repository.JobViewRepository;
 import com.jobportal.util.BotDetector;
@@ -47,18 +50,26 @@ public class JobSearchService {
     private static final int MAX_SALARY = 100_000_000;
     private static final int TEXT_FILTER_MAX_LENGTH = 100;
 
+    // How many skill chips the filter panel shows (Section 10.8). Twelve fits the panel
+    // without scrolling and is long enough that the useful skills are in it; the point of
+    // a facet is to offer the few filters worth clicking, not to list the vocabulary.
+    static final int MAX_SKILL_FACETS = 12;
+
     private final JobRepository jobRepository;
     private final JobApplicationRepository jobApplicationRepository;
     private final JobViewRepository jobViewRepository;
     private final SettingsService settingsService;
+    private final SkillService skillService;
     private final Clock clock;
 
     public JobSearchService(JobRepository jobRepository, JobApplicationRepository jobApplicationRepository,
-            JobViewRepository jobViewRepository, SettingsService settingsService, Clock clock) {
+            JobViewRepository jobViewRepository, SettingsService settingsService, SkillService skillService,
+            Clock clock) {
         this.jobRepository = jobRepository;
         this.jobApplicationRepository = jobApplicationRepository;
         this.jobViewRepository = jobViewRepository;
         this.settingsService = settingsService;
+        this.skillService = skillService;
         this.clock = clock;
     }
 
@@ -67,6 +78,11 @@ public class JobSearchService {
     // Builds the Specification from every filter that parsed, always starting from
     // live(today) so pending, rejected, closed, expired and hidden jobs never appear
     // (Section 3.5 rule 4, one definition of Live).
+    //
+    // The skill facet (Section 10.8) is built from `spec` at the point marked below -
+    // after every other filter, before the skill filter itself - so each count answers
+    // "how many of the jobs this search already found list that skill", and picking one
+    // facet never hides the others.
     public JobSearchResult search(JobSearchCriteria raw) {
         NormalisedCriteria criteria = normalise(raw);
         Specification<Job> spec = JobSpecifications.live(LocalDate.now(clock));
@@ -94,9 +110,37 @@ public class JobSearchService {
         if (criteria.postedWithin() != null) {
             spec = spec.and(JobSpecifications.approvedSince(LocalDateTime.now(clock).minusDays(criteria.postedWithin())));
         }
+
+        List<SkillFacet> facets = skillFacets(spec, criteria.skill());
+
+        if (criteria.skill() != null) {
+            spec = spec.and(JobSpecifications.hasSkill(criteria.skill()));
+        }
         Pageable pageable = PageRequest.of(criteria.page(), settingsService.get().getPageSize(), sortFor(criteria.sort()));
         Page<Job> jobs = jobRepository.findAll(spec, pageable);
-        return new JobSearchResult(jobs, criteria, criteria.warnings());
+        return new JobSearchResult(jobs, criteria, criteria.warnings(), facets);
+    }
+
+    // The facet list for one search. The selected skill is always included even if it
+    // falls outside the top MAX_SKILL_FACETS by count - otherwise selecting a rare skill
+    // would make its own chip vanish from the panel and leave no way to unselect it.
+    private List<SkillFacet> skillFacets(Specification<Job> spec, String selectedSlug) {
+        List<SkillFacet> facets = new ArrayList<>();
+        boolean selectedShown = false;
+        for (JobSkillFacets.SkillCount count : jobRepository.countSkills(spec, MAX_SKILL_FACETS)) {
+            boolean selected = count.slug().equals(selectedSlug);
+            selectedShown |= selected;
+            facets.add(new SkillFacet(count.slug(), count.label(), count.jobCount(), selected));
+        }
+        if (selectedSlug != null && !selectedShown) {
+            for (JobSkillFacets.SkillCount count : jobRepository.countSkills(spec, Integer.MAX_VALUE)) {
+                if (count.slug().equals(selectedSlug)) {
+                    facets.add(new SkillFacet(count.slug(), count.label(), count.jobCount(), true));
+                    break;
+                }
+            }
+        }
+        return List.copyOf(facets);
     }
 
     // Whitelisted sort options only (Section 7.9): user input is never passed straight to
@@ -123,10 +167,20 @@ public class JobSearchService {
         Integer minSalary = parseMinSalary(raw.getMinSalary(), warnings);
         Integer maxExperience = parseFromOptions(raw.getMaxExperience(), EXPERIENCE_OPTIONS);
         Integer postedWithin = parseFromOptions(raw.getPostedWithin(), POSTED_WITHIN_OPTIONS);
+        String skill = parseSkill(raw.getSkill());
         String sort = parseSort(raw.getSort());
         int page = parsePage(raw.getPage());
         return new NormalisedCriteria(q, location, category, jobType, workMode, minSalary, maxExperience,
-                postedWithin, sort, page, warnings);
+                postedWithin, skill, sort, page, warnings);
+    }
+
+    // The facet parameter carries a canonical slug, but it arrives from a URL a person
+    // can edit, so it is canonicalised again here and checked against the skills table.
+    // An unknown skill is dropped silently, like an unknown category: a link shared after
+    // the last job listing that skill came down should show every job, not an error and
+    // not an empty page.
+    private String parseSkill(String raw) {
+        return skillService.findBySlug(raw).map(Skill::getSlug).orElse(null);
     }
 
     private String trimToLength(String raw) {

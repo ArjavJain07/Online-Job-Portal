@@ -77,7 +77,7 @@ public class RecommendationService {
         List<JobApplication> pastApplications = jobApplicationRepository.findBySeeker_IdAndStatusIn(seekerId,
                 EnumSet.allOf(ApplicationStatus.class), Sort.unsorted());
 
-        boolean hasSkills = profile.getSkills() != null && !profile.getSkills().isBlank();
+        boolean hasSkills = !profile.getSkills().isEmpty();
         boolean hasApplications = !pastApplications.isEmpty();
 
         // Step 2: the fallback. A seeker who has given the scorer nothing to match on

@@ -2,10 +2,13 @@ package com.jobportal.support;
 
 import com.jobportal.domain.Job;
 import com.jobportal.domain.JobApplication;
+import com.jobportal.domain.Skill;
 import com.jobportal.domain.User;
 import com.jobportal.repository.JobApplicationRepository;
 import com.jobportal.repository.JobRepository;
 import com.jobportal.repository.UserRepository;
+import com.jobportal.service.SkillService;
+import java.util.List;
 import java.util.Locale;
 import org.springframework.stereotype.Component;
 
@@ -19,12 +22,24 @@ public class TestData {
     private final UserRepository userRepository;
     private final JobRepository jobRepository;
     private final JobApplicationRepository jobApplicationRepository;
+    private final SkillService skillService;
 
     public TestData(UserRepository userRepository, JobRepository jobRepository,
-            JobApplicationRepository jobApplicationRepository) {
+            JobApplicationRepository jobApplicationRepository, SkillService skillService) {
         this.userRepository = userRepository;
         this.jobRepository = jobRepository;
         this.jobApplicationRepository = jobApplicationRepository;
+        this.skillService = skillService;
+    }
+
+    // Skill rows for a throwaway Job or SeekerProfile a test builds by hand
+    // (data.skills("Java, SQL")). It has to go through SkillService rather than
+    // Skill.of(...) because the rows are about to be persisted with the fixture: an
+    // unsaved Skill on the other end of the @ManyToMany would fail the save outright.
+    // Reuses whatever the seeder already created, so a test asking for "Java" gets the
+    // same row every seeded job points at - which is the whole point of the relation.
+    public List<Skill> skills(String csv) {
+        return skillService.resolve(csv);
     }
 
     public User user(String email) {

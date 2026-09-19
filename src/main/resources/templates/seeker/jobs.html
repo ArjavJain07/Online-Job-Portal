@@ -65,7 +65,7 @@
             <!-- The full filter panel, opened by the "All filters" pill and already open
                  whenever a detailed filter is in use, so nothing is hidden by surprise. -->
             <div class="collapse mb-3" id="jobFiltersPanel" th:classappend="${(criteria.q != null and criteria.q != '') or (criteria.location != null and criteria.location != '') or (criteria.category != null and criteria.category != '') or (criteria.minSalary != null and criteria.minSalary != '') or (criteria.maxExperience != null and criteria.maxExperience != '')} ? 'show'">
-                <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/seeker/jobs')}"></div>
+                <div th:replace="~{fragments/job-filters :: filters(${criteria}, '/seeker/jobs', ${skillFacets})}"></div>
             </div>
 
             <p class="text-muted mb-3"

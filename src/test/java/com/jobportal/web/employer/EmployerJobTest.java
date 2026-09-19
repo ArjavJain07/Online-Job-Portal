@@ -268,7 +268,7 @@ class EmployerJobTest extends IntegrationTestBase {
         params.set("title", job.getTitle());
         params.set("description", job.getDescription());
         params.set("requirements", job.getRequirements());
-        params.set("skills", job.getSkills());
+        params.set("skills", String.join(", ", job.skillList()));
         params.set("category", job.getCategory().name());
         params.set("jobType", job.getJobType().name());
         params.set("workMode", job.getWorkMode().name());
