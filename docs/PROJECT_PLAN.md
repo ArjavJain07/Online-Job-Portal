@@ -3419,6 +3419,143 @@ If the backfill had gone wrong, V4's own guard would already have aborted the mi
 * The character walk keeps non-ASCII characters in a slug, where `TextMatcher` keeps letters and digits but turns exotic punctuation into a space. For any real skill the two agree; where they could not, the migration errs towards keeping the data.
 ---
 
+### 10.9 Better job search: whole-word matching and relevance ranking
+
+Two things were still wrong with `JobSpecifications.keyword` after 10.8.
+
+| Symptom | Cause |
+|---|---|
+| Searching **java** still returned the **Frontend Developer** job | Its skills are HTML, CSS, JavaScript and React — no Java — and the skills branch excluded it correctly. Its *description* says "interfaces with HTML, CSS and JavaScript", and the description was still `like '%java%'`, which dragged it back in. |
+| A job **called** "Java Developer" could come below one that mentions Java in passing | Results came back in date order. There was no notion of a result being a *better* match, only of it being a match. |
+
+Both are fixed here. The ranking is new; the matching change is 10.8's job finished.
+
+**The decision that shapes everything else: one rule, evaluated in two places**
+
+Production is PostgreSQL 14; local development and the whole test suite are H2 (10.1, 10.3). PostgreSQL's full-text search — `tsvector`, `to_tsquery`, `ts_rank`, a GIN index — is the obvious tool and it was rejected, because H2 has no equivalent. Three options were weighed:
+
+| Option | Why not / why |
+|---|---|
+| `tsvector` + `ts_rank`, GIN-indexed | The best search, and untestable. It would make the single most user-visible query in the application impossible to run on any machine the project is actually developed on, so the first time anyone found out it was wrong would be in production. 10.7's rule — "a migration that is only ever run in production is a migration nobody has tested" — applies with more force to a query nobody can run. |
+| `tsvector` in production, a portable `LIKE` fallback for H2 | Worse than either half on its own. Every test would exercise the path that *does not run in production*, so the production path would be the untested one and the two would be free to disagree about which jobs match. A vendor-specific branch no test reaches is worse than not having the feature. |
+| **A persisted search index, computed in Java, matched with portable SQL** | **Chosen.** Three derived columns hold the normalised text; matching is one `LIKE` per column and ranking is a sum of `CASE` expressions. Every construct is SQL:2003 that H2 and PostgreSQL 14 spell and evaluate identically, so the order a visitor sees in production is the order the test suite observes on H2. |
+
+**The trade-off accepted.** No stemming, no ranking by term frequency or field length, no dictionary, and — because `LIKE '% word %'` cannot use a B-tree index on either engine — a full scan of `jobs` on every keyword search. That is the same scan the old `like '%java%'` did, so it is not a regression, but it is a ceiling: this design is right for a portal with thousands of jobs and would need revisiting at a million. The gain is that the ranking is *testable and explainable* rather than a black box that scores differently on two databases.
+
+**The model (V7)**
+
+```
+jobs.search_title          varchar(122)  not null   -- SearchIndex.of(title)
+jobs.search_description    varchar(4002) not null   -- SearchIndex.of(description)
+users.search_company_name  varchar(122)             -- SearchIndex.of(company_name), null for non-employers
+```
+
+`SearchIndex.of(text)` is `" " + TextMatcher.normalise(text) + " "` — the 10.8 normalisation, wrapped in one space at each end. `SearchIndex.phrasePattern(q)` is `"% " + normalise(q) + " %"`, or **null** when the visitor typed nothing searchable, which callers must read as "matches nothing", never "matches everything".
+
+Padding the stored value is what makes a single `LIKE` mean "contains this whole word", with no special case for the first or last word — and the pair `of` / `phrasePattern` *is* `TextMatcher.containsPhrase`'s implementation, so `containsPhrase` is now written in terms of them. There is nothing to prove equivalent because there is nothing different. Lengths are the source column + 2, exactly: `normalise` maps one character to one and then collapses runs, so it can only shrink.
+
+The pattern is always built in Java and sent as one ordinary `varchar` parameter. Nothing is concatenated in SQL — 10.7's `concat('%', :q, '%')` / `bytea||bytea` lesson, applied to a new place. `cb.like(..., pattern, '\\')` is used rather than the two-argument form because Hibernate renders that one as `like ? escape ''`, an empty escape clause this application has never executed against PostgreSQL; `escape '\'` is what the skills branch has been sending to production since 10.8.
+
+**Skills are untouched.** The skills branch still matches whole tokens against `Skill.slug` with its four `LIKE` patterns and still uses a subquery, so `hasSkill`, the facet and its counts, and `RecommendationScorer` all behave exactly as 10.8 left them. Skills were deliberately *not* denormalised into a fourth index column, even though it would have been faster and would have removed the subquery from the `ORDER BY`: a joined `" java spring boot "` column would match the phrase "spring boot" across two separate skills `Spring` and `Boot`, which is a different rule from the one 10.8 settled on.
+
+**The backfill is in Java, not in V7**
+
+V7 adds the columns and nothing else — no parsing, no normalisation, not one line of logic. `service.SearchIndexService` fills them at start-up, by re-running the entity setters that define them.
+
+This is the two-database decision again, in the place V4 had to solve the hard way. V4's header explains why it contains no regular expression: H2's `REGEXP_REPLACE` replaces every match and *rejects* the `g` flag, PostgreSQL's replaces only the first *without* it, so the one-liner canonicalises correctly in tests and mangles production data. V4 paid for that with a recursive character walk whose intermediate result is quadratic in the length of the text — affordable for a twelve-character skill, not for a 4000-character job description. But V4 had no choice: the comma-separated columns it read were the only copy of that data. These three columns are a *cache* of text still sitting untouched in the same row, so nothing has to be computed in SQL at all. Doing it in Java does not answer the portability question, it deletes it.
+
+What it costs: between Flyway finishing and `SearchIndexService` running — the same start-up, before the web server accepts a request — keyword search would find fewer jobs than it should. It can never find the **wrong** ones, because `''` is `LIKE` nothing. A missing result for a fraction of a second on one deploy is the cheaper half of that trade, and it is the direction to fail in.
+
+`''` is the "never indexed" marker, and the two `jobs` columns are `not null` so that a future code path which inserts a job without an index fails at the `INSERT` rather than quietly creating a job no search can find. `of(...)` never returns `''` (it returns at least its two padding spaces), so a job whose title is pure punctuation is not re-indexed on every start-up for ever. `users.search_company_name` is nullable because `company_name` is; `company_name is not null and search_company_name is null` tells "not indexed" from "not an employer" exactly.
+
+**Maintenance is in the setters, not in `@PreUpdate`.** `Job.setTitle`, `Job.setDescription` and `User.setCompanyName` write the index in the same call. Hibernate decides which properties are dirty *before* it invokes `@PreUpdate`, so a field touched only in that callback can be left out of the generated `UPDATE` — the index would then silently stop tracking edited titles, on exactly the rows people search for most. Assigning it in the setter makes the field dirty at the moment the text is.
+
+**How ranking works**
+
+One `CASE` per place the phrase can be found, added together:
+
+| Place | Weight |
+|---|---|
+| Title | 100 |
+| Skills | 60 |
+| Company name | 30 |
+| Description | 10 |
+
+```sql
+order by (case when search_title like ? then 100 else 0 end
+        + case when id in (<skills subquery>) then 60 else 0 end
+        + case when search_company_name like ? then 30 else 0 end
+        + case when search_description like ? then 10 else 0 end) desc,
+         approved_at desc, id desc
+```
+
+`100 > 60 + 30 + 10`, deliberately: **one higher place always beats any combination of lower ones.** That is what makes the ranking explainable rather than merely plausible — a job is ahead of another because of the single best place its phrase was found, and the lower matches only break ties between jobs whose best place is the same. "Java Developer" is above a job that merely mentions Java, whatever else that job matches.
+
+**Stability** comes from three keys, the last of which is unique. Score, then `approvedAt` descending (the existing "newest" order, so equally relevant jobs stay in the order the rest of the site would have shown them), then `id` descending. No two rows can tie on all three, so page 2 cannot repeat or drop a job page 1 already showed — the failure a two-key relevance sort produces the day two jobs are approved in the same second.
+
+**Explainability** is on the page, not only in this document. Each result card carries "Matched in title, skills and description", built in `JobSearchService.matchReasons` by `TextMatcher.containsPhrase` over the *same two strings the database was handed*. It cannot name a place the query did not match, and the places are listed in weight order, so the first one named is the one that decided the job's position. With no keyword the map is empty and nothing is printed.
+
+**Relevance is a Specification, not a `Sort`.** Spring Data's `Sort` can only name mapped properties, and relevance is a function of the row *and* of what was typed. `JobSpecifications.relevanceOrder` sets the order on the query and the `Pageable` is handed over unsorted. This is supported, not a trick: `SimpleJpaRepository.getCountQuery` clears the order list with the comment *"Remove all Orders the Specifications might have applied"*, so the count beside the page is unaffected. It is chained on only after the facet counts have been built, so it never reaches the facet query.
+
+A phrase that normalises to nothing leaves the score out of the `ORDER BY` entirely rather than ordering by a constant — `order by 0 desc` is a *positional* reference on PostgreSQL ("ORDER BY position 0 is not in select list"), so emitting a bare literal there would be a query that passes every test on H2 and fails in production.
+
+**`sort=relevance`**, added to the whitelist. A keyword search with no explicit sort now defaults to relevance; a search with no keyword still defaults to "newest", unchanged. `sort=relevance` with no keyword falls back to "newest" rather than erroring, per 7.9's lenient binding rule.
+
+**The cost of whole-word matching, stated plainly**
+
+Searching **develop** no longer finds **Developer**. "java matches part of a word" and "java does not match javascript" are the same rule read twice; the second cannot be had without giving up the first. The old comment defended substring matching on prose as "what a visitor typing half a word expects", and that is a real loss. It is accepted because the alternative is the reported bug, and because what is bought is one definition of "matches" across the whole application — the skills branch, the three prose columns, `RecommendationScorer`'s rules 2 and 3, and the "why did this appear" line on each card now all mean the same thing. A prefix-matching second pass, run only when the exact search found nothing, is the natural follow-up and is deliberately not in this change.
+
+**Existing expectations that changed, and why each is correct**
+
+| Test | Was | Now |
+|---|---|---|
+| `JobSpecificationsTest#keywordEscapesPercentAndUnderscore` → `#keywordIgnoresAPhraseThatIsOnlyPunctuation` | `keyword("%")` returned the one job whose title contains a literal `%` — correct for an escaped substring `LIKE` | `%` and `_` are not words, they are whitespace, so the phrase is empty and matches **nothing**. The danger the old test guarded (one keystroke turning a filtered search into every job on the site) is asserted from the other side, and the escaping itself is still proved by the new `#locationEscapesPercentAndUnderscore`, on the filter that really is still a substring search. |
+| `JobSearchTest#jobsListPaneDefaultsToFirstResult` | `q=java&location=pune` opened the pane on Spring Boot Intern (newest) | Split in two. `#keywordSearchPaneOpensOnTheMostRelevantResult` asserts Java Developer (title match, 170 against 70) — the feature working. `#jobsListPaneDefaultsToFirstResult` keeps the old assertion with the keyword removed, which is the case that proves the site-wide default sort did **not** change. |
+| `JobSearchTest#unknownJobParamFallsBackToFirstResult` | fell back to Spring Boot Intern | Falls back to Java Developer. The fallback rule is unchanged; "first result" moved. |
+| `JobSearchTest#seekerJobsPaneDefaultsToFirstResultAndFallsBackOnUnknownId` | as above, on `/seeker/jobs` | as above. |
+| `SkillBackfillMigrationTest#theGuardFailsWhenARowsSkillsDidNotMakeItAcross` | raw `INSERT` into `jobs` with no search columns | Supplies `search_title`/`search_description` as `''`. That this `INSERT` could not run without them is the `not null` working as intended. |
+
+**Before the first deploy: run these against a real PostgreSQL.** Every test here runs on H2. The constructs were chosen to be standard on both and the one known divergence was designed out, but *designed to be portable* is not *observed to be portable*, and no PostgreSQL is available on the machine this was written on.
+
+1. **V7 itself.** `alter table ... alter column ... set not null` is standard and both engines document it; H2 proves it on every test run. Apply V7 to a copy of production and confirm it completes.
+2. **The relevance `ORDER BY`.** This is the one genuinely new query *shape* in the application. Confirm it plans and runs:
+   ```sql
+   select j.id, j.title,
+          (case when j.search_title like '% java %' escape '\' then 100 else 0 end
+         + case when j.id in (select j2.id from jobs j2
+                                join job_skills js on j2.id = js.job_id
+                                join skills s on s.id = js.skill_id
+                               where s.slug = 'java' or s.slug like 'java %' escape '\'
+                                  or s.slug like '% java' escape '\' or s.slug like '% java %' escape '\')
+                then 60 else 0 end
+         + case when u.search_company_name like '% java %' escape '\' then 30 else 0 end
+         + case when j.search_description like '% java %' escape '\' then 10 else 0 end) as score
+     from jobs j join users u on u.id = j.employer_id
+    order by score desc, j.approved_at desc, j.id desc;
+   ```
+   Hibernate sends the weights as `cast(? as integer)`, which is what keeps PostgreSQL from having to infer an untyped parameter; the query above inlines them, so run the application's own search as well and check the log.
+3. **The backfill.** Start the application once against the copy and confirm it logs `Search index: built N missing entries`, then that nothing is left:
+   ```sql
+   -- Expect 0 rows from both.
+   select id, title from jobs where search_title = '' or search_description = '';
+   select id, company_name from users where company_name is not null and search_company_name is null;
+
+   -- And spot-check the values, which is the part a different engine could have got wrong
+   -- if this had been done in SQL. Every row must be lower-case, punctuation-free and
+   -- wrapped in exactly one space at each end.
+   select title, search_title from jobs order by id limit 20;
+   ```
+4. **The end-to-end answer.** On the copy, `GET /jobs?q=java` must not return the Frontend Developer job, and must put Java Developer first.
+
+**Known limits**
+
+* No index can serve `LIKE '% word %'`, so a keyword search is a full scan of `jobs`. Unchanged from before, and the ceiling on this design. On PostgreSQL a `pg_trgm` GIN index over the three columns would help and would be purely additive — a future change that alters no behaviour and therefore needs no H2 equivalent.
+* Multi-word queries are treated as a **phrase**, not as a set of words: "java developer" finds "Java Developer" and not "Senior Java Backend Developer". That is what the old substring `LIKE` did too, so nothing regressed, but matching all words in any order is the obvious next step.
+* `requirements` is still not searched — it never was. Indexing it is one more column and one more line in `SearchIndexService`, and widening what a search matches is a separate decision from making the matching correct.
+* `SearchIndexService` loads every unindexed row in one pass. That happens exactly once in the life of a database; if a portal ever outgrows it, page the loop — do not move the rule back into SQL.
+* The score is not shown to the visitor, only the places that matched. Showing a number invites arguing with it.
+---
+
 ## 11. Implementation Milestones
 
 ### 11.1 Overview

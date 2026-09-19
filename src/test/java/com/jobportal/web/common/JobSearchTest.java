@@ -141,14 +141,38 @@ class JobSearchTest extends IntegrationTestBase {
     }
 
     // Section 7.1 core rule 7 (two-pane jobs page): with no "job" request parameter, the
-    // pane opens on the first result of the current page - "newest" is the default sort,
-    // and Spring Boot Intern (J2, approved 5 days ago) is newer than Java Developer (J1,
-    // approved 19 days ago), so it is first. Only the pane renders a job's full
-    // description (fragments/job-card never does), so a snippet of it is used to tell
+    // pane opens on the first result of the current page. Only the pane renders a job's
+    // full description (fragments/job-card never does), so a snippet of it is used to tell
     // "shown in the pane" apart from merely "present in the list".
+    //
+    // CHANGED BY SECTION 10.9, and this is the change working. This test used to expect
+    // Spring Boot Intern here, because the default sort was "newest" and J2 was approved 5
+    // days ago against Java Developer's 19. A keyword search now defaults to relevance, and
+    // "java" is in Java Developer's TITLE (weight 100) where Spring Boot Intern has it only
+    // in its skills and its description (60 + 10), so J1 is first. That is precisely the
+    // behaviour the feature was asked for - a job called "Java Developer" outranks one that
+    // mentions Java further down - and it only applies because this request has a keyword;
+    // #paginationKeepsFilters and every other test with no q still sort by date.
+    @Test
+    void keywordSearchPaneOpensOnTheMostRelevantResult() throws Exception {
+        String body = mockMvc.perform(get("/jobs").param("q", "java").param("location", "pune"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("join our backend team in Pune"); // Java Developer's own description
+        assertThat(body).doesNotContain("learn to build real backend features"); // Spring Boot Intern's
+        assertThat(cardIsSelected(body, "Java Developer")).isTrue();
+        assertThat(cardIsSelected(body, "Spring Boot Intern")).isFalse();
+    }
+
+    // The other half of the same rule: with NO keyword there is nothing to be relevant to,
+    // so the default is still "newest" and the pane still opens on the newest Live job
+    // (Spring Boot Intern, approved 5 days ago). Kept as its own test because it is the
+    // case that proves Section 10.9 did not quietly change the default sort of the whole
+    // site.
     @Test
     void jobsListPaneDefaultsToFirstResult() throws Exception {
-        String body = mockMvc.perform(get("/jobs").param("q", "java").param("location", "pune"))
+        String body = mockMvc.perform(get("/jobs").param("location", "pune"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -176,7 +200,9 @@ class JobSearchTest extends IntegrationTestBase {
     }
 
     // A "job" id that is not one of this result page's jobs (here, not seeded at all)
-    // falls back to the first result, the same as no "job" parameter.
+    // falls back to the first result, the same as no "job" parameter - which on a keyword
+    // search is now the most relevant one rather than the newest (Section 10.9, see
+    // #keywordSearchPaneOpensOnTheMostRelevantResult for why).
     @Test
     void unknownJobParamFallsBackToFirstResult() throws Exception {
         String body = mockMvc.perform(get("/jobs").param("q", "java").param("location", "pune")
@@ -184,9 +210,9 @@ class JobSearchTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(body).contains("learn to build real backend features"); // Spring Boot Intern's own description
-        assertThat(cardIsSelected(body, "Spring Boot Intern")).isTrue();
-        assertThat(cardIsSelected(body, "Java Developer")).isFalse();
+        assertThat(body).contains("join our backend team in Pune"); // Java Developer's own description
+        assertThat(cardIsSelected(body, "Java Developer")).isTrue();
+        assertThat(cardIsSelected(body, "Spring Boot Intern")).isFalse();
     }
 
     // Same pane wiring on GET /seeker/jobs, plus the seeker-specific apply/login CTA
@@ -218,9 +244,13 @@ class JobSearchTest extends IntegrationTestBase {
     // Same pane default/fallback rules as jobsListPaneDefaultsToFirstResult and
     // unknownJobParamFallsBackToFirstResult above (Section 7.1 core rule 7), exercised on
     // GET /seeker/jobs so both routes that gained the "job" parameter are covered the same
-    // way: with no "job" parameter the pane opens on the first result (Spring Boot Intern,
-    // newer than Java Developer under the default "newest" sort), and an id that is not one
-    // of this result page's own jobs falls back to that same first result.
+    // way: with no "job" parameter the pane opens on the first result, and an id that is
+    // not one of this result page's own jobs falls back to that same first result.
+    //
+    // Both requests carry q=java, so "first result" here means the most relevant one - Java
+    // Developer, which has the word in its title - not the newest (Section 10.9). The
+    // no-keyword default is covered by jobsListPaneDefaultsToFirstResult above; this test's
+    // subject is the fallback rule, which is unchanged.
     @Test
     void seekerJobsPaneDefaultsToFirstResultAndFallsBackOnUnknownId() throws Exception {
         UserDetails priya = userDetailsService.loadUserByUsername("priya@demo.local");
@@ -229,17 +259,17 @@ class JobSearchTest extends IntegrationTestBase {
                         .with(user(priya)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertThat(defaultBody).contains("learn to build real backend features"); // Spring Boot Intern's own description
-        assertThat(cardIsSelected(defaultBody, "Spring Boot Intern")).isTrue();
-        assertThat(cardIsSelected(defaultBody, "Java Developer")).isFalse();
+        assertThat(defaultBody).contains("join our backend team in Pune"); // Java Developer's own description
+        assertThat(cardIsSelected(defaultBody, "Java Developer")).isTrue();
+        assertThat(cardIsSelected(defaultBody, "Spring Boot Intern")).isFalse();
 
         String unknownIdBody = mockMvc.perform(get("/seeker/jobs").param("q", "java").param("location", "pune")
                         .param("job", "999999").with(user(priya)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertThat(unknownIdBody).contains("learn to build real backend features");
-        assertThat(cardIsSelected(unknownIdBody, "Spring Boot Intern")).isTrue();
-        assertThat(cardIsSelected(unknownIdBody, "Java Developer")).isFalse();
+        assertThat(unknownIdBody).contains("join our backend team in Pune");
+        assertThat(cardIsSelected(unknownIdBody, "Java Developer")).isTrue();
+        assertThat(cardIsSelected(unknownIdBody, "Spring Boot Intern")).isFalse();
     }
 
     // Whether a job's list card carries ".is-selected" (Section 7.1 core rule 7). Same

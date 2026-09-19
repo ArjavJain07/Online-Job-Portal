@@ -62,6 +62,19 @@
                 &middot;
                 Apply by <span th:text="${#temporals.format(job.applicationDeadline, 'dd MMM yyyy')}">11 Oct 2026</span>
             </p>
+
+            <!-- Why this job is in these results, and in this position (Section 10.9).
+                 Read from the plain model attribute "matchReasons" exactly the way
+                 "selectedJobId" above is read, so the fragment signature stays
+                 "card(job, applied)" and no caller changes: the two search pages add the
+                 map, every other page that uses this card (the landing page, the
+                 recommendations list) simply does not, and th:if reads the missing
+                 attribute as null and renders nothing.
+                 The places are listed best-first, so the first one named is the one that
+                 decided the job's rank. -->
+            <p class="job-meta mb-0 mt-1" th:if="${matchReasons != null and matchReasons[job.id] != null}">
+                <i class="bi bi-check2 me-1" aria-hidden="true"></i><span th:text="${matchReasons[job.id]}">Matched in title</span>
+            </p>
         </div>
     </div>
 </div>

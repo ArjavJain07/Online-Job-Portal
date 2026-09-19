@@ -2,6 +2,7 @@ package com.jobportal.dto;
 
 import com.jobportal.domain.Job;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.Page;
 
 
@@ -17,6 +18,17 @@ import org.springframework.data.domain.Page;
 // a facet list usable - with the filter applied, picking "Java" would leave "Java (24)"
 // as the only row and there would be no way to switch to another skill without clearing
 // the filter first.
+// matchReasons (Section 10.9) is the "why is this here" line under each result card, keyed
+// by job id: "Matched in title and skills". Empty whenever the search has no keyword, which
+// is what tells the templates to render nothing - a list that is not the answer to a
+// question does not need to justify itself.
+//
+// It is a plain Map keyed by id rather than a field on some new row type because the two
+// results pages iterate different things (public/jobs.html walks the Page of jobs directly,
+// seeker/jobs.html walks SeekerJobRow), and fragments/job-card is shared by both. That is
+// the same shape the two-pane layout's "selectedJobId" already uses and for the same
+// reason: one plain model attribute the fragment reads for itself, instead of a third
+// parameter on a fragment signature every caller would have to change.
 public record JobSearchResult(Page<Job> jobs, NormalisedCriteria criteria, List<String> warnings,
-        List<SkillFacet> skillFacets) {
+        List<SkillFacet> skillFacets, Map<Long, String> matchReasons) {
 }

@@ -60,6 +60,10 @@ public class JobBrowseController {
         model.addAttribute("warning", firstWarningOrNull(result));
         // Section 10.8: the "Java (24)" chips fragments/job-filters renders.
         model.addAttribute("skillFacets", result.skillFacets());
+        // Section 10.9: the "Matched in title and skills" line fragments/job-card renders
+        // under each result when the search had a keyword. An empty map (no keyword) makes
+        // the fragment render nothing, so this is always safe to add.
+        model.addAttribute("matchReasons", result.matchReasons());
 
         Job selectedJob = jobSearchService.selectForPane(result.jobs().getContent(), jobId);
         model.addAttribute("selectedJob", selectedJob);

@@ -1,6 +1,7 @@
 package com.jobportal.domain;
 
 import com.jobportal.domain.enums.Role;
+import com.jobportal.util.SearchIndex;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,6 +42,24 @@ public class User {
 
     @Column(length = 120)
     private String companyName;
+
+    // Search index for companyName (Section 10.9, V7): SearchIndex.of(companyName), so
+    // " acme technologies " - the form JobSpecifications.keyword matches a typed phrase
+    // against with a single whole-word LIKE.
+    //
+    // It lives here, on the row that owns the name, rather than being copied onto each of
+    // the employer's jobs so that the whole search could read one table. Copying it would
+    // have been faster and wrong: an employer who renames the company would leave a stale
+    // name on every job they have posted, and the search reads this on every request, so
+    // V4's "a column nothing reads cannot drift into a wrong answer" would not save it.
+    // Here, setCompanyName below is the only thing that can write it.
+    //
+    // NULLABLE, unlike the two on Job, because companyName is: only employers have one.
+    // NULL therefore means "no company name OR not indexed yet", and the two are told
+    // apart exactly by UserRepository.findWithUnindexedCompanyName's predicate
+    // (companyName is not null and searchCompanyName is null).
+    @Column(length = 122)
+    private String searchCompanyName;
 
     @Column(length = 200)
     private String companyWebsite;
@@ -124,8 +143,37 @@ public class User {
         return companyName;
     }
 
+    // Setting the company name re-indexes it in the same call (Section 10.9), for the same
+    // reason Job.setTitle does: a field written only inside @PreUpdate can be left out of
+    // the UPDATE Hibernate generates, and a search index that stops tracking renames is
+    // wrong in a way nothing would notice. All six callers of this setter - registration,
+    // the employer's own profile edit, the admin user form (both create and edit), the
+    // account service and DemoDataLoader - therefore maintain the index without knowing it
+    // exists. The seventh, UserService's "demote an employer" path, passes null and
+    // clears it, which is correct: a user who is no longer an employer has no company name
+    // to find them by.
     public void setCompanyName(String companyName) {
         this.companyName = companyName;
+        this.searchCompanyName = companyName == null ? null : SearchIndex.of(companyName);
+    }
+
+    // True when this user has a company name that predates Section 10.9 and has never been
+    // indexed. Distinguishes "not indexed" from the far more common "not an employer, so
+    // there is nothing to index", which are the same NULL in the column.
+    public boolean needsSearchIndex() {
+        return companyName != null && searchCompanyName == null;
+    }
+
+    // Rebuilds the index from the name already on this user, by re-running the one setter
+    // that defines it (Section 10.9 backfill).
+    public void reindexSearchText() {
+        setCompanyName(companyName);
+    }
+
+    // The raw stored index. Package-private: only the test that proves the column is
+    // really maintained reads it directly.
+    String searchCompanyNameIndex() {
+        return searchCompanyName;
     }
 
     public String getCompanyWebsite() {

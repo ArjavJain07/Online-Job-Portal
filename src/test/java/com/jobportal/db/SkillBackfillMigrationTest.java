@@ -141,11 +141,20 @@ class SkillBackfillMigrationTest {
         try (Connection c = connect(url); Statement s = c.createStatement()) {
             // A job added after the migration, with the old column set and no join rows -
             // exactly the state a backfill that quietly skipped a row would leave behind.
+            //
+            // search_title and search_description are supplied because V7 made them NOT
+            // NULL (Section 10.9) and this INSERT is the one in this file that runs AFTER
+            // the migrations rather than before them. They carry SearchIndex.UNINDEXED,
+            // which is exactly what a row that has never been indexed holds; nothing here
+            // searches, and SearchIndexService is not running in this test, so the real
+            // index would be no truer than the sentinel. That this row could not be
+            // inserted without them is the NOT NULL working as intended - a job with no
+            // search index fails loudly instead of becoming unfindable.
             s.execute("insert into jobs (id, employer_id, title, description, requirements, skills, category, "
                     + "job_type, work_mode, location, salary_min, salary_max, min_experience_years, openings, "
-                    + "application_deadline, status, view_count, created_at) values "
-                    + "(99, 1, 'Missed', 'd', 'r', 'Java', 'OTHER', 'FULL_TIME', 'ONSITE', 'Pune', 1, 2, 0, 1, "
-                    + "date '2030-01-01', 'APPROVED', 0, timestamp '2026-01-01 10:00:00')");
+                    + "application_deadline, status, view_count, created_at, search_title, search_description) "
+                    + "values (99, 1, 'Missed', 'd', 'r', 'Java', 'OTHER', 'FULL_TIME', 'ONSITE', 'Pune', 1, 2, "
+                    + "0, 1, date '2030-01-01', 'APPROVED', 0, timestamp '2026-01-01 10:00:00', '', '')");
 
             s.execute("create table guard_rerun (checked integer not null)");
             assertThatThrownBy(() -> s.execute("insert into guard_rerun (checked) "

@@ -1,0 +1,131 @@
+-- ===========================================================================
+-- V7 - the persisted search index for relevance-ranked job search (Section 10.9)
+--
+-- Adds three derived columns and NOTHING ELSE. No data is moved, no text is
+-- parsed, and there is not a single line of normalisation logic in this file.
+-- That is the whole point, and it is the answer to the two-database problem
+-- Section 10.9 sets out: production is PostgreSQL 14, every developer machine
+-- and the entire test suite are H2, and the thing that has to be identical on
+-- both is the definition of "does this text contain that word".
+--
+-- WHAT THE COLUMNS HOLD
+-- Each one holds util.SearchIndex.of(<the column beside it>): the source text
+-- put through util.TextMatcher.normalise - lower-cased, every character other
+-- than a letter, digit, + or # replaced by a space, runs of spaces collapsed -
+-- and then wrapped in one leading and one trailing space. So the job titled
+-- "Node.js Developer" stores " node js developer ".
+--
+-- The surrounding spaces are not decoration. They are what turns a whole-word
+-- test into a plain LIKE that neither database has to be clever about:
+--
+--     search_title LIKE '% java %'
+--
+-- is true for " java developer " and false for " javascript engineer ", which
+-- is exactly the bug Section 10.9 exists to fix, and it is character-for-
+-- character the same test TextMatcher.containsPhrase already runs in Java
+-- (`(" " + normalise(text) + " ").contains(" " + normalise(phrase) + " ")`).
+-- One rule, evaluated in two places, not two rules that agree today.
+--
+-- WHY NOT tsvector / to_tsquery / ts_rank / GIN
+-- Because H2 has no equivalent. A PostgreSQL full-text column would make the
+-- single most user-visible query in the application untestable and unrunnable
+-- on every machine the project is actually developed on, and the first time
+-- anyone found out it was wrong would be in production. Section 10.7's "a
+-- migration that is only ever run in production is a migration nobody has
+-- tested" applies with even more force to a query nobody can run.
+--
+-- WHY THE BACKFILL IS NOT IN THIS FILE (the V4 lesson, applied)
+-- V4's header explains at length why it contains no regular expression: H2's
+-- REGEXP_REPLACE replaces every match and REJECTS the 'g' flag, PostgreSQL's
+-- replaces only the first match WITHOUT it, so the obvious one-liner would
+-- canonicalise correctly in tests and mangle production data. V4 paid for that
+-- with a recursive character walk, which is affordable for a twelve-character
+-- skill and is NOT affordable for a 4000-character job description: it carries
+-- a shrinking remainder, so the intermediate result is quadratic in the length
+-- of the text being normalised.
+--
+-- But V4 had no choice - the comma-separated columns it read were the only
+-- copy of that data, so the move had to happen inside the transaction that
+-- restructured them. These three columns are different in kind: they are a
+-- CACHE of text that is still sitting untouched in the same row. Nothing is
+-- lost if they are empty, so nothing has to be computed here.
+--
+-- They are therefore filled by service.SearchIndexService at start-up, in
+-- Java, by TextMatcher.normalise itself. That removes the portability question
+-- instead of answering it: there is no SQL dialect involved in normalisation
+-- at all, on either database, so H2 and PostgreSQL cannot disagree about a
+-- rule neither of them evaluates.
+--
+-- '' IS THE "NOT INDEXED YET" SENTINEL, AND IT IS SAFE
+-- The two job columns are NOT NULL, so a future code path that somehow writes
+-- a job without an index fails loudly at INSERT instead of quietly producing a
+-- job that no search can find. The value this migration puts there is the
+-- empty string, which SearchIndexService looks for and replaces; a real index
+-- is never empty, because SearchIndex.of always returns at least the two
+-- padding spaces.
+--
+-- Between this migration finishing and SearchIndexService running - the same
+-- start-up, before the web server accepts a request - a keyword search would
+-- match fewer jobs than it should. It can never match the WRONG jobs: '' is
+-- LIKE nothing. A stale index is a missing result, not a false one, which is
+-- the failure mode to choose if one has to be chosen.
+--
+-- users.search_company_name is NULLABLE instead, because company_name is:
+-- only employers have one. NULL there means "no company name OR not indexed
+-- yet", and the finder in UserRepository tells the two apart exactly
+-- (company_name is not null and search_company_name is null).
+--
+-- LENGTHS ARE THE SOURCE COLUMN + 2
+-- normalise() maps one character to one character and then collapses runs, so
+-- it can only ever shrink its input; SearchIndex.of then adds the two padding
+-- spaces. title varchar(120) -> varchar(122), description varchar(4000) ->
+-- varchar(4002), company_name varchar(120) -> varchar(122). These match
+-- domain.Job and domain.User exactly, which is what BaselineSchemaTest
+-- compares (Section 10.7).
+--
+-- ROLLING BACK
+-- Deploy the previous release and run nothing. Flyway keeps its V7 row, which
+-- the older application ignores; the three columns sit unread; every source
+-- column is untouched, because this migration never writes to one. Re-
+-- upgrading finds V7 applied and SearchIndexService rebuilds anything that is
+-- still empty. Nothing can be lost here: every value in these columns is
+-- recomputable from the row it lives in.
+--
+-- BEFORE THE FIRST DEPLOY, ON POSTGRESQL: nothing in this file needs checking
+-- for behaviour - there is no logic in it - but the three DDL spellings below
+-- do. `alter table ... alter column ... set not null` is standard and is what
+-- both engines document; H2 proves it on every test run, PostgreSQL does not.
+-- Section 10.9's deployment checklist lists this together with the one query
+-- shape that genuinely needs eyes on a real PostgreSQL.
+-- ===========================================================================
+
+
+-- ---------------------------------------------------------------------------
+-- jobs: the two prose columns a keyword search reads.
+--
+-- requirements is deliberately NOT indexed. It is not searched today (see
+-- JobSpecifications.keyword, which has always read title, description and
+-- company name), and widening what a search matches is a separate decision
+-- from making the matching correct. Adding it later is one more column and one
+-- more line in SearchIndexService.
+-- ---------------------------------------------------------------------------
+alter table jobs add column search_title varchar(122);
+alter table jobs add column search_description varchar(4002);
+
+update jobs set search_title = '', search_description = '';
+
+alter table jobs alter column search_title set not null;
+alter table jobs alter column search_description set not null;
+
+
+-- ---------------------------------------------------------------------------
+-- users: the employer's company name, indexed in the row that owns it.
+--
+-- Copying company_name onto every one of that employer's jobs would have made
+-- the whole search read one table, and would have been wrong: a company that
+-- renames itself would leave a stale name on each of its jobs, and "a column
+-- nothing reads cannot drift" (V4's rule for jobs.skills) does not apply to a
+-- column the search reads on every request. Keeping the index next to its
+-- source means User.setCompanyName maintains it and nothing else can.
+-- ---------------------------------------------------------------------------
+alter table users add column search_company_name varchar(122);

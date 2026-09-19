@@ -11,6 +11,15 @@ public final class TextMatcher {
 
     // True when phrase appears as a whole word (or whole punctuation-joined token, such
     // as "node.js" or "c++") inside text.
+    //
+    // Expressed through SearchIndex since Section 10.9, and the behaviour is unchanged -
+    // SearchIndex.of(text) IS `" " + normalise(text) + " "`, which is what this method
+    // built inline before. The point of routing it through that class is that the same
+    // two strings are now what the database sees: jobs.search_title holds
+    // SearchIndex.of(title) and the keyword query sends SearchIndex.phrasePattern(q) as a
+    // LIKE pattern. So "does this job's title match what was typed" has ONE answer,
+    // whether it is asked of ten rows in Java or of every row in SQL - which is what lets
+    // the results page say why a job appeared and be right (Section 10.9).
     public static boolean containsPhrase(String text, String phrase) {
         if (text == null || phrase == null) {
             return false;
@@ -19,8 +28,7 @@ public final class TextMatcher {
         if (normalisedPhrase.isEmpty()) {
             return false;
         }
-        String normalisedText = normalise(text);
-        return (" " + normalisedText + " ").contains(" " + normalisedPhrase + " ");
+        return SearchIndex.of(text).contains(" " + normalisedPhrase + " ");
     }
 
     // Lower-cases the value and replaces every character other than letters, digits, +

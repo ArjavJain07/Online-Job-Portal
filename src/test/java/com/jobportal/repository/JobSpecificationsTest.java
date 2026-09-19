@@ -3,6 +3,7 @@ package com.jobportal.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jobportal.domain.Job;
+import com.jobportal.domain.User;
 import com.jobportal.domain.enums.JobCategory;
 import com.jobportal.domain.enums.JobStatus;
 import com.jobportal.domain.enums.JobType;
@@ -23,6 +24,8 @@ class JobSpecificationsTest extends IntegrationTestBase {
 
     @Autowired
     private JobRepository jobRepository;
+    @Autowired
+    private UserRepository userRepository;
     @Autowired
     private Clock clock;
 
@@ -68,20 +71,54 @@ class JobSpecificationsTest extends IntegrationTestBase {
                 .containsExactlyInAnyOrder("Spring Boot Intern", "QA Engineer", "Marketing Executive");
     }
 
-    // keyword() must escape LIKE metacharacters (Section 7.9) before it reaches
-    // JobSpecifications.likePattern: without escaping, "%" and "_" are SQL wildcards that
-    // would match almost every seeded job (an empty/one-character LIKE wildcard), so
-    // matching only the one job that really contains the literal character proves the
-    // escaping works.
+    // CHANGED BY SECTION 10.9, and the change is the correct one.
+    //
+    // This used to assert that keyword("%") returned the one job whose title contains a
+    // literal "%", which is what a correctly escaped substring LIKE does. keyword() is no
+    // longer a substring search: it matches whole words against the V7 index, and
+    // SearchIndex.of turns every character that is not a letter, digit, + or # into a
+    // space - so "%" and "_" are not words, they are whitespace, and the phrase a visitor
+    // typed is empty. An empty phrase matches NOTHING, the same answer
+    // TextMatcher.containsPhrase and the skills branch have always given for one.
+    //
+    // The danger the old test guarded against is unchanged and is still covered: an
+    // unescaped "%" reaching a LIKE means one keystroke silently turns a filtered search
+    // into "every job on the site". That is asserted here from the other side - the result
+    // must be empty, not everything - and the escaping itself is still proved by
+    // locationEscapesPercentAndUnderscore below, which covers the filter that really is
+    // still a substring search over raw text.
     @Test
-    void keywordEscapesPercentAndUnderscore() {
+    void keywordIgnoresAPhraseThatIsOnlyPunctuation() {
         Job job = jobRepository.saveAndFlush(oddlyNamedJob());
 
-        List<Job> percentMatches = jobRepository.findAll(JobSpecifications.keyword("%"));
-        assertThat(percentMatches).extracting(Job::getId).containsExactly(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("%")))
+                .as("\"%\" is not a word, so it must match nothing - and above all not everything")
+                .isEmpty();
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("_"))).isEmpty();
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("---"))).isEmpty();
 
-        List<Job> underscoreMatches = jobRepository.findAll(JobSpecifications.keyword("_"));
-        assertThat(underscoreMatches).extracting(Job::getId).containsExactly(job.getId());
+        // The job itself is still findable by the words in its title, so "matches nothing"
+        // is about the phrase that was typed and not about the row.
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("sale")))
+                .extracting(Job::getId).containsExactly(job.getId());
+    }
+
+    // locationContains is still a substring search over the raw column - "pun" has to find
+    // "Pune" - so it still builds a LIKE pattern from text a visitor typed, and still has
+    // to escape it. Without escaping, "%" and "_" are SQL wildcards that would match almost
+    // every seeded job, so matching only the one job that really contains the literal
+    // character proves the escaping works (Section 7.9).
+    @Test
+    void locationEscapesPercentAndUnderscore() {
+        Job job = plainJob();
+        job.setLocation("50% Off_Sale Park");
+        job.assignSkills(data.skills("Sales"));
+        jobRepository.saveAndFlush(job);
+
+        assertThat(jobRepository.findAll(JobSpecifications.locationContains("%")))
+                .extracting(Job::getId).containsExactly(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.locationContains("_")))
+                .extracting(Job::getId).containsExactly(job.getId());
     }
 
     // The defect that made skills an entity (Section 10.8): searching "Java" used to
@@ -91,9 +128,12 @@ class JobSpecificationsTest extends IntegrationTestBase {
     // whose skill is "Spring Boot", because a search box has to match part of a phrase.
     //
     // The fixture keeps the word out of the title, description, requirements and company
-    // name, so a match can only have come through the skills branch. (No seeded job works
-    // for this: Frontend Developer lists JavaScript, but its description says "JavaScript"
-    // too, and the prose columns are still - correctly - a substring search.)
+    // name, so a match can only have come through the skills branch. (When this test was
+    // written no seeded job could be used for it: Frontend Developer lists JavaScript, but
+    // its description says "JavaScript" too, and the prose columns were still a substring
+    // search, so it came back for "java" anyway. Section 10.9 fixed that half as well -
+    // see keywordDoesNotMatchAWordInsideAnotherWordInProse below, which now asserts on
+    // that exact seeded job.)
     @Test
     void keywordMatchesSkillsAsWholeTokensNotSubstrings() {
         Job job = jobRepository.saveAndFlush(skilledJob("Front End Engineer", "JavaScript, Spring Boot"));
@@ -113,6 +153,99 @@ class JobSpecificationsTest extends IntegrationTestBase {
         assertThat(jobRepository.findAll(JobSpecifications.keyword("boot")))
                 .as("including the last word")
                 .extracting(Job::getId).contains(job.getId());
+    }
+
+    // THE DEFECT SECTION 10.9 EXISTS TO FIX, on the exact seeded job it was reported
+    // against. Frontend Developer (J3) lists HTML, CSS, JavaScript and React - no Java at
+    // all - and its description reads "build user interfaces with HTML, CSS and
+    // JavaScript". Under the old substring LIKE over the description it came back for
+    // "java" even though the skills branch had correctly excluded it, so the precision
+    // Section 10.8 bought was worth nothing to anyone using the search box.
+    //
+    // Both directions are asserted, because "match less" is only right if it still matches
+    // the jobs that really are about Java: the three seeded jobs that mention Java as a
+    // word (J1 in its title, skills and description; J2 in its skills and description; J4
+    // in its skills and description) must all still be found.
+    @Test
+    void keywordDoesNotMatchAWordInsideAnotherWordInProse() {
+        List<Job> matches = jobRepository.findAll(
+                JobSpecifications.live(LocalDate.now(clock)).and(JobSpecifications.keyword("java")));
+
+        assertThat(matches).extracting(Job::getTitle)
+                .as("\"java\" must not match the description's \"JavaScript\"")
+                .doesNotContain("Frontend Developer");
+        assertThat(matches).extracting(Job::getTitle)
+                .containsExactlyInAnyOrder("Java Developer", "Spring Boot Intern", "QA Engineer");
+
+        // And the JavaScript job is still findable by its own name, in prose as well as in
+        // its skills - this is a precision fix, not a narrower index.
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("javascript")))
+                .extracting(Job::getTitle).contains("Frontend Developer");
+    }
+
+    // Whole-word matching over prose has to be punctuation-tolerant, or it trades one kind
+    // of wrong answer for another: a description that ends a sentence with the word, or
+    // writes it as "Node.js", still contains that word. SearchIndex.of normalises the
+    // stored text the same way TextMatcher does, so all three spellings below land on the
+    // same token - while "java" still fails to reach inside "JavaScript".
+    @Test
+    void keywordMatchesWholeWordsThroughPunctuationAndCase() {
+        Job job = plainJob();
+        job.setTitle("Platform Engineer");
+        job.setDescription("You will own our Node.js services. Deployment is automated; JavaScript everywhere.");
+        job.assignSkills(data.skills("Docker"));
+        jobRepository.saveAndFlush(job);
+
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("node js")))
+                .as("\"Node.js\" and \"node js\" are the same word")
+                .extracting(Job::getId).contains(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("NODE.JS")))
+                .as("matching ignores case and punctuation")
+                .extracting(Job::getId).contains(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("deployment")))
+                .as("a word followed by a full stop is still that word")
+                .extracting(Job::getId).contains(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("java")))
+                .as("but a word inside another word is not")
+                .extracting(Job::getId).doesNotContain(job.getId());
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("deploy")))
+                .as("the accepted cost of the above: a prefix is no longer a match")
+                .extracting(Job::getId).doesNotContain(job.getId());
+    }
+
+    // The company-name branch, which moved to the users table's own index (V7) rather than
+    // being copied onto each job. Same whole-word rule: "Acme" finds Acme Technologies'
+    // jobs, "Acm" finds nothing.
+    @Test
+    void keywordMatchesTheEmployersCompanyNameAsWholeWords() {
+        assertThat(jobRepository.findAll(
+                JobSpecifications.live(LocalDate.now(clock)).and(JobSpecifications.keyword("acme"))))
+                .extracting(Job::getTitle)
+                .contains("Java Developer", "Frontend Developer", "QA Engineer");
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("acm"))).isEmpty();
+    }
+
+    // Renaming a company has to move its jobs with it, which is the whole reason the index
+    // lives on the user row and is written by User.setCompanyName rather than being
+    // denormalised onto every job the employer has posted.
+    // "Java Developer" and "QA Engineer" are the two Acme jobs whose own title, description
+    // and skills never say "Acme" (J2, J3 and J5 all name the company in their opening
+    // sentence), so they can only ever have matched through the company-name branch. After
+    // the rename they must follow the new name and stop answering to the old one - which
+    // is what a denormalised copy of the name on each job would have got wrong.
+    @Test
+    void renamingACompanyMovesItsJobsInTheSearch() {
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("acme")))
+                .extracting(Job::getTitle).contains("Java Developer", "QA Engineer");
+
+        User acme = data.user("hr@acme.local");
+        acme.setCompanyName("Northwind Systems");
+        userRepository.saveAndFlush(acme);
+
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("northwind")))
+                .extracting(Job::getTitle).contains("Java Developer", "QA Engineer");
+        assertThat(jobRepository.findAll(JobSpecifications.keyword("acme")))
+                .extracting(Job::getTitle).doesNotContain("Java Developer", "QA Engineer");
     }
 
     // The same rule applied to the filter the facet chips use: hasSkill is exact identity,
