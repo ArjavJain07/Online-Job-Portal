@@ -60,7 +60,23 @@ public class SearchIndexService implements CommandLineRunner {
         this.userRepository = userRepository;
     }
 
+    // @Transactional sits HERE, on the entry point Spring itself calls, and not on
+    // reindexMissing below. That is not a style choice. @Transactional is applied by a
+    // proxy, and a call from one method of a bean to another - this.reindexMissing() -
+    // does not go through the proxy, so annotating the inner method started no
+    // transaction at all. The repositories then each opened and closed their own, the
+    // entities came back DETACHED, and dirty checking had nothing to flush: the counter
+    // still rose, the log still said "built 15 missing entries", and not one row was
+    // written. Found in production, where every search column was empty and a search for
+    // "developer" returned nothing.
+    //
+    // The saveAll calls below make that independent of proxying altogether. Either one
+    // alone would fix it; both together mean this keeps working if someone later calls
+    // reindexMissing directly, which is exactly how the original defect was hidden - the
+    // unit test called it from inside a @Transactional test, where the entities happen to
+    // be managed and dirty checking does work.
     @Override
+    @Transactional
     public void run(String... args) {
         int indexed = reindexMissing();
         if (indexed > 0) {
@@ -88,16 +104,15 @@ public class SearchIndexService implements CommandLineRunner {
             job.reindexSearchText();
             count++;
         }
+        jobRepository.saveAll(jobs);
 
         List<User> employers = userRepository.findNeedingSearchIndex();
         for (User employer : employers) {
             employer.reindexSearchText();
             count++;
         }
+        userRepository.saveAll(employers);
 
-        // No explicit save: both lists are managed entities inside this transaction, so
-        // Hibernate's dirty checking writes them at the commit. Calling save() would be
-        // harmless and would also suggest these were detached, which they are not.
         return count;
     }
 }
