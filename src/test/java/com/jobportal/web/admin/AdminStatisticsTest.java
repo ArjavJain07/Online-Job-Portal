@@ -15,6 +15,7 @@ import com.jobportal.dto.EngagementMetric;
 import com.jobportal.dto.KpiValue;
 import com.jobportal.service.AdminStatisticsService;
 import com.jobportal.support.IntegrationTestBase;
+import java.util.Comparator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,6 +90,59 @@ class AdminStatisticsTest extends IntegrationTestBase {
         assertThat(metric(stats, "Seeker participation")).isEqualTo("4 of 6 (67%)");
         assertThat(metric(stats, "Active users (7 days)")).isEqualTo("6 of 10 (60%)");
         assertThat(metric(stats, "Approval turnaround")).isEqualTo("24.0 hours");
+    }
+
+    // AC-A-D4-1, now that the KPI row comes from the one SQL statement of Section 10.10
+    // rather than from .size() on the lists the charts are bucketed from: a KPI and its
+    // own chart's data table must still add up to the same total, for every range. This is
+    // the assertion that replaced a structural guarantee - see AdminStatisticsService's
+    // header - so it checks all three series over all three ranges rather than the one
+    // case the 30-day test above happens to cover.
+    @Test
+    void everyRangeKpiStillEqualsItsOwnChartTotal() {
+        for (String range : List.of("7", "30", "90")) {
+            AdminStatistics stats = adminStatisticsService.getStatistics(range);
+
+            assertThat(kpi(stats, "Applications"))
+                    .as("Applications KPI vs chart, days=%s", range)
+                    .isEqualTo(String.valueOf(sum(stats.applicationsOverTime())));
+            assertThat(kpi(stats, "Jobs posted"))
+                    .as("Jobs posted KPI vs chart, days=%s", range)
+                    .isEqualTo(String.valueOf(sum(stats.jobsPostedOverTime())));
+            assertThat(kpi(stats, "New users"))
+                    .as("New users KPI vs chart, days=%s", range)
+                    .isEqualTo(String.valueOf(sum(stats.registrationsOverTime())));
+        }
+    }
+
+    // Section 10.10: the "Most in-demand skills" ranking reaches the page as an ordinary
+    // ChartData, cut to TOP_SKILLS_LIMIT, and - the part worth asserting through MockMvc
+    // rather than off the record - it is rendered by the same fragments/chart-card as
+    // every other chart, so it has the "View data" table that Section 7.1 requires of a
+    // chart. The caption only exists because the fragment drew it.
+    //
+    // The ranking itself (which skills, in what order, and that it agrees with the Live
+    // job Specification) is AdminReportingJdbcRepositoryTest's job; this is about the
+    // wiring between the SQL and the page.
+    @Test
+    void skillDemandIsRenderedAsAChartWithItsDataTable() throws Exception {
+        AdminStatistics stats = adminStatisticsService.getStatistics("30");
+        ChartData skills = stats.skillDemand();
+
+        assertThat(skills.label()).isEqualTo("Live jobs");
+        assertThat(skills.labels()).hasSize(AdminStatisticsService.TOP_SKILLS_LIMIT);
+        assertThat(skills.values()).hasSameSizeAs(skills.labels());
+        assertThat(skills.labels().get(0)).isEqualTo("Java");
+        assertThat(skills.values()).isSortedAccordingTo(Comparator.reverseOrder());
+
+        // Not scoped to the selected range: the 7/30/90 pills must not change it.
+        assertThat(adminStatisticsService.getStatistics("7").skillDemand()).isEqualTo(skills);
+
+        mockMvc.perform(get("/admin/statistics").with(user(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Most in-demand skills, Live jobs now")))
+                .andExpect(content().string(containsString("Data for Most in-demand skills, Live jobs now")))
+                .andExpect(content().string(containsString("id=\"skillDemandChart-table\"")));
     }
 
     // AC-A-D4-4: the logins chart totals 8 for days=30 and 6 for days=7 (the 8 users who

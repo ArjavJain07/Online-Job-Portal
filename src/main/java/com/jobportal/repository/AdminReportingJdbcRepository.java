@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Component;
 
 // The two /admin/statistics reports that are written as SQL rather than as JPA
 // (Section 10.10). Everything else on that page stays exactly where it was, in
@@ -122,7 +122,22 @@ import org.springframework.stereotype.Repository;
 // PostgreSQL agrees. The riskiest construct is the FROM-less SELECT in headlineCounts
 // (both engines allow it; the SQL standard does not) and it is the first thing to try
 // against a real PostgreSQL 14.
-@Repository
+//
+// @Component, NOT @Repository, WHICH IS THE ANNOTATION THIS CLASS LOOKS LIKE IT WANTS
+// @Repository would be the conventional choice and it is actively wrong here. It opts the
+// bean into Spring's PersistenceExceptionTranslationPostProcessor - which Spring Data JPA
+// auto-configures, so it is present in this application - and that proxy translates
+// IllegalArgumentException into InvalidDataAccessApiUsageException, because that is what
+// a bad argument to a JPA call means. The argument guard in topSkillsByLiveJobDemand
+// would therefore reach callers disguised as a data-access failure, which is a lie about
+// what went wrong: nothing had touched the database. Found by the test that asserts the
+// guard, which is the only reason that guard has a test at all.
+//
+// Nothing is lost by dropping it. @Repository's translation exists for persistence APIs
+// that throw their own vendor exceptions; JdbcTemplate already converts every SQLException
+// into a DataAccessException itself, through the SQLExceptionTranslator it carries, with
+// or without the annotation.
+@Component
 public class AdminReportingJdbcRepository {
 
     // Twelve counts, one statement, one round-trip (Section 10.10).
