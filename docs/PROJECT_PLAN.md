@@ -135,6 +135,7 @@ The baseline stack is already scaffolded and compiles on the target machine. It 
 | Charts | Chart.js 4.4.1 (webjar) | Simple JavaScript API; data passed from Thymeleaf inline JSON |
 | Security | Spring Security 6.5 | Form login, BCrypt, CSRF protection, URL role rules, session handling |
 | Persistence | Spring Data JPA + Hibernate 6.6 | Repositories from interfaces, derived queries, `Specification` for search |
+| Persistence (reporting) | Spring JDBC `NamedParameterJdbcTemplate` — **already on the classpath**, no dependency added | Two `/admin/statistics` reports an ORM makes worse: nine `count` queries collapsed into one statement, and a `GROUP BY` ranking with a limit (10.10). Same `DataSource`, pool and transaction as Hibernate |
 | Validation | Jakarta Bean Validation (Hibernate Validator) | `@NotBlank`, `@Size` and so on, on form objects, shown next to fields |
 | Database | H2 2.3 file database `./data/jobportal` (default); MySQL 8 via the `mysql` profile (optional) | H2 needs no install and survives restarts; the MySQL driver is already on the classpath |
 | File storage | Local folder `./uploads/resumes` | No cloud dependency; simple to inspect |
@@ -1482,7 +1483,7 @@ The database uses the default foreign key behaviour (restrict): a parent row wit
 - AC-A-D4-3: The Jobs by status table shows Pending approval 2, Approved 8, Rejected 1, Closed 1; the engagement table shows Seeker participation "4 of 6 (67%)", Active users (7 days) "6 of 10 (60%)" and Approval turnaround "24.0 hours".
 - AC-A-D4-4: The "Logins over time" chart's data table adds up to 8 for `days=30` (the seeded `LOGIN_SUCCESS` rows of the 8 users who have logged in; Neha and Karan never have) and to 6 for `days=7`; a failed login attempt does not change it.
 
-**Tests:** `AdminStatisticsTest#thirtyDayKpisMatchSeedData`, `#ninetyDaysUsesWeeklyBuckets`, `#invalidRangeFallsBackTo30`, `#engagementMetricsMatchSeedData`, `#loginsChartCountsLoginSuccessRows`; `DateBucketsTest`.
+**Tests:** `AdminStatisticsTest#thirtyDayKpisMatchSeedData`, `#ninetyDaysUsesWeeklyBuckets`, `#invalidRangeFallsBackTo30`, `#engagementMetricsMatchSeedData`, `#loginsChartCountsLoginSuccessRows`, `#everyRangeKpiStillEqualsItsOwnChartTotal`, `#skillDemandIsRenderedAsAChartWithItsDataTable`; `AdminReportingJdbcRepositoryTest` (the two SQL reports, Section 10.10); `DateBucketsTest`.
 
 #### A-D5 User activity monitoring
 
@@ -2430,6 +2431,8 @@ Settings deliberately **not** built (COULD, see Section 16): maintenance mode, m
 
 **Records passed to templates:** `ChartData(String label, List<String> labels, List<Long> values)`, `KpiValue(String label, String value, String hint)`, `EngagementMetric(String name, String formula, String value)`, `JobStatsRow(...)`, `TopJobRow(...)`, `AdminStatistics(...)`, `EmployerStatistics(...)`. They contain only strings and numbers, so Thymeleaf's JavaScript inlining serialises them safely.
 
+**Two of `/admin/statistics`' reports are hand-written SQL, not JPA** (Section 10.10). The rows below marked **(10.10)** record what the JPA version was; the live implementation is one statement in `repository.AdminReportingJdbcRepository` over the same pooled `DataSource` and the same transaction as Hibernate. Those JPA methods are deliberately kept — they are the oracle the SQL is tested against.
+
 **Repository queries** (interface projections use the alias `total`, not the reserved-looking `count`):
 
 | Purpose | Repository method (JPQL) |
@@ -2437,16 +2440,17 @@ Settings deliberately **not** built (COULD, see Section 16): maintenance mode, m
 | Timestamps for trends | `JobApplicationRepository.findAppliedAtSince(from)`: `select a.appliedAt from JobApplication a where a.appliedAt >= :from`; employer version adds `a.job.employer.id = :employerId and (:jobId is null or a.job.id = :jobId)`; `JobRepository.findCreatedAtSince(from)`; `UserRepository.findCreatedAtSince(from)` |
 | Logins over time (A-D4 engagement chart) | `ActivityLogRepository.findCreatedAtByTypeSince(type, from)`: `select l.createdAt from ActivityLog l where l.type = :type and l.createdAt >= :from`, called with `LOGIN_SUCCESS`; bucketed with `DateBuckets.count` |
 | Jobs by status | `select j.status as status, count(j) as total from Job j group by j.status` |
-| Live jobs | `jobRepository.count(JobSpecifications.live(today))` |
+| Live jobs **(10.10)** | `jobRepository.count(JobSpecifications.live(today))` |
+| **Most in-demand skills (10.10)** | `select s.label, count(distinct j.id) from skills s join job_skills js on js.skill_id = s.id join jobs j on j.id = js.job_id join users e on e.id = j.employer_id where j.status = :approvedStatus and j.application_deadline >= :today and e.enabled = true group by s.id, s.label order by count(distinct j.id) desc, s.id asc fetch first 10 rows only`. No JPA predecessor — this report did not exist before 10.10. |
 | Applications by category | `select j.category as category, count(a) as total from JobApplication a join a.job j where a.appliedAt >= :from group by j.category order by count(a) desc` |
 | Applications by status | `select a.status as status, count(a) as total from JobApplication a where a.appliedAt >= :from group by a.status` (+ employer/job version) |
 | Per-job pivot (E-D5 table) | `select a.job.id as jobId, a.status as status, count(a) as total from JobApplication a where a.job.employer.id = :employerId group by a.job.id, a.status`, pivoted in Java into `JobStatsRow` |
 | Top 5 jobs | `select a.job.id as jobId, a.job.title as title, a.job.employer.companyName as company, count(a) as total from JobApplication a where a.appliedAt >= :from group by a.job.id, a.job.title, a.job.employer.companyName order by count(a) desc` with `PageRequest.of(0, 5)` |
-| Hires in range | `select count(c) from ApplicationStatusChange c where c.toStatus = :hired and c.changedAt >= :from` |
-| Seekers who applied | `select count(distinct a.seeker.id) from JobApplication a where a.appliedAt >= :from` |
-| Employers who posted | `select count(distinct j.employer.id) from Job j where j.createdAt >= :from` |
-| Active users | `userRepository.countByLastLoginAtGreaterThanEqual(now.minusDays(7))` |
-| Messages sent | `messageRepository.countBySentAtGreaterThanEqual(from)` |
+| Hires in range **(10.10)** | `select count(c) from ApplicationStatusChange c where c.toStatus = :hired and c.changedAt >= :from` |
+| Seekers who applied **(10.10)** | `select count(distinct a.seeker.id) from JobApplication a where a.appliedAt >= :from` |
+| Employers who posted **(10.10)** | `select count(distinct j.employer.id) from Job j where j.createdAt >= :from` |
+| Active users **(10.10)** | `userRepository.countByLastLoginAtGreaterThanEqual(now.minusDays(7))` |
+| Messages sent **(10.10)** | `messageRepository.countBySentAtGreaterThanEqual(from)` |
 | Approval turnaround (two steps, because only the **decision** must be in range) | 1. `select c from JobStatusChange c where c.toStatus in :decisions and c.changedAt >= :from` (`decisions` = `APPROVED`, `REJECTED`) gives the decisions in range and their job ids. 2. `select c from JobStatusChange c where c.job.id in :decidedJobIds order by c.job.id, c.changedAt` loads **all** rows of those jobs with no date filter; in Java, pair each decision with the latest preceding `PENDING_APPROVAL` row of the same job. A single date filter over both rows (the obvious one-query version) would silently drop every decision whose `PENDING_APPROVAL` row is older than the window, so the displayed mean would not be the metric defined below. |
 | First response (E-D5) | `select c.application.id as applicationId, c.application.appliedAt as appliedAt, min(c.changedAt) as firstChange from ApplicationStatusChange c where c.application.job.employer.id = :employerId and c.actorRole = :employer and c.application.appliedAt >= :from group by c.application.id, c.application.appliedAt`; days computed in Java |
 | Reply rate, candidates messaged, messages chart (E-D5) | `MessageRepository.findMessageEvents(employerId, jobId)` returning `MessageEventRow`: `select m.application.id as applicationId, m.sender.id as senderId, m.recipient.id as recipientId, m.sentAt as sentAt from Message m where m.application.job.employer.id = :employerId and (:jobId is null or m.application.job.id = :jobId) order by m.sentAt`; grouped in Java. For the chart, rows in range are split by `senderId == employerId` into "Employer messages" and "Candidate replies", and each list goes through `DateBuckets.count` (same labels) |
@@ -2476,6 +2480,7 @@ Settings deliberately **not** built (COULD, see Section 16): maintenance mode, m
 | | Applications by category (horizontal bar) | category group query |
 | | Application outcomes (pie) | status group query in range |
 | | User engagement: logins over time (bar) | `ActivityLogRepository.findCreatedAtByTypeSince(LOGIN_SUCCESS, from)` through `DateBuckets` |
+| | Most in-demand skills, Live jobs now (horizontal bar) | `AdminReportingJdbcRepository.topSkillsByLiveJobDemand(today, 10)` (10.10). The one chart on the page the 7/30/90 range control does not affect |
 | `/employer/dashboard` | Applications, last 30 days (line) | employer `findAppliedAtSince` |
 | `/employer/statistics` | Applications over time (line) | employer `findAppliedAtSince` |
 | | Hiring pipeline (bar) | employer status group query |
@@ -2792,7 +2797,7 @@ Every spec ID maps to a feature block (Section 6), routes, templates and automat
 | A-D1 | Table of user accounts with edit and delete options | User management (6.2) | `GET /admin/users?q=&role=&status=&page=` | `admin/users.html`, `fragments/pagination.html` | `AdminUserManagementTest#tableFiltersByRoleAndQuery`; `PageRenderSmokeTest` |
 | A-D2 | Table of job postings with approve and reject options | Job listing management (6.2) | `GET /admin/jobs?status=&q=&page=`, `POST /admin/jobs/{id}/approve`, `POST /admin/jobs/{id}/reject` (inline reject form) | `admin/jobs.html` | `AdminJobApprovalTest#pendingTabOldestFirst`; `AccessControlTest#employerGets403OnAdminPages` |
 | A-D3 | Panel for system-wide settings | System settings (6.2) | `GET /admin/settings` | `admin/settings.html` | `SystemSettingsTest#invalidValuesSaveNothing`; `PageRenderSmokeTest` |
-| A-D4 | Graphs and tables: job postings, application trends, user engagement | Job statistics (6.2, 7.6) | `GET /admin/statistics?days=`, `GET /admin/dashboard` | `admin/statistics.html`, `admin/dashboard.html`, `fragments/chart-card.html` | `AdminStatisticsTest#thirtyDayKpisMatchSeedData`, `#ninetyDaysUsesWeeklyBuckets`, `#invalidRangeFallsBackTo30`, `#engagementMetricsMatchSeedData`, `#loginsChartCountsLoginSuccessRows`; `AdminDashboardTest#kpisMatchSeedData`; `DateBucketsTest`; manual A-08 |
+| A-D4 | Graphs and tables: job postings, application trends, user engagement | Job statistics (6.2, 7.6, 10.10) | `GET /admin/statistics?days=`, `GET /admin/dashboard` | `admin/statistics.html`, `admin/dashboard.html`, `fragments/chart-card.html` | `AdminStatisticsTest#thirtyDayKpisMatchSeedData`, `#ninetyDaysUsesWeeklyBuckets`, `#invalidRangeFallsBackTo30`, `#engagementMetricsMatchSeedData`, `#loginsChartCountsLoginSuccessRows`, `#everyRangeKpiStillEqualsItsOwnChartTotal`, `#skillDemandIsRenderedAsAChartWithItsDataTable`; `AdminReportingJdbcRepositoryTest#headlineCountsAgreeWithTheJpaCountsTheyReplaced`, `#headlineCountsMatchSection13`, `#headlineCountsNarrowWithTheRange`, `#skillDemandAgreesWithTheLiveJobSpecification`, `#skillDemandRanksTheSeededLiveJobs`, `#disablingAnEmployerRemovesItsJobsFromBothReports`, `#skillDemandHonoursTheRowLimit`; `AdminDashboardTest#kpisMatchSeedData`; `DateBucketsTest`; manual A-08 |
 | A-D5 | Real-time updates on user activities and job applications | Activity monitoring (6.2, 7.7) | `GET /admin/activity`, `GET /admin/activity/feed?afterId=`, `GET /admin/dashboard` | `admin/activity.html`, `admin/dashboard.html`, `fragments/activity-feed.html`, `static/js/activity-feed.js` | `ActivityFeedTest#returnsOnlyNewerEntriesAscending`, `#limitsTo50`, `#forbiddenForEmployer`, `#unauthorizedForAnonymousAjax`, `#intervalRenderedFromSettings`, `#latestApplicationsPanelRendered` (both pages: `#latest-applications` and the `activity-feed.js` include), `#messageBodiesNeverLogged`; `AccessControlTest#feedRedirectsAnonymousNonAjax`; manual LV-1 to LV-4 |
 | E-F1 | Post a job (title, description, requirements, salary) with confirmation | Job posting (6.3) | `GET /employer/jobs/new`, `POST /employer/jobs`, `GET /employer/jobs/{id}` | `employer/job-form.html`, `employer/job-detail.html` | `EmployerJobTest#postJobPendingWithConfirmation`, `#invalidSalaryDeadlineOrDescriptionRejected`, `#activeJobLimitEnforced`; manual E-01 |
 | E-F2 | Review applications; output status updates | Application management (6.3) | `POST /employer/applications/{id}/status`, `POST /employer/applications/{id}/internal-note` | `employer/application-detail.html`, `fragments/timeline.html` | `EmployerApplicationTest#shortlistWithNoteVisibleToSeeker`, `#invalidTransitionRejected`, `#dropdownOffersOnlyAllowedStatuses`, `#internalNoteNeverShownToSeeker`; `ApplicationStatusTest`; manual E-04 |
@@ -2892,6 +2897,7 @@ Online Job Portal/
     │   │   │       └── Role.java  TargetType.java  WorkMode.java
     │   │   ├── repository/
     │   │   │   ├── ActivityLogRepository.java
+    │   │   │   ├── AdminReportingJdbcRepository.java  the two SQL reports of 10.10 (JdbcTemplate, not JPA)
     │   │   │   ├── ApplicationStatusChangeRepository.java
     │   │   │   ├── JobApplicationRepository.java
     │   │   │   ├── JobRepository.java
@@ -2926,9 +2932,10 @@ Online Job Portal/
     │   │   │   └── UserService.java
     │   │   ├── dto/
     │   │   │   ├── ActivityDto.java  AdminStatistics.java  ApplicationCounts.java  ChartData.java
-    │   │   │   ├── DeletionCheck.java  EmployerStatistics.java  EngagementMetric.java  JobSearchResult.java
-    │   │   │   ├── JobStatsRow.java  KpiValue.java  NormalisedCriteria.java  RecommendedJob.java
-    │   │   │   └── ScoreResult.java  StoredFile.java  ThreadSummary.java  TimelineEntry.java  TopJobRow.java
+    │   │   │   ├── DeletionCheck.java  EmployerStatistics.java  EngagementMetric.java  HeadlineCounts.java
+    │   │   │   ├── JobSearchResult.java  JobStatsRow.java  KpiValue.java  NormalisedCriteria.java
+    │   │   │   ├── RecommendedJob.java  ScoreResult.java  SkillDemandRow.java  StoredFile.java
+    │   │   │   └── ThreadSummary.java  TimelineEntry.java  TopJobRow.java
     │   │   ├── web/
     │   │   │   ├── form/
     │   │   │   │   ├── ApplicationForm.java (with nested enum ResumeChoice)  ApplicationStatusForm.java  ComposeMessageForm.java
@@ -3037,6 +3044,7 @@ Online Job Portal/
         │   ├── db/
         │   │   └── BaselineSchemaTest.java      db/migration vs Hibernate's own DDL (10.7)
         │   ├── repository/
+        │   │   ├── AdminReportingJdbcRepositoryTest.java  the SQL of 10.10, differential against JPA
         │   │   ├── JobApplicationRepositoryTest.java   @DataJpaTest
         │   │   ├── JobSpecificationsTest.java
         │   │   └── UserRepositoryTest.java             @DataJpaTest
@@ -3554,6 +3562,97 @@ Searching **develop** no longer finds **Developer**. "java matches part of a wor
 * `requirements` is still not searched — it never was. Indexing it is one more column and one more line in `SearchIndexService`, and widening what a search matches is a separate decision from making the matching correct.
 * `SearchIndexService` loads every unindexed row in one pass. That happens exactly once in the life of a database; if a portal ever outgrows it, page the loop — do not move the rule back into SQL.
 * The score is not shown to the visitor, only the places that matched. Showing a number invites arguing with it.
+
+### 10.10 Two reports in SQL: `JdbcTemplate` on `/admin/statistics`
+
+Every query in Sections 1–10.9 goes through Spring Data JPA, and that is still the default for this application. Two reports on `/admin/statistics` do not, and this section is the argument for each of them — because "some of our queries are raw SQL" is a claim that has to be defensible per query, not in general.
+
+Both live in `repository.AdminReportingJdbcRepository`, and neither is a second route to the database. No dependency was added: `spring-boot-starter-data-jpa` already pulls in `spring-jdbc`, so Spring Boot auto-configures a `JdbcTemplate`/`NamedParameterJdbcTemplate` over the **same** `DataSource` bean Hibernate uses — the same HikariCP pool, and the same Spring-managed transaction, because Spring JDBC takes its connection through `DataSourceUtils` and gets the one already bound to the caller's `@Transactional(readOnly = true)`. One transaction, one snapshot.
+
+**Report 1 — `headlineCounts`: twelve counts, one statement**
+
+`AdminStatisticsService` built this page's KPI row and engagement table with **nine** separate `select count(*) … where <one predicate>` repository calls, plus three counts taken as `.size()` of lists already fetched for the charts. Nine round-trips to render six tiles and a six-row table.
+
+| Why not JPA | |
+|---|---|
+| JPQL | Cannot express it at all. A JPQL query selects over a root entity, and nine unrelated aggregates have no root. |
+| Criteria | Can, by building nine `Subquery<Long>` objects against a dummy root — more code than the SQL, and still SQL, just written in Java with the `WHERE` clauses turned inside out. |
+| `@Query(nativeQuery = true)` | Is this file with a worse API: no `RowMapper`, no named parameters, `Object[]` instead of a record. |
+
+So: twelve uncorrelated scalar subqueries in one select list, mapped to `dto.HeadlineCounts`. The gain is the eight round-trips, not a clever join — which is exactly why the statement is deliberately dull.
+
+`NamedParameterJdbcTemplate` rather than the plain one for a concrete reason: `:from` appears in five subqueries. Positionally that is five identical `?`s the caller must supply in the right order, and inserting a thirteenth count in the middle shifts every later argument by one while the statement still compiles, still runs, and reports wrong numbers.
+
+**What this cost, and why it is acceptable (AC-A-D4-1)**
+
+New users, Jobs posted and Applications used to be `.size()` of the very lists their charts are bucketed from, so a KPI and its chart's data table could not disagree *by construction*. They now come from SQL, so the guarantee changes shape: both sides ask the identical question (`timestamp >= from`, with `from` computed once in Java by `rangeStart`), but "the same number because it is the same list" becomes "the same number because it is the same boundary". That is weaker, so it is asserted instead of assumed — `AdminStatisticsTest#everyRangeKpiStillEqualsItsOwnChartTotal` checks all three series across all three ranges.
+
+**Report 2 — `topSkillsByLiveJobDemand`: most in-demand skills**
+
+Since 10.8 skills are rows, so "which skills are most in demand" is answerable for the first time: a `GROUP BY` over `skills` × `job_skills` × `jobs` (× `users`, see below), ordered by the aggregate, cut to the top 10.
+
+| Why not JPA | |
+|---|---|
+| Derived query | No aggregate, no ordering by one, no limit over a projection of a join table. |
+| JPQL | Can group and order by `count(…)`, but has no `LIMIT` — the cut needs a `Pageable`, so Spring Data issues a **second** statement to count the groups for a `Page` that is then thrown away (`findTopJobsSince` on this same page already pays that). |
+| Either | Returns an interface projection, so the shape the page needs is described in a third file rather than in the query. |
+
+Entities are the wrong unit anyway: the report never wants a `Skill` or a `Job`, only a label and a number.
+
+Three decisions inside it are worth recording:
+
+* **"In demand" means Live.** Otherwise the ranking is driven by postings that were rejected, closed, or whose deadline passed last year. Live is the site's own three-part definition — approved, deadline not passed, employer still enabled (`JobSpecifications.live`, `Job.isLive`) — and the third part lives on `users`, which is why the employer row is joined by a report that says nothing about employers. Dropping that join would make this the only place on the site where a disabled employer's jobs still count; the seeded QuickHire account is exactly that case.
+* **`count(distinct j.id)`, not `count(*)`.** The metric is "how many Live jobs ask for this skill", so the unit is the job, not the join row. `job_skills`' primary key is `(display_order, job_id)` — it is an ordered `@OrderColumn` list, keyed by position — so "a job lists each skill at most once" is a guarantee `SkillService` and the V4 backfill make, **not one the database makes**. A report that would overcount if that invariant ever slipped is a report that lies quietly.
+* **Ties break on `skills.id`, never on `label`.** See below.
+
+**Portability: the same SQL on H2 and PostgreSQL 14**
+
+Production is PostgreSQL 14; development and the whole test suite are H2 (10.1, 10.3). This project has been bitten twice by SQL that was right on one engine and wrong on the other — V4's `REGEXP_REPLACE` and `UserRepository.search`'s `concat('%', :q, '%')` resolving to `bytea||bytea` — and **neither would have failed a test**. So every construct here is deliberately boring: `COUNT`, `COUNT(DISTINCT)`, `GROUP BY`, inner `JOIN`, scalar subqueries, `FETCH FIRST n ROWS ONLY`.
+
+| Deliberately avoided | Why |
+|---|---|
+| Any date or string function (`date_trunc`, `now()`, `age`, `to_char`, `extract`, `datediff`, `regexp_*`) | The whole class that differs between engines. 7.6 already keeps date bucketing in Java for this reason; `activeSince` ("now − 7 days") is therefore computed in Java and passed in as a parameter, not written as SQL. |
+| `ORDER BY <select alias>` and `ORDER BY <ordinal>` | A bare integer is a *positional reference* on PostgreSQL — the trap 10.9 hit with `order by 0`. The aggregate is repeated in full in the `ORDER BY` instead. |
+| **`ORDER BY s.label` as the tie-break** | Ordering text asks the engine for a collation, and H2's default and PostgreSQL's `en_US.UTF-8` disagree: byte order puts `SQL` before `Spring Boot` (`Q` < `p`), a locale-aware collation puts `Spring Boot` first (`p` < `q`). Two skills on equal demand would swap places between the test suite and production — and *at the row limit they would appear and disappear*. `skills.id` is an integer and compares identically everywhere, so ties show in vocabulary-insertion order: arbitrary, stable, the same on both engines. This is the V4 `REGEXP_REPLACE` shape of bug exactly, and the one the author was most likely to write. |
+| A bound parameter in `FETCH FIRST` | The standard requires a literal, H2 requires a literal, and PostgreSQL only takes a parameter in the parenthesised `fetch first (?) rows only` form, which H2 rejects. The limit is an `int` formatted into the string — nothing can be injected through a value whose type is `int`, and the guard rejects anything below 1 so that `fetch first 0 rows only` cannot return an empty report that reads as "no skills are in demand". |
+| Vendor extensions of any kind (`tsvector`, `LATERAL`, `FILTER (WHERE …)`, `DISTINCT ON`, window functions) | `FILTER` and `DISTINCT ON` would both have shortened report 1. Neither is on H2. 10.9's rule stands: a production path no test can reach is worse than not having the feature. |
+
+**No cast is needed on any parameter, and that is a statement about these queries rather than a rule.** Every parameter is compared directly against a column (`u.created_at >= :from`, `j.application_deadline >= :today`, `u.role = :role`), so PostgreSQL infers each type from that column, and none can be null. Those are precisely the two properties `UserRepository.search` lacked: its parameter was fed to `||` with no column to infer from, and it was nullable. **Add a parameter here that is nullable, or that appears anywhere other than beside a column, and it needs an explicit cast.**
+
+Enum values are passed as `.name()` rather than written as `'APPROVED'` literals — the columns are `varchar` with a `CHECK` of the names (V1, `@Enumerated(EnumType.STRING)`), and naming the constants means renaming `JobStatus.APPROVED` breaks the build instead of silently making the report return zero.
+
+**No migration.** Both reports are reads over V1 and V4 tables. Nothing was added to `db/migration`, and nothing needs to be.
+
+**`@Component`, not `@Repository`.** `@Repository` opts the bean into the `PersistenceExceptionTranslationPostProcessor` that Spring Data JPA auto-configures, and that proxy translates `IllegalArgumentException` into `InvalidDataAccessApiUsageException` — so the argument guard reached callers disguised as a data-access failure, for a call that had not touched the database. Nothing is lost: `JdbcTemplate` converts `SQLException` to `DataAccessException` itself, with or without the annotation.
+
+**One real consequence of sharing Hibernate's transaction.** These statements read the *database*, not Hibernate's session, so uncommitted changes made through an entity are invisible until the persistence context is flushed. The application never meets this — the page is read-only and no mutating request calls it — but an `@Transactional` test that repoints a seeded row and then asks for a report must `saveAndFlush`, or it is asserting against the row as it was before.
+
+**How these are tested (12.2)**
+
+Hand-written SQL has one failure mode a smoke test cannot see: it runs, returns plausible numbers, and the numbers are wrong. So every case in `AdminReportingJdbcRepositoryTest` is **differential** — it asserts the SQL against a second, independent, already-trusted implementation of the same question, namely the JPA repository methods and Criteria `Specification`s the page used before. That is why `AdminStatisticsService` no longer calling `countByToStatusAndChangedAtGreaterThanEqual` and friends did *not* mean deleting them: they are the oracle, and a differential test needs the other side to still exist.
+
+| Test | What it pins |
+|---|---|
+| `#headlineCountsAgreeWithTheJpaCountsTheyReplaced` | All twelve counts equal the nine JPA counts and three list sizes they replaced. The only wrong SQL that survives it is wrong in exactly the same way JPQL and Criteria are, in twelve places at once. |
+| `#headlineCountsMatchSection13` | The absolute figures of 13.8 and 7.6, so "both implementations agree" cannot mean "both are wrong the same way". |
+| `#headlineCountsNarrowWithTheRange` | A narrower window moves the scoped counts and leaves the all-time denominators alone — without it, every `>= :from` could be on the wrong column and the 30-day test would still pass. |
+| `#skillDemandAgreesWithTheLiveJobSpecification` | For **every** skill in the vocabulary, not only the returned ones, the SQL agrees with `live(today).and(hasSkill(slug))`. A skill the report omits must have no Live job, so a dropped row is a failure rather than an absence. |
+| `#skillDemandRanksTheSeededLiveJobs` | 16 skills over the 6 Live jobs, 20 (job, skill) pairs, Java 3, SQL and Spring Boot 2. The two on 2 are asserted as a pair, not in order: their order is `skills.id` order, and pinning it would turn a harmless seeder change into a failure in another file. |
+| `#disablingAnEmployerRemovesItsJobsFromBothReports` | The employer-enabled third of Live, the easiest part to leave out of a hand-written join. Repoints a seeded row — it does **not** insert, because inserting a `JobApplication` moves H2's identity counter, which does not roll back and which `JobApplicationTest`'s hard-coded `APP-00016` depends on. |
+| `#skillDemandHonoursTheRowLimit` | The limit cuts from the bottom, keeps rank order, and refuses 0 with the right exception type — which is what caught the `@Repository` translation above. |
+| `AdminStatisticsTest#everyRangeKpiStillEqualsItsOwnChartTotal` | AC-A-D4-1, now a tested property rather than a structural one. |
+| `AdminStatisticsTest#skillDemandIsRenderedAsAChartWithItsDataTable` | The ranking reaches the page as an ordinary `ChartData` through the same `fragments/chart-card`, so it has the "View data" table 7.1 requires, and the range pills do not change it. |
+
+**Surfacing (7.1, 7.6)**
+
+The skills ranking is an eighth `ChartData` on `admin/statistics.html`, rendered by the same `fragments/chart-card :: card` as the other seven — horizontal bar, like "Applications by category", because its labels are words of arbitrary length. It therefore gets the collapsible data table of the identical numbers that 7.1 requires of every chart; a report added later does not get to skip that. Its title ends "Live jobs now" rather than naming the range, because it is the one chart the 7/30/90 pills above it do not affect — the same wording convention as "Jobs by status, all time".
+
+**Known limits**
+
+* The ranking counts *postings*, not demand weighted by openings or by applications received. A job with 10 openings counts once, like a job with 1. Weighting it is one more column in the select list; what it is not is the same question.
+* Supply is not shown beside demand. `seeker_profile_skills` holds exactly the other half ("how many candidates claim this skill"), and a demand-vs-supply report is the obvious next step and a genuinely useful one — a second `GROUP BY` in the same shape as this one. Left out because "in demand" is a complete answer on its own and a two-sided chart needs a design decision about what the pairing means.
+* `headlineCounts` is twelve full scans of small tables on every page load. On this dataset that is nothing; the counts are not cached, and the first thing to do if it ever matters is cache the four all-time denominators, which change rarely.
+* Both are `/admin/statistics` only. The employer page (`EmployerStatisticsService`, E-D5) has the identical nine-counts-in-a-row shape and was deliberately left alone: it is scoped per employer and per job, so it is the same change again with a `:employerId` and a nullable `:jobId` — and a **nullable** parameter is exactly the case the cast rule above says needs care.
 ---
 
 ## 11. Implementation Milestones
@@ -3780,7 +3879,8 @@ class JobApplicationTest extends IntegrationTestBase {
 | `AdminUserManagementTest` | Integration | `#createUserShowsConfirmationAndCanLogin`, `#duplicateEmailRejected`, `#employerRequiresCompanyName`, `#deleteAllowedOnlyWithoutDependencies`, `#deactivatedUserLoggedOutOnNextRequest`, `#selfAndLastAdminProtected`, `#updateUserShowsConfirmation` (AC-A-F1-5), `#ownEmailChangeForcesRelogin` (the admin changing their own email is logged out to `/login?emailChanged`, not `/login?changed`), `#roleChangeAllowedWithoutActivity` (AC-A-F1-6), `#roleChangeBlockedWhenUserHasActivity`, `#tableFiltersByRoleAndQuery` | A-F1, A-D1 |
 | `AdminJobApprovalTest` | Integration | `#approveMakesJobLive`, `#rejectRequiresReasonAndShowsToEmployer`, `#takeDownHidesJobKeepsApplications`, `#approveBlockedWhenDeadlinePassed`, `#pendingTabOldestFirst` (also the inline reject form and the `ALL` / unknown `status` values) | A-F2, A-D2 |
 | `SystemSettingsTest` | Integration | `#disablingSeekerRegistrationBlocksIt`, `#approvalOffAutoApprovesNewJobsOnly`, `#resumeSizeLimitApplied`, `#siteNameShownInNavbar` (after saving "CampusJobs", the next page's navbar brand and `<title>` show it), `#invalidValuesSaveNothing` | A-F3, A-D3 |
-| `AdminStatisticsTest` | Integration | `#thirtyDayKpisMatchSeedData`, `#ninetyDaysUsesWeeklyBuckets`, `#invalidRangeFallsBackTo30`, `#engagementMetricsMatchSeedData`, `#loginsChartCountsLoginSuccessRows` | A-D4 |
+| `AdminStatisticsTest` | Integration | `#thirtyDayKpisMatchSeedData`, `#ninetyDaysUsesWeeklyBuckets`, `#invalidRangeFallsBackTo30`, `#engagementMetricsMatchSeedData`, `#loginsChartCountsLoginSuccessRows`, `#everyRangeKpiStillEqualsItsOwnChartTotal`, `#skillDemandIsRenderedAsAChartWithItsDataTable` | A-D4 |
+| `AdminReportingJdbcRepositoryTest` | Integration | `#headlineCountsAgreeWithTheJpaCountsTheyReplaced`, `#headlineCountsMatchSection13`, `#headlineCountsNarrowWithTheRange`, `#skillDemandAgreesWithTheLiveJobSpecification`, `#skillDemandRanksTheSeededLiveJobs`, `#disablingAnEmployerRemovesItsJobsFromBothReports`, `#skillDemandHonoursTheRowLimit` — every case differential against the JPA path (Section 10.10) | A-D4 |
 | `ActivityFeedTest` | Integration | `#returnsOnlyNewerEntriesAscending`, `#limitsTo50`, `#forbiddenForEmployer`, `#unauthorizedForAnonymousAjax`, `#intervalRenderedFromSettings`, `#latestApplicationsPanelRendered` (both `/admin/activity` and `/admin/dashboard` contain a `#latest-applications` list and include `/js/activity-feed.js`), `#messageBodiesNeverLogged` | A-D5 |
 | `EmployerDashboardTest` | Integration | `#kpisAndAttentionListMatchSeedData` | G-1, E-D5 |
 | `EmployerProfileTest` | Integration | `#companyNameUpdateShownOnJobPage`, `#emailChangeForcesRelogin` | EP |
@@ -4173,6 +4273,7 @@ call run.bat
 | A-D2 | 5:00-7:30 | `/admin/jobs?status=ALL` (admin) |
 | A-D3 | 5:00-7:30 | `/admin/settings` (admin): enter page size 500 to show validation |
 | A-D4 | 5:00-7:30 | `/admin/statistics?days=90` (admin) |
+| Database integration (JDBC) | — | `/admin/statistics` (admin): the KPI row is one SQL statement and "Most in-demand skills" is the `GROUP BY` ranking, both in `repository.AdminReportingJdbcRepository` (10.10). Open "View data" under the skills chart to show the numbers; have the class and `AdminReportingJdbcRepositoryTest` ready beside it |
 | A-D5 | 5:00-7:30 | `/admin/activity` (admin) with another browser acting |
 | E-F1 | 2:40-5:00 | `/employer/jobs/new` (`hr@acme.local`) |
 | E-F2 | 2:40-5:00 | `/employer/applications/4` (Sneha's application) |
@@ -4223,7 +4324,11 @@ Keep one screenshot per row in the backup deck.
 | How do you prevent duplicate applications? | The service checks first, and the database has a unique constraint on (job, seeker) as a safety net for double clicks. |
 | How are uploads secured? | Allowed extensions from settings, magic-byte content check, size limit, random UUID file names outside the static folder, downloads only through ownership-checked routes. |
 | Why copy the resume for each application? | So an employer always sees exactly what was submitted, even if the seeker replaces the profile resume later. |
-| How are the statistics computed and drawn? | Grouped JPQL counts and timestamp lists; Java puts timestamps into daily or weekly buckets; Thymeleaf writes the data into the page as JSON for Chart.js; each chart also has a table. |
+| How are the statistics computed and drawn? | Grouped JPQL counts and timestamp lists, plus two reports in hand-written SQL (10.10); Java puts timestamps into daily or weekly buckets; Thymeleaf writes the data into the page as JSON for Chart.js; each chart also has a table. |
+| Where do you use JDBC rather than JPA, and why? | Two reports on `/admin/statistics` (`repository.AdminReportingJdbcRepository`, Section 10.10). The admin KPI row and engagement table needed **nine** separate `select count(*)` queries, which JPQL cannot combine — it selects over a root entity and nine unrelated aggregates have no root — so they are one statement of twelve scalar subqueries, one round-trip. "Most in-demand skills" is a `GROUP BY` over `skills` × `job_skills` × `jobs` with a limit: JPQL has no `LIMIT`, so a `Pageable` would make Spring Data run a second count query for a `Page` we then throw away, and the result would be an interface projection in a third file. Reporting is where an ORM stops paying for itself. |
+| Is that a second connection to the database? | No. `spring-boot-starter-data-jpa` already includes `spring-jdbc`, so Spring Boot auto-configures a `JdbcTemplate` over the **same** `DataSource` Hibernate uses — the same HikariCP pool and, because Spring JDBC takes its connection through `DataSourceUtils`, the same transaction. No new dependency and no second credential. |
+| How do you know the hand-written SQL is right? | It is tested *differentially*: every case in `AdminReportingJdbcRepositoryTest` asserts the SQL against the JPA repository methods and `Specification`s the page used before, which is why those were kept. The skills ranking is checked for every skill in the vocabulary against `live(today).and(hasSkill(slug))`, and the KPI counts against both the old JPA counts and their own chart totals. Two independent implementations agreeing is the proof; one absolute check against the Section 13 seed figures catches them agreeing on the same wrong answer. |
+| The SQL has to run on H2 and on PostgreSQL. How? | Only `COUNT`, `COUNT(DISTINCT)`, `GROUP BY`, inner `JOIN`, scalar subqueries and `FETCH FIRST n ROWS ONLY` — no date or string function, no vendor extension, nothing assembled by the database. The subtle one: ties are broken on `skills.id`, never on `label`, because text ordering asks for a collation and H2's default and PostgreSQL's `en_US.UTF-8` disagree, so two equally-demanded skills would swap — and at the row limit, appear and disappear — between the tests and production. This project has been bitten by that class of bug twice (V4's `REGEXP_REPLACE`, `UserRepository.search`'s `bytea||bytea`), neither time with a failing test. |
 | What happens when an admin deactivates a logged-in user? | `CurrentUserInterceptor` reloads the user on each request; on the next click the user is logged out and sees the deactivated message. |
 | Why can't every user or job be deleted? | Deleting would destroy other people's records (applications, messages). Users with history are deactivated; jobs with applications are closed. |
 | What does "Live" mean for a job? | Approved, deadline today or later, employer account active. It is computed, not stored, and used by every public query and by apply. |

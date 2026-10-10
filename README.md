@@ -308,6 +308,7 @@ See **[docs/DEPLOY.md](docs/DEPLOY.md)** for the steps and the free-plan limits 
 | Document | What is in it |
 |---|---|
 | **[docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md)** | The full plan the project was built from: architecture, data model, every route and screen, a requirement traceability matrix, milestones, test plan and a demo script |
+| **[docs/RUBRIC.md](docs/RUBRIC.md)** | Where each marking-rubric item is implemented, with file references |
 | **[docs/DEPLOY.md](docs/DEPLOY.md)** | Hosting on Render |
 | **[design-system/jobportal/MASTER.md](design-system/jobportal/MASTER.md)** | The visual design system: palette, typography and layout rules |
 

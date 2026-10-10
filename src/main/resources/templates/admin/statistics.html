@@ -2,7 +2,7 @@
 <!--
   Admin job/engagement statistics (Section 6.2 A-D4, 7.6). AdminStatisticsController puts
   everything under "stats", an AdminStatistics record (Section 7.6): the normalised range
-  (7/30/90, used to highlight the active pill below), the KPI row, all seven ChartData
+  (7/30/90, used to highlight the active pill below), the KPI row, all eight ChartData
   series and the two tables. Every chart is a fragments/chart-card (canvas + collapsible
   data table, Section 7.1), wired from the scripts block below using the exact JavaScript
   inlining pattern Section 7.6 specifies (a plain "const x = ..." per chart, built from a
@@ -59,8 +59,9 @@
         </div>
     </div>
 
-    <!-- The seven charts of Section 6.2 A-D4, two per row on wide screens; each keeps its
-         own accessible data table (fragments/chart-card "View data" toggle). -->
+    <!-- The seven charts of Section 6.2 A-D4 plus the skills ranking of Section 10.10,
+         two per row on wide screens; each keeps its own accessible data table
+         (fragments/chart-card "View data" toggle). -->
     <div class="row g-4">
         <div class="col-12 col-lg-6">
             <div th:replace="~{fragments/chart-card :: card('applicationsChart', 'Applications over time', ${stats.applicationsOverTime})}"></div>
@@ -82,6 +83,19 @@
         </div>
         <div class="col-12 col-lg-6">
             <div th:replace="~{fragments/chart-card :: card('loginsChart', 'User engagement: logins over time', ${stats.loginsOverTime})}"></div>
+        </div>
+        <!-- Most in-demand skills (Section 10.10). Same chart-card as its seven
+             neighbours, so it gets the same "View data" table of the same numbers - the
+             accessibility rule of Section 7.1, which a report added later does not get to
+             skip. Horizontal, like "Applications by category" and for the same reason:
+             the labels are words of arbitrary length, not dates.
+
+             The title ends "Live jobs now" rather than naming the range, because this is
+             the one chart on the page the 7/30/90 pills above do not affect - it ranks the
+             jobs that are open today. Same wording convention as "Jobs by status, all
+             time" above. -->
+        <div class="col-12 col-lg-6">
+            <div th:replace="~{fragments/chart-card :: card('skillDemandChart', 'Most in-demand skills, Live jobs now', ${stats.skillDemand})}"></div>
         </div>
     </div>
 
@@ -147,6 +161,7 @@
         const applicationsByCategory = /*[[${stats.applicationsByCategory}]]*/ null;
         const applicationOutcomes = /*[[${stats.applicationOutcomes}]]*/ null;
         const logins = /*[[${stats.loginsOverTime}]]*/ null;
+        const skillDemand = /*[[${stats.skillDemand}]]*/ null;
 
         JobPortalCharts.line('applicationsChart', applications);
         JobPortalCharts.bar('jobsPostedChart', jobsPosted);
@@ -155,6 +170,7 @@
         JobPortalCharts.bar('applicationsByCategoryChart', applicationsByCategory, true);
         JobPortalCharts.pie('applicationOutcomesChart', applicationOutcomes);
         JobPortalCharts.bar('loginsChart', logins);
+        JobPortalCharts.bar('skillDemandChart', skillDemand, true);
     </script>
 </th:block>
 </body>
